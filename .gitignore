@@ -1,6 +1,8 @@
 venv/
 runs/
+logs/
 __pycache__/
 *.pyc
 .DS_Store
 models/*.pt
+*.egg-info/
