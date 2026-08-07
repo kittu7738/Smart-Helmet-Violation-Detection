@@ -1,8 +1,5 @@
 venv/
+runs/
 __pycache__/
 *.pyc
 .DS_Store
-runs/
-*.pt
-*.pth
-*.onnx
