@@ -1,52 +1,53 @@
 # 🪖 Smart Helmet Violation Detection System
 
-An AI-powered Smart Helmet Violation Detection System built using **YOLOv8**, **Python**, **Gradio**, and **OpenCV**. The application detects people and is being extended to detect helmet violations in real time.
+An AI-powered Smart Helmet Violation Detection System developed using **YOLOv8**, **Python**, **Gradio**, **OpenCV**, and **PyTorch**. This project aims to improve road safety by automatically detecting helmet violations and generating alerts for riders who are not wearing helmets.
 
 ---
 
 ## 📖 Project Overview
 
-This project aims to improve road safety by automatically detecting whether motorcycle riders are wearing helmets. The system uses a YOLOv8 object detection model and provides an easy-to-use web interface built with Gradio.
+The Smart Helmet Violation Detection System is a computer vision application designed to monitor traffic and identify riders who violate helmet safety rules.
 
-The current version successfully performs AI-based object detection and serves as the foundation for helmet violation detection.
+The current version provides a web-based interface using Gradio and performs real-time object detection using the YOLOv8 model. Future versions will include helmet detection, webcam support, buzzer alerts, number plate recognition, and OCR.
 
 ---
 
-## 🎯 Project Objectives
+## 🎯 Objectives
 
-- Detect riders and motorcycles.
-- Detect helmets using a custom-trained YOLO model.
-- Trigger a buzzer when a rider is not wearing a helmet.
-- Support image upload and webcam detection.
+- Detect riders and motorcycles using AI.
+- Detect whether a rider is wearing a helmet.
+- Trigger a buzzer for helmet violations.
+- Support real-time webcam monitoring.
 - Detect vehicle number plates.
-- Read number plates using OCR.
-- Store violation records.
+- Extract number plate text using OCR.
+- Store violation records for future analysis.
 
 ---
 
-## ✨ Current Features
+# 🚀 Current Features
 
-- ✅ AI Object Detection using YOLOv8
+- ✅ YOLOv8 Object Detection
 - ✅ Image Upload Interface
-- ✅ Fast Inference with Gradio
-- ✅ Local Model Loading
+- ✅ Fast AI Inference
+- ✅ Gradio Web Application
 - ✅ Bounding Box Visualization
+- ✅ Local Model Loading
 
 ---
 
-## 🚧 Features Under Development
+# 🚧 Features Under Development
 
 - 🪖 Helmet Detection
-- 🎥 Live Webcam Detection
+- 🎥 Webcam Detection
 - 🔔 Automatic Buzzer Alert
 - 🚘 Number Plate Detection
 - 🔤 OCR Number Plate Recognition
-- 💾 Violation Database
+- 💾 Violation Logging
 - 📊 Dashboard
 
 ---
 
-## 🛠️ Technologies Used
+# 🛠️ Technologies Used
 
 - Python 3.13
 - YOLOv8 (Ultralytics)
@@ -57,66 +58,76 @@ The current version successfully performs AI-based object detection and serves a
 
 ---
 
-## 📂 Project Structure
+# 📂 Project Structure
 
 ```
 Smart-Helmet-Violation-Detection/
 │
 ├── app.py
+├── README.md
+├── requirements.txt
+├── LICENSE
+├── .gitignore
 ├── yolov8n.pt
-├── models/
+│
 ├── datasets/
+├── docs/
+├── models/
 ├── results/
 ├── screenshots/
 ├── src/
-├── README.md
-├── requirements.txt
 └── venv/
 ```
 
 ---
 
-## ⚙️ Installation
+# ⚙️ Installation
 
-Clone the repository
+## Clone the Repository
 
 ```bash
 git clone https://github.com/kittu7738/Smart-Helmet-Violation-Detection.git
 ```
 
-Navigate to the project
+## Navigate to the Project
 
 ```bash
 cd Smart-Helmet-Violation-Detection
 ```
 
-Create a virtual environment
+## Create Virtual Environment
 
 ```bash
 python3 -m venv venv
 ```
 
-Activate the virtual environment
+## Activate Virtual Environment
 
-macOS/Linux
+macOS / Linux
 
 ```bash
 source venv/bin/activate
 ```
 
-Install the required packages
+Windows
+
+```bash
+venv\Scripts\activate
+```
+
+## Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Run the application
+## Run the Application
 
 ```bash
 python3 app.py
 ```
 
-Open your browser
+Open your browser and visit:
 
 ```
 http://127.0.0.1:7860
@@ -124,52 +135,106 @@ http://127.0.0.1:7860
 
 ---
 
-## 📸 Current Output
+# 📸 Current Output
 
-The current application successfully detects objects such as:
+The application currently detects:
 
 - Person
+- Bicycle
 - Car
 - Motorcycle
 - Bus
 - Truck
-- Bicycle
+- Traffic Light
+- Stop Sign
+- Other COCO dataset objects
 
-Bounding boxes and confidence scores are displayed in real time.
-
----
-
-## 🎯 Next Milestones
-
-- Integrate custom helmet detection model (`best.pt`)
-- Trigger buzzer for helmet violations
-- Real-time webcam detection
-- Number plate detection
-- OCR integration
-- Save violation history
+Detection results include bounding boxes and confidence scores.
 
 ---
 
-## 📷 Demo
+# 📈 Project Progress
 
-Current Version
+## ✅ Completed
 
-- ✅ Image Upload
-- ✅ AI Detection
-- ✅ Fast YOLOv8 Inference
+- Project Setup
+- GitHub Repository
+- Python Virtual Environment
+- YOLOv8 Integration
+- Gradio Interface
+- Image Upload
+- Object Detection
+- README Documentation
 
 ---
 
-## 👨‍💻 Developer
+## 🚧 In Progress
+
+- Helmet Detection Model
+- Webcam Detection
+
+---
+
+## 📅 Upcoming
+
+- Helmet / No Helmet Classification
+- Buzzer Alert System
+- Number Plate Detection
+- OCR Integration
+- Violation Database
+- Dashboard
+- Cloud Deployment
+
+---
+
+# 🎯 Future Workflow
+
+```
+Image / Webcam
+        │
+        ▼
+Object Detection
+        │
+        ▼
+Helmet Detection
+        │
+   ┌────┴────┐
+   │         │
+Helmet   No Helmet
+   │         │
+   ▼         ▼
+ Safe     🔔 Buzzer
+             │
+             ▼
+ Number Plate Detection
+             │
+             ▼
+      OCR Recognition
+             │
+             ▼
+      Save Violation
+```
+
+---
+
+# 👨‍💻 Developer
 
 **CH. Anjan Prasad**
 
-B.Tech – Computer Science and Engineering
+B.Tech Computer Science and Engineering
 
 Indian Institute of Information Technology Vadodara – International Campus Diu
 
 ---
 
-## 📄 License
+# 🤝 Contributions
 
-This project is developed for academic and research purposes.
+Contributions, suggestions, and improvements are welcome.
+
+Feel free to fork the repository and submit a pull request.
+
+---
+
+# 📄 License
+
+This project is developed for academic and educational purposes.
