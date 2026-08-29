@@ -155,35 +155,43 @@ Detection results include bounding boxes and confidence scores.
 
 # 📈 Project Progress
 
-## ✅ Completed
+### Completed
+- Project setup
+- YOLOv8 setup
+- Gradio image detection
+- Colab GPU setup
+- Motorcycle helmet dataset preparation
+- WithHelmet / WithoutHelmet dataset preparation
 
-- Project Setup
-- GitHub Repository
-- Python Virtual Environment
-- YOLOv8 Integration
-- Gradio Interface
-- Image Upload
-- Object Detection
-- README Documentation
+### Current
+- Helmet model training preparation
+
+### Upcoming
+- YOLOv8n training
+- Model evaluation
+- best.pt
+- Mac integration
+- Webcam
+- Buzzer
+- Number plate
+- OCR
+- Violation logging
+- 3D website
+- Deployment
 
 ---
 
-## 🚧 In Progress
+# 📊 Dataset Specifications & Preparation
 
-- Helmet Detection Model
-- Webcam Detection
+The motorcycle helmet violation dataset has been prepared with strict filtering and verification standards:
 
----
-
-## 📅 Upcoming
-
-- Helmet / No Helmet Classification
-- Buzzer Alert System
-- Number Plate Detection
-- OCR Integration
-- Violation Database
-- Dashboard
-- Cloud Deployment
+- **Target Classes**:
+  - `0`: `WithHelmet`
+  - `1`: `WithoutHelmet`
+- **Class Filtering**: `Plate` annotations were completely filtered out from this phase to focus purely on helmet compliance.
+- **Evaluation / Holdout Split**: The original test split contained 0 helmet annotations and was unusable. A new, stratified holdout evaluation split (`test/`) and validation split (`valid/`) were constructed using a fixed random seed (`seed=42`) from helmet-annotated images, ensuring zero data leakage and non-empty evaluation targets.
+- **Dataset Configuration**: Generated 2-class `data.yaml`.
+- **Quality Checks**: Image-label 1:1 matching, normalized bounding box boundary checks, zero split overlap, and visual bounding box verification grids.
 
 ---
 
@@ -235,6 +243,13 @@ Feel free to fork the repository and submit a pull request.
 
 ---
 
-# 📄 License
+# 📄 License & Dataset Licensing Notice
 
 This project is developed for academic and educational purposes.
+
+### Dataset Licensing Notice
+- **Kaggle** reports the dataset license as **CC BY 4.0**.
+- The embedded **Roboflow YAML** reports `license: Private`.
+
+> [!WARNING]
+> This licensing discrepancy between Kaggle (CC BY 4.0) and the embedded Roboflow metadata (Private) needs clarification from the dataset maintainers before academic publication or public redistribution.
