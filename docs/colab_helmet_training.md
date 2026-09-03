@@ -1,20 +1,18 @@
 # Google Colab Helmet Training Workflow
 
-This workflow prepares and verifies the Smart Helmet Violation Detection dataset in
-Google Colab on a **Tesla T4 GPU** before training starts. It does not modify the Mac
-application. Run the cells in order with a Colab runtime configured for GPU.
+This workflow executes YOLOv8n fine-tuning and holdout test evaluation for the Smart Helmet Violation Detection System in Google Colab on a **Tesla T4 GPU**.
 
 ---
 
-## 1. Configure the Colab Runtime
+## 1. Configure Colab GPU Runtime
 
-In Google Colab, select **Runtime > Change runtime type > T4 GPU**, then run:
+In Google Colab, select **Runtime > Change runtime type > T4 GPU**, then verify GPU availability:
 
 ```python
 !nvidia-smi
 ```
 
-The output must show a CUDA-capable GPU (Tesla T4).
+Ensure a CUDA-capable GPU (Tesla T4) is allocated.
 
 ---
 
@@ -34,9 +32,7 @@ if torch.cuda.is_available():
 
 ---
 
-## 3. Clone Repository or Upload Source
-
-Clone your repository to access `src/prepare_dataset.py` directly:
+## 3. Clone Repository
 
 ```python
 !git clone https://github.com/kittu7738/Smart-Helmet-Violation-Detection.git
@@ -45,123 +41,114 @@ Clone your repository to access `src/prepare_dataset.py` directly:
 
 ---
 
-## 4. Download Raw Dataset
+## 4. Dataset Verification & Inspection
 
-Download the raw `HelmetViolations` dataset (or mount Google Drive if previously downloaded):
+Confirm the downloaded dataset path and verified split statistics:
+- **Dataset Path**: `/content/edgevision_dataset/EdgeVision-Dataset/data.yaml`
+- **Classes**:
+  - `0`: `helmet`
+  - `1`: `no helmet`
+- **Confirmed Split Counts**:
+  - **Train**: 1,110 images, 1,110 labels (1,554 helmet, 744 no-helmet, 2,298 total annotations)
+  - **Validation**: 105 images, 105 labels (147 helmet, 81 no-helmet, 228 total annotations)
+  - **Test (Holdout)**: 53 images, 53 labels (64 helmet, 29 no-helmet, 93 total annotations)
 
 ```python
-from getpass import getpass
-from roboflow import Roboflow
+from pathlib import Path
+import yaml
 
-ROBOFLOW_API_KEY = getpass("Roboflow API key: ")
+DATA_YAML = "/content/edgevision_dataset/EdgeVision-Dataset/data.yaml"
+with open(DATA_YAML, "r") as f:
+    data_cfg = yaml.safe_load(f)
 
-rf = Roboflow(api_key=ROBOFLOW_API_KEY)
-workspace = rf.workspace("innovatech")
-project = workspace.project("motorcycle-helmet-q0wmd")
-dataset = project.version(1).download("yolov8")
-
-RAW_DATASET_DIR = dataset.location
-print("Raw dataset location:", RAW_DATASET_DIR)
+print("data.yaml config:", data_cfg)
 ```
 
 ---
 
-## 5. Prepare Filtered Dataset & Stratified Holdout Split
+## 5. Train YOLOv8n on Tesla T4 GPU
 
-Run the automated dataset preparation pipeline:
-- Filters out all `Plate` annotations.
-- Remaps classes to:
-  - `0`: `WithHelmet`
-  - `1`: `WithoutHelmet`
-- Creates a reproducible stratified holdout evaluation split (`test/`) and validation split (`valid/`) with fixed random seed (`seed=42`).
-- Generates a 2-class `data.yaml`.
+Execute training for 50 epochs with batch size 16 on GPU device 0:
 
 ```python
-from src.prepare_dataset import prepare_dataset, verify_dataset_integrity, generate_sample_visualizations
+from ultralytics import YOLO
 
-PREPARED_DATASET_DIR = "datasets/helmet_violation_prepared"
+model = YOLO("yolov8n.pt")
 
-stats = prepare_dataset(
-    raw_dir=RAW_DATASET_DIR,
-    output_dir=PREPARED_DATASET_DIR,
-    train_ratio=0.80,
-    val_ratio=0.10,
-    test_ratio=0.10,
-    seed=42
+results = model.train(
+    data="/content/edgevision_dataset/EdgeVision-Dataset/data.yaml",
+    epochs=50,
+    imgsz=640,
+    batch=16,
+    device=0,
+    seed=42,
+    project="/content/Smart-Helmet-Violation-Detection/runs/detect",
+    name="helmet_training",
+    verbose=True,
+    save=True,
+    plots=True
 )
 ```
 
 ---
 
-## 6. Verify Dataset Quality & Integrity
-
-Run the full automated dataset verification suite:
+## 6. Validate & Evaluate on Unseen Test Split
 
 ```python
-verified_stats = verify_dataset_integrity(PREPARED_DATASET_DIR)
-```
+from src.evaluate import evaluate_helmet_model
 
-### Verification Checklist:
-- [x] All class IDs are strictly in `{0, 1}` (`0: WithHelmet`, `1: WithoutHelmet`).
-- [x] Zero `Plate` annotations remain.
-- [x] All images and label files match 1:1.
-- [x] Bounding box coordinates are within normalized `[0, 1]` boundaries.
-- [x] Zero duplicate images or data leakage between `train`, `valid`, and `test` splits.
-- [x] `test/` holdout set contains valid helmet-labelled samples for evaluation.
+best_weights = "/content/Smart-Helmet-Violation-Detection/runs/detect/helmet_training/weights/best.pt"
+
+eval_metrics = evaluate_helmet_model(
+    model_path=best_weights,
+    data_yaml="/content/edgevision_dataset/EdgeVision-Dataset/data.yaml",
+    imgsz=640,
+    conf_threshold=0.25,
+    device="0",
+    save_predictions=True
+)
+```
 
 ---
 
-## 7. Display Visual Verification Grids
-
-Render and inspect visual samples from `train`, `valid`, and `test` splits with distinct bounding box colors (**Green** for `WithHelmet`, **Red** for `WithoutHelmet`):
+## 7. Display Holdout Prediction Visualizations
 
 ```python
-import matplotlib.pyplot as plt
+import glob
 import cv2
+import matplotlib.pyplot as plt
 
-vis_file = generate_sample_visualizations(
-    PREPARED_DATASET_DIR,
-    output_image_path="screenshots/dataset_verification_samples.png",
-    num_samples_per_split=2
-)
-
-# Display in notebook
-img = cv2.imread(vis_file)
-if img is not None:
-    plt.figure(figsize=(16, 12))
-    plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-    plt.axis("off")
+pred_images = sorted(glob.glob("runs/detect/holdout_predictions/*.jpg"))
+if pred_images:
+    sample_preds = pred_images[:6]
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+    for ax, p_img in zip(axes.flat, sample_preds):
+        img = cv2.imread(p_img)
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        ax.imshow(img_rgb)
+        ax.axis("off")
+        ax.set_title(p_img.split("/")[-1], fontsize=10)
+    plt.tight_layout()
     plt.show()
 ```
 
 ---
 
-## 8. Staging for Next Milestone: YOLOv8n Model Training
-
-> [!IMPORTANT]
-> **Do not start model training until the dataset preparation and verification above are completed and pushed to GitHub.**
-
-The next milestone will run YOLOv8n fine-tuning on the verified dataset:
+## 8. Export `best.pt`
 
 ```python
-# STAGED FOR NEXT MILESTONE
-from ultralytics import YOLO
+import shutil
+from pathlib import Path
 
-model = YOLO("yolov8n.pt")
-results = model.train(
-    data=f"{PREPARED_DATASET_DIR}/data.yaml",
-    epochs=50,
-    imgsz=640,
-    batch=16,
-    device=0,
-    project="runs/detect",
-    name="train_helmet",
-    seed=42
-)
+weights_src = Path(best_weights)
+weights_dst = Path("models/best.pt")
+weights_dst.parent.mkdir(parents=True, exist_ok=True)
+shutil.copy2(weights_src, weights_dst)
+print(f"Saved best weights to {weights_dst} (Size: {weights_dst.stat().st_size / (1024*1024):.2f} MB)")
 ```
 
 ---
 
 ## ⚠️ Licensing Notice
 
-The dataset is listed on Kaggle under **CC BY 4.0**, whereas the embedded Roboflow configuration indicates `license: Private`. This licensing discrepancy must be clarified with the dataset authors/maintainers prior to academic publication or public model redistribution.
+The dataset is listed on Kaggle under **CC BY 4.0**, whereas the embedded Roboflow configuration indicates `license: Private`. This licensing discrepancy must be clarified with the dataset maintainers prior to academic publication or public redistribution.

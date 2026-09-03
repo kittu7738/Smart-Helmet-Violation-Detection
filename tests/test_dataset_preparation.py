@@ -4,6 +4,7 @@ Unit and Integration Tests for Dataset Preparation and Verification Pipeline
 
 import os
 import shutil
+import sys
 import tempfile
 import unittest
 from collections import Counter
@@ -11,6 +12,8 @@ from pathlib import Path
 import numpy as np
 import cv2
 import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.prepare_dataset import (
     parse_raw_yaml,

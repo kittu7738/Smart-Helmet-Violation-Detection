@@ -1,9 +1,55 @@
+# Python environment & caches
 venv/
-runs/
-logs/
+.venv/
+env/
 __pycache__/
 *.pyc
-.DS_Store
-models/*.pt
+*.pyo
+*.pyd
+.pytest_cache/
+.cache/
 *.egg-info/
+
+# Operating system files
+.DS_Store
+
+# Training logs, outputs & checkpoints
+runs/
+logs/
+work_dirs/
+checkpoints/
+training/outputs/
+models/*.pt
+*.pth
+*.ckpt
+
+# Datasets & video media (AI City Challenge & others)
 datasets/
+data/raw/
+data/processed/
+data/extracted/
+data/aicity*/
+aicity*/
+*.mp4
+*.avi
+*.mov
+*.mkv
+frames/
+extracted_frames/
+
+# Archives & temporary files
+*.tar.gz
+*.tar
+*.zip
+*.rar
+*.7z
+*.tmp
+*.swp
+*.bak
+
+# Environment variables & secrets
+*.env
+.env*
+*key.txt
+*token*
+secrets*

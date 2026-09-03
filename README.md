@@ -70,16 +70,29 @@ Smart-Helmet-Violation-Detection/
 ├── .gitignore
 ├── yolov8n.pt
 │
+├── configs/
+│   └── codetr/
+├── data/
+│   ├── README.md
+│   ├── prepare_aicity.py
+│   └── validate_aicity.py
 ├── datasets/
 ├── docs/
+│   ├── colab_codetr_setup.md
+│   └── colab_helmet_training.md
+├── evaluation/
+├── inference/
+│   └── codetr/
 ├── models/
 ├── results/
 ├── screenshots/
+├── scripts/
 ├── src/
+├── tests/
+├── training/
+│   └── codetr/
 └── venv/
 ```
-
----
 
 # ⚙️ Installation
 
@@ -165,19 +178,32 @@ Detection results include bounding boxes and confidence scores.
 
 ### Current
 - Helmet model training preparation
+- AI City Challenge Track 5 paper reproduction setup (Phase 1)
 
 ### Upcoming
-- YOLOv8n training
-- Model evaluation
-- best.pt
-- Mac integration
-- Webcam
-- Buzzer
-- Number plate
-- OCR
-- Violation logging
-- 3D website
-- Deployment
+- YOLOv8n training & evaluation
+- Co-DETR model training (AI City Track 5)
+- Minority Class Enhancement (Minority Optimizer & Virtual Expander)
+- WBF ensemble & multi-scale inference
+- best.pt Mac integration
+- Webcam, Buzzer, Number plate OCR, Violation logging
+
+---
+
+# 🔬 Paper Reproduction — AI City Track 5
+
+This project includes an implementation track following the architecture of the CVPRW 2024 winning research paper:
+
+> **"Robust Motorcycle Helmet Detection in Real-World Scenarios: Using Co-DETR and Minority Class Enhancement"**  
+> *Hao Vo, Sieu Tran, Duc Minh Nguyen, Thua Nguyen, Tien Do, Duy-Dinh Le, Thanh Duc Ngo* (1st Place, AI City Challenge 2024 Track 5)
+
+### Phased Roadmap:
+- **Phase 1 (Current)**: Dataset inspection, validation, and preparation tools for the official **AI City Challenge 2024 Track 5** dataset (100 video sequences, 10 FPS, 1920×1080 resolution, 9 rider-specific helmet violation classes).
+- **Phase 2 (Upcoming)**: Co-DETR (Co-DINO with Swin-Large backbone) configuration and training pipeline on Google Colab Tesla T4 GPU.
+- **Phase 3 (Upcoming)**: Minority Class Enhancement (Minority Optimizer & Virtual Expander).
+- **Phase 4 (Upcoming)**: Multi-scale test-time augmentation, Weighted Boxes Fusion (WBF), and evaluation benchmarking against the YOLO baseline.
+
+*Status: Phase 1 focuses exclusively on dataset validation and preparation. Model training and enhancements are staged for future phases.*
 
 ---
 
