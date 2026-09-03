@@ -243,13 +243,20 @@ Feel free to fork the repository and submit a pull request.
 
 ---
 
-# 📄 License & Dataset Licensing Notice
+# 📄 License
 
 This project is developed for academic and educational purposes.
 
-### Dataset Licensing Notice
-- **Kaggle** reports the dataset license as **CC BY 4.0**.
-- The embedded **Roboflow YAML** reports `license: Private`.
+## Dataset Attribution & Licensing
 
-> [!WARNING]
-> This licensing discrepancy between Kaggle (CC BY 4.0) and the embedded Roboflow metadata (Private) needs clarification from the dataset maintainers before academic publication or public redistribution.
+This project uses a motorcycle helmet detection dataset obtained through the project's dataset source.
+
+The downloaded dataset metadata contains licensing information that should be checked against the original dataset source and its current terms before redistribution.
+
+For this project:
+- The dataset is used for academic/educational model development.
+- The dataset itself is not included in this GitHub repository.
+- The trained model and source code are provided as part of this project.
+- Users who reuse the dataset should verify the applicable license and attribution requirements from the original dataset provider.
+
+Do not reproduce or redistribute the dataset through this repository.
