@@ -1,288 +1,198 @@
-# 🪖 Smart Helmet Violation Detection System
+# 🪖 Robust Motorcycle Helmet Detection System
 
-An AI-powered Smart Helmet Violation Detection System developed using **YOLOv8**, **Python**, **Gradio**, **OpenCV**, and **PyTorch**. This project aims to improve road safety by automatically detecting helmet violations and generating alerts for riders who are not wearing helmets.
+An AI-powered Motorcycle Helmet Violation Detection System reproducing the CVPRW 2024 winning research paper:
+
+> **"Robust Motorcycle Helmet Detection in Real-World Scenarios: Using Co-DETR and Minority Class Enhancement"**  
+> *Hao Vo, Sieu Tran, Duc Minh Nguyen, Thua Nguyen, Tien Do, Duy-Dinh Le, Thanh Duc Ngo*  
+> *CVPR Workshops 2024 (1st Place in AI City Challenge 2024 Track 5: Detecting Violation of Helmet Rule for Motorcyclists)*
 
 ---
 
 ## 📖 Project Overview
 
-The Smart Helmet Violation Detection System is a computer vision application designed to monitor traffic and identify riders who violate helmet safety rules.
+This project is dedicated to reproducing and implementing the state-of-the-art methodology from the AI City Challenge 2024 Track 5. The system detects motorcycles and identifies helmet-rule compliance for riders across challenging real-world surveillance footage (fog, varying camera angles, low-light, dense traffic).
 
-The current version provides a web-based interface using Gradio and performs real-time object detection using the YOLOv8 model. Future versions will include helmet detection, webcam support, buzzer alerts, number plate recognition, and OCR.
+Unlike generic person helmet detectors, the system focuses on **motorcycle-specific rider violation detection**, distinguishing driver and passenger roles individually.
 
----
-
-## 🎯 Objectives
-
-- Detect riders and motorcycles using AI.
-- Detect whether a rider is wearing a helmet.
-- Trigger a buzzer for helmet violations.
-- Support real-time webcam monitoring.
-- Detect vehicle number plates.
-- Extract number plate text using OCR.
-- Store violation records for future analysis.
+> [!NOTE]
+> **Baseline Note**: An earlier YOLOv8 exploration served as an initial baseline and has been removed from the active project structure to focus entirely on the authoritative Co-DETR research paper reproduction.
 
 ---
 
-# 🚀 Current Features
+## 🎯 Target Architecture & Roadmap
 
-- ✅ YOLOv8 Object Detection
-- ✅ Image Upload Interface
-- ✅ Fast AI Inference
-- ✅ Gradio Web Application
-- ✅ Bounding Box Visualization
-- ✅ Local Model Loading
+The implementation follows the paper's multi-stage pipeline:
 
----
-
-# 🚧 Features Under Development
-
-- 🪖 Helmet Detection
-- 🎥 Webcam Detection
-- 🔔 Automatic Buzzer Alert
-- 🚘 Number Plate Detection
-- 🔤 OCR Number Plate Recognition
-- 💾 Violation Logging
-- 📊 Dashboard
-
----
-
-# 🛠️ Technologies Used
-
-- Python 3.13
-- YOLOv8 (Ultralytics)
-- PyTorch
-- OpenCV
-- Gradio
-- NumPy
+```
+AI City Challenge 2024 Track 5 Dataset (100 videos @ 10 FPS, 1920x1080)
+                              │
+                              ▼
+           9-Class Rider & Motorcycle Annotations
+                              │
+                              ▼
+       Co-DETR (Collaborative Detection Transformer)
+                              │
+                              ▼
+           Co-DINO Pre-training & Swin-L Backbone
+                              │
+                              ▼
+             Multi-scale Training & Inference
+                              │
+                              ▼
+     Minority Class Enhancement (Minority Optimizer & Virtual Expander)
+                              │
+                              ▼
+           Weighted Boxes Fusion (WBF) Ensemble
+                              │
+                              ▼
+               Final Robust Detection & Evaluation
+```
 
 ---
 
-# 📂 Project Structure
+## 🚦 Project Status
+
+### Phase 1 (Current)
+- ✅ Repository cleanup: Obsolete YOLOv8/EdgeVision files and legacy weights removed.
+- ✅ AI City Challenge Track 5 dataset preparation & validation tools implemented (`data/validate_aicity.py`, `data/prepare_aicity.py`).
+- ✅ Project structure established for Co-DETR architecture.
+- ✅ Environment & Colab T4 setup guidelines documented.
+
+### Future Phases
+- 📅 **Phase 2**: AI City Track 5 dataset acquisition & validation on official competition data.
+- 📅 **Phase 3**: Co-DETR (Co-DINO with Swin-Large backbone) configuration and Google Colab Tesla T4 GPU training.
+- 📅 **Phase 4**: Multi-scale training and multi-scale inference pipeline.
+- 📅 **Phase 5**: Minority Class Enhancement (Minority Optimizer & Virtual Expander).
+- 📅 **Phase 6**: Weighted Boxes Fusion (WBF) post-processing ensemble.
+- 📅 **Phase 7**: Evaluation on AI City Challenge Track 5 test benchmark.
+- 📅 **Phase 8**: Application integration (`app.py`), webcam support, buzzer alert, and violation logging.
+
+> [!IMPORTANT]
+> *Status Clarification: The project is in Phase 1 (repository cleanup and dataset preparation). Model training and minority enhancement modules have not been implemented yet.*
+
+---
+
+## 🏷️ Target Classes (9 Classes)
+
+The paper strictly follows the 9 official AI City Challenge Track 5 classes:
+
+| Class ID | Class Name   | Description |
+|:--------:|:-------------|:------------|
+| **0**    | `Motorbike`  | Motorcycle / two-wheeler vehicle bounding box |
+| **1**    | `DHelmet`    | Driver wearing a helmet |
+| **2**    | `DNoHelmet`  | Driver without a helmet (Violation) |
+| **3**    | `P1Helmet`   | Passenger 1 (first passenger behind driver) wearing a helmet |
+| **4**    | `P1NoHelmet` | Passenger 1 without a helmet (Violation) |
+| **5**    | `P2Helmet`   | Passenger 2 (second passenger) wearing a helmet |
+| **6**    | `P2NoHelmet` | Passenger 2 without a helmet (Violation) |
+| **7**    | `P0Helmet`   | Passenger 0 (child seated in front of driver) wearing a helmet |
+| **8**    | `P0NoHelmet` | Passenger 0 without a helmet (Violation) |
+
+---
+
+## 📂 Project Structure
 
 ```
 Smart-Helmet-Violation-Detection/
 │
-├── app.py
-├── README.md
-├── requirements.txt
-├── LICENSE
-├── .gitignore
-├── yolov8n.pt
+├── app.py                      # Preserved Gradio web interface (to be adapted for Co-DETR)
+├── README.md                   # Project documentation & architecture roadmap
+├── requirements.txt            # Python dependencies (PyTorch, OpenCV, Gradio)
+├── LICENSE                     # Project license
+├── .gitignore                  # Git protection rules
 │
 ├── configs/
-│   └── codetr/
-├── data/
+│   └── codetr/                 # Co-DETR Swin-Large model configurations
+│       └── README.md
+│
+├── data/                       # AI City Track 5 dataset validation & preparation tools
 │   ├── README.md
 │   ├── prepare_aicity.py
 │   └── validate_aicity.py
-├── datasets/
-├── docs/
-│   ├── colab_codetr_setup.md
-│   └── colab_helmet_training.md
-├── evaluation/
-├── inference/
+│
+├── docs/                       # Setup and training guidelines
+│   └── colab_codetr_setup.md
+│
+├── evaluation/                 # Benchmark evaluation protocols (mAP)
+│   └── README.md
+│
+├── inference/                  # Inference and multi-scale testing modules
 │   └── codetr/
-├── models/
-├── results/
-├── screenshots/
-├── scripts/
-├── src/
-├── tests/
-├── training/
-│   └── codetr/
-└── venv/
+│       └── README.md
+│
+├── scripts/                    # Standalone execution scripts
+│   └── README.md
+│
+├── src/                        # Core utility and application source code
+│   └── webcam.py
+│
+├── tests/                      # Automated unit and validation tests
+│   └── test_aicity_validation.py
+│
+└── training/                   # Model training pipelines (Colab Tesla T4)
+    └── codetr/
+        └── README.md
 ```
 
-# ⚙️ Installation
+---
 
-## Clone the Repository
+## ⚙️ Installation & Usage
+
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/kittu7738/Smart-Helmet-Violation-Detection.git
-```
-
-## Navigate to the Project
-
-```bash
 cd Smart-Helmet-Violation-Detection
 ```
 
-## Create Virtual Environment
+### 2. Set Up Virtual Environment
 
 ```bash
 python3 -m venv venv
-```
-
-## Activate Virtual Environment
-
-macOS / Linux
-
-```bash
-source venv/bin/activate
-```
-
-Windows
-
-```bash
-venv\Scripts\activate
-```
-
-## Install Dependencies
-
-```bash
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Run the Application
+### 3. Validate AI City Track 5 Dataset
+
+Once the official dataset is obtained from the challenge organizers, inspect and validate it:
 
 ```bash
-python3 app.py
+python data/validate_aicity.py --dataset /path/to/aicity2024_track5
 ```
 
-Open your browser and visit:
+### 4. Run Automated Test Suite
 
-```
-http://127.0.0.1:7860
-```
-
----
-
-# 📸 Current Output
-
-The application currently detects:
-
-- Person
-- Bicycle
-- Car
-- Motorcycle
-- Bus
-- Truck
-- Traffic Light
-- Stop Sign
-- Other COCO dataset objects
-
-Detection results include bounding boxes and confidence scores.
-
----
-
-# 📈 Project Progress
-
-### Completed
-- Project setup
-- YOLOv8 setup
-- Gradio image detection
-- Colab GPU setup
-- Motorcycle helmet dataset preparation
-- WithHelmet / WithoutHelmet dataset preparation
-
-### Current
-- Helmet model training preparation
-- AI City Challenge Track 5 paper reproduction setup (Phase 1)
-
-### Upcoming
-- YOLOv8n training & evaluation
-- Co-DETR model training (AI City Track 5)
-- Minority Class Enhancement (Minority Optimizer & Virtual Expander)
-- WBF ensemble & multi-scale inference
-- best.pt Mac integration
-- Webcam, Buzzer, Number plate OCR, Violation logging
-
----
-
-# 🔬 Paper Reproduction — AI City Track 5
-
-This project includes an implementation track following the architecture of the CVPRW 2024 winning research paper:
-
-> **"Robust Motorcycle Helmet Detection in Real-World Scenarios: Using Co-DETR and Minority Class Enhancement"**  
-> *Hao Vo, Sieu Tran, Duc Minh Nguyen, Thua Nguyen, Tien Do, Duy-Dinh Le, Thanh Duc Ngo* (1st Place, AI City Challenge 2024 Track 5)
-
-### Phased Roadmap:
-- **Phase 1 (Current)**: Dataset inspection, validation, and preparation tools for the official **AI City Challenge 2024 Track 5** dataset (100 video sequences, 10 FPS, 1920×1080 resolution, 9 rider-specific helmet violation classes).
-- **Phase 2 (Upcoming)**: Co-DETR (Co-DINO with Swin-Large backbone) configuration and training pipeline on Google Colab Tesla T4 GPU.
-- **Phase 3 (Upcoming)**: Minority Class Enhancement (Minority Optimizer & Virtual Expander).
-- **Phase 4 (Upcoming)**: Multi-scale test-time augmentation, Weighted Boxes Fusion (WBF), and evaluation benchmarking against the YOLO baseline.
-
-*Status: Phase 1 focuses exclusively on dataset validation and preparation. Model training and enhancements are staged for future phases.*
-
----
-
-# 📊 Dataset Specifications & Preparation
-
-The motorcycle helmet violation dataset has been prepared with strict filtering and verification standards:
-
-- **Target Classes**:
-  - `0`: `WithHelmet`
-  - `1`: `WithoutHelmet`
-- **Class Filtering**: `Plate` annotations were completely filtered out from this phase to focus purely on helmet compliance.
-- **Evaluation / Holdout Split**: The original test split contained 0 helmet annotations and was unusable. A new, stratified holdout evaluation split (`test/`) and validation split (`valid/`) were constructed using a fixed random seed (`seed=42`) from helmet-annotated images, ensuring zero data leakage and non-empty evaluation targets.
-- **Dataset Configuration**: Generated 2-class `data.yaml`.
-- **Quality Checks**: Image-label 1:1 matching, normalized bounding box boundary checks, zero split overlap, and visual bounding box verification grids.
-
----
-
-# 🎯 Future Workflow
-
-```
-Image / Webcam
-        │
-        ▼
-Object Detection
-        │
-        ▼
-Helmet Detection
-        │
-   ┌────┴────┐
-   │         │
-Helmet   No Helmet
-   │         │
-   ▼         ▼
- Safe     🔔 Buzzer
-             │
-             ▼
- Number Plate Detection
-             │
-             ▼
-      OCR Recognition
-             │
-             ▼
-      Save Violation
+```bash
+python tests/test_aicity_validation.py
 ```
 
 ---
 
-# 👨‍💻 Developer
+## 🌐 Application Interface (`app.py`)
 
-**CH. Anjan Prasad**
-
-B.Tech Computer Science and Engineering
-
-Indian Institute of Information Technology Vadodara – International Campus Diu
+The repository retains `app.py` as a general Gradio web interface. In future phases, `app.py` will be connected to the trained Co-DETR model pipeline for interactive inference, video testing, and violation visualization.
 
 ---
 
-# 🤝 Contributions
+## 📄 Dataset Attribution & Licensing
 
-Contributions, suggestions, and improvements are welcome.
+This project uses the dataset from the **AI City Challenge 2024 Track 5**.
 
-Feel free to fork the repository and submit a pull request.
+- The dataset must be obtained directly through the official [AI City Challenge](https://www.aicitychallenge.org/) process under the challenge terms of use.
+- The dataset itself is **not** hosted or distributed in this repository.
+- Users wishing to replicate the dataset preparation must register with the challenge organizers.
 
 ---
 
-# 📄 License
+## 👨‍💻 Developer
 
-This project is developed for academic and educational purposes.
+**CH. Anjan Prasad**  
+B.Tech Computer Science and Engineering  
+Indian Institute of Information Technology Vadodara – International Campus Diu  
 
-## Dataset Attribution & Licensing
+---
 
-This project uses a motorcycle helmet detection dataset obtained through the project's dataset source.
+## 🤝 Contributions
 
-The downloaded dataset metadata contains licensing information that should be checked against the original dataset source and its current terms before redistribution.
-
-For this project:
-- The dataset is used for academic/educational model development.
-- The dataset itself is not included in this GitHub repository.
-- The trained model and source code are provided as part of this project.
-- Users who reuse the dataset should verify the applicable license and attribution requirements from the original dataset provider.
-
-Do not reproduce or redistribute the dataset through this repository.
+Contributions, feedback, and discussion on the paper reproduction are welcome. Feel free to open an issue or pull request.

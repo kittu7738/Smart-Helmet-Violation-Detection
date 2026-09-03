@@ -1,6 +1,5 @@
 torch
 torchvision
-ultralytics
 gradio
 opencv-python
 numpy
