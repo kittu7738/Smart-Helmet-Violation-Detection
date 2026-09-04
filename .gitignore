@@ -28,6 +28,7 @@ datasets/
 data/raw/
 data/processed/
 data/extracted/
+data/coco/
 data/aicity*/
 aicity*/
 *.mp4
@@ -36,6 +37,9 @@ aicity*/
 *.mkv
 frames/
 extracted_frames/
+
+# Evaluation outputs
+results/
 
 # Archives & temporary files
 *.tar.gz
