@@ -244,6 +244,12 @@ def check_model(cfg):
     try:
         import torch
         from mmdet.models import build_detector
+        
+        # Explicitly import Co-DETR projects module to register the model
+        try:
+            import projects
+        except ImportError:
+            _warn("Could not import 'projects' from Co-DETR. Ensure CODETR_REPO is correct.")
 
         model = build_detector(
             cfg.model,

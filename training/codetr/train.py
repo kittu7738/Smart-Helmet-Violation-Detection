@@ -203,9 +203,12 @@ def main():
         from mmdet.datasets import build_dataset
         from mmdet.models import build_detector
         from mmdet.utils import collect_env, get_root_logger
+        
+        # Explicitly import Co-DETR projects module to register the model
+        import projects
     except ImportError as exc:
         sys.exit(
-            f"[ERROR] Could not import mmdet/mmcv: {exc}\n"
+            f"[ERROR] Could not import mmdet/mmcv/projects: {exc}\n"
             "Ensure the codetr conda environment is active and "
             "PYTHONPATH includes the Co-DETR repo root."
         )
