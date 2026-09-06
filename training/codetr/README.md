@@ -51,9 +51,9 @@ $CODETR_DATA_ROOT/
 ├── instances_train.json    # COCO annotations (7 classes)
 ├── instances_val.json
 ├── instances_test.json     # optional
-├── train/                  # training images
-├── vaid/                   # validation images
-└── test/                   # optional test images
+├── train/images/           # training images
+├── vaid/images/            # validation images
+└── test/images/            # optional test images
 ```
 
 The dataset is **not** stored in Git. Supply it via Google Drive mount or
