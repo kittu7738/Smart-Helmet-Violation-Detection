@@ -262,7 +262,10 @@ def main():
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     log_file = os.path.join(work_dir, f"train_{timestamp}.log")
     logger = get_root_logger(log_file=log_file, log_level=cfg.log_level)
-    logger.info("Environment info:\n" + "-" * 60 + "\n" + collect_env())
+    env_info = collect_env()
+    if isinstance(env_info, dict):
+        env_info = "\n".join([f"{k}: {v}" for k, v in env_info.items()])
+    logger.info("Environment info:\n" + "-" * 60 + "\n" + str(env_info))
     logger.info(f"Config:\n{cfg.pretty_text}")
     logger.info(f"Data root: {data_root}")
     logger.info(f"Work dir : {work_dir}")
