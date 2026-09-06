@@ -266,12 +266,7 @@ def main():
     if isinstance(env_info, dict):
         env_info = "\n".join([f"{k}: {v}" for k, v in env_info.items()])
     logger.info("Environment info:\n" + "-" * 60 + "\n" + str(env_info))
-    try:
-        config_text = cfg.pretty_text
-    except TypeError:
-        # MMCV 1.5.0 and YAPF >= 0.40.0 compatibility fallback
-        config_text = cfg.text
-    logger.info(f"Config:\n{config_text}")
+    logger.info(f"Config:\n{cfg.pretty_text}")
     logger.info(f"Data root: {data_root}")
     logger.info(f"Work dir : {work_dir}")
 
