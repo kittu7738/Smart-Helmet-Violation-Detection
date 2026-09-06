@@ -208,7 +208,7 @@ def check_gpu():
         _ok(f"PyTorch {torch.__version__}")
         if torch.cuda.is_available():
             gpu = torch.cuda.get_device_name(0)
-            mem = torch.cuda.get_device_properties(0).total_mem / (1024 ** 3)
+            mem = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
             _ok(f"CUDA available — GPU: {gpu} ({mem:.1f} GB)")
             return True
         else:
@@ -248,6 +248,13 @@ def check_model(cfg):
         # Explicitly import Co-DETR projects module to register the model
         try:
             import projects
+            
+            # Patch: Register mmcv's MultiScaleDeformableAttention as MultiScaleDeformAttn
+            # to match the config's expectations without duplicating code.
+            from mmcv.cnn.bricks.registry import ATTENTION
+            from mmcv.ops.multi_scale_deform_attn import MultiScaleDeformableAttention
+            if 'MultiScaleDeformAttn' not in ATTENTION:
+                ATTENTION.register_module(name='MultiScaleDeformAttn', module=MultiScaleDeformableAttention)
         except ImportError:
             _warn("Could not import 'projects' from Co-DETR. Ensure CODETR_REPO is correct.")
 
@@ -289,10 +296,8 @@ def check_model(cfg):
 # ──────────────────────────────────────────────────────────────────────────────
 def main():
     args = _parse_args()
-    data_root = (
-        args.data_root
-        or os.environ.get("CODETR_DATA_ROOT", "data/coco")
-    ).rstrip("/").rstrip(os.sep)
+    data_root_raw = args.data_root or os.environ.get("CODETR_DATA_ROOT")
+    data_root = data_root_raw.rstrip("/").rstrip(os.sep) if data_root_raw else None
 
     print(f"\n{_BOLD}{'═' * 52}{_RESET}")
     print(f"{_BOLD}  Co-DETR Pre-Training Sanity Check{_RESET}")
@@ -307,11 +312,14 @@ def main():
     results["config"] = cfg is not None
 
     # 2–4. Dataset
-    if cfg is not None and os.path.isdir(data_root):
+    if cfg is not None and data_root and os.path.isdir(data_root):
         results["dataset"] = check_dataset(cfg, data_root)
-    elif not os.path.isdir(data_root):
+    elif not data_root or not os.path.isdir(data_root):
         _header("2–4. Dataset")
-        _warn(f"Data root does not exist: {data_root}")
+        if not data_root:
+            _warn("Data root not specified.")
+        else:
+            _warn(f"Data root does not exist: {data_root}")
         _warn("Dataset checks skipped. Supply --data-root or CODETR_DATA_ROOT.")
         results["dataset"] = None  # skipped, not failed
     else:

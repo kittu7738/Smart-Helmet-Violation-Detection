@@ -206,6 +206,13 @@ def main():
         
         # Explicitly import Co-DETR projects module to register the model
         import projects
+        
+        # Patch: Register mmcv's MultiScaleDeformableAttention as MultiScaleDeformAttn
+        # to match the config's expectations without duplicating code.
+        from mmcv.cnn.bricks.registry import ATTENTION
+        from mmcv.ops.multi_scale_deform_attn import MultiScaleDeformableAttention
+        if 'MultiScaleDeformAttn' not in ATTENTION:
+            ATTENTION.register_module(name='MultiScaleDeformAttn', module=MultiScaleDeformableAttention)
     except ImportError as exc:
         sys.exit(
             f"[ERROR] Could not import mmdet/mmcv/projects: {exc}\n"
