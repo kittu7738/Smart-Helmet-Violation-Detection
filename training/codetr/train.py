@@ -13,7 +13,7 @@ Environment variables (all optional – CLI args take priority):
                            instances_train.json
                            instances_val.json
                            train/  (image directory)
-                           val/    (image directory)
+                           vaid/   (image directory)
                        Default: data/coco
     CODETR_WORK_DIR    Directory for checkpoints and logs.
                        Default: work_dirs/helmet_codetr
@@ -72,7 +72,7 @@ def _parse_args():
         help="Root of the COCO-format dataset. "
              "Overrides CODETR_DATA_ROOT env var. "
              "Must contain instances_train.json, instances_val.json, "
-             "train/ and val/ subdirectories.",
+             "train/ and vaid/ subdirectories.",
     )
     parser.add_argument(
         "--resume-from",
@@ -159,7 +159,7 @@ def _validate_data_root(data_root):
         "instances_train.json",
         "instances_val.json",
     ]
-    required_dirs = ["train", "val"]
+    required_dirs = ["train", "vaid"]
 
     missing = []
     for f in required:
@@ -181,7 +181,7 @@ def _patch_config_data_root(cfg, data_root):
     """Override data.{train,val,test}.ann_file and img_prefix in the config."""
     splits = {
         "train": ("instances_train.json", "train/"),
-        "val": ("instances_val.json", "val/"),
+        "val": ("instances_val.json", "vaid/"),
         "test": ("instances_test.json", "test/"),
     }
     for split, (ann_file, img_prefix) in splits.items():

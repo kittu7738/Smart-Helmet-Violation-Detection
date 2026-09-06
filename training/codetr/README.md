@@ -52,7 +52,7 @@ $CODETR_DATA_ROOT/
 ├── instances_val.json
 ├── instances_test.json     # optional
 ├── train/                  # training images
-├── val/                    # validation images
+├── vaid/                   # validation images
 └── test/                   # optional test images
 ```
 

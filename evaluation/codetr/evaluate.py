@@ -123,7 +123,7 @@ def _patch_config_data_root(cfg, data_root, split):
         "test": "instances_test.json",
     }
     img_map = {
-        "val": "val/",
+        "val": "vaid/",
         "test": "test/",
     }
     if hasattr(cfg.data, split):

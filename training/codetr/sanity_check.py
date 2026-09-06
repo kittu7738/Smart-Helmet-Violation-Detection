@@ -120,7 +120,7 @@ def check_dataset(cfg, data_root):
     ann_train = os.path.join(data_root, "instances_train.json")
     ann_val = os.path.join(data_root, "instances_val.json")
     img_train = os.path.join(data_root, "train")
-    img_val = os.path.join(data_root, "val")
+    img_val = os.path.join(data_root, "vaid")
 
     ok = True
     for path, label in [
