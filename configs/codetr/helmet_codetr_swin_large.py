@@ -227,6 +227,15 @@ model = dict(
         with_box_refine=True,
         as_two_stage=True,
         mixed_selection=True,
+        dn_cfg=dict(
+            type='CdnQueryGenerator',
+            noise_scale=dict(label=0.5, box=1.0),
+            group_cfg=dict(
+                dynamic=True,
+                num_groups=None,
+                num_dn_queries=100,
+            ),
+        ),
         transformer=dict(
             type='CoDinoTransformer',
             with_coord_feat=False,
@@ -515,7 +524,7 @@ log_config = dict(
         dict(type='TextLoggerHook'),
     ],
 )
-custom_hooks = [dict(type='SetEpochInfoHook')]
+custom_hooks = [dict(type='NumClassCheckHook')]
 
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
