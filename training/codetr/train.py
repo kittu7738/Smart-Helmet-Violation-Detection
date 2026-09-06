@@ -247,16 +247,35 @@ def main():
         cfg.load_from = args.load_from
 
     # ── 5. Distributed / launcher setup ──────────────────────────────────────
+    if 'LOCAL_RANK' not in os.environ:
+        os.environ['LOCAL_RANK'] = str(args.local_rank)
+
     if args.launcher == "none":
         distributed = False
+        cfg.gpu_ids = [0]
     else:
-        import torch.distributed as dist
-        dist.init_process_group(backend=cfg.get("dist_params", {}).get("backend", "nccl"))
         distributed = True
+        import torch.distributed as dist
+        from mmcv.runner import get_dist_info
+        dist.init_process_group(backend=cfg.get("dist_params", {}).get("backend", "nccl"))
+        _, world_size = get_dist_info()
+        cfg.gpu_ids = range(world_size)
+
+    # Set device configuration expected by MMDet 2.25.3
+    try:
+        from mmdet.utils import get_device
+        cfg.device = get_device()
+    except ImportError:
+        import torch
+        cfg.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # ── 6. Reproducibility ────────────────────────────────────────────────────
     set_random_seed(args.seed, deterministic=False)
     cfg.seed = args.seed
+    
+    if cfg.get('cudnn_benchmark', False):
+        import torch
+        torch.backends.cudnn.benchmark = True
 
     # ── 7. Logging ────────────────────────────────────────────────────────────
     timestamp = time.strftime("%Y%m%d_%H%M%S")
@@ -272,13 +291,39 @@ def main():
 
     # ── 8. Build dataset(s) ───────────────────────────────────────────────────
     datasets = [build_dataset(cfg.data.train)]
-    if not args.no_validate:
-        datasets.append(build_dataset(cfg.data.val))
+    # In MMDetection 2.x, EvalHook handles validation datasets directly.
+    # We only append to `datasets` if the workflow explicitly contains 'val'.
+    if len(cfg.get('workflow', [('train', 1)])) == 2:
+        val_dataset = copy.deepcopy(cfg.data.val)
+        val_dataset.pipeline = cfg.data.train.get(
+            'pipeline', cfg.data.train.dataset.get('pipeline', []))
+        datasets.append(build_dataset(val_dataset))
 
     # ── 9. Build model ────────────────────────────────────────────────────────
     model = build_detector(cfg.model, train_cfg=cfg.get("train_cfg"),
                            test_cfg=cfg.get("test_cfg"))
     model.init_weights()
+    model.CLASSES = datasets[0].CLASSES
+
+    # Set up checkpoint meta expected by MMDetection 2.x
+    if cfg.get("checkpoint_config") is not None:
+        try:
+            import mmdet
+            from mmdet.utils import get_git_hash
+            mmdet_version = mmdet.__version__ + get_git_hash()[:7]
+        except ImportError:
+            mmdet_version = "unknown"
+        cfg.checkpoint_config.meta = dict(
+            mmdet_version=mmdet_version,
+            CLASSES=datasets[0].CLASSES
+        )
+    
+    # Initialize meta dict for logger/runner
+    meta = dict()
+    meta['env_info'] = env_info
+    meta['config'] = cfg.pretty_text
+    meta['seed'] = cfg.seed
+    meta['exp_name'] = os.path.basename(args.config)
 
     # ── 10. Launch training ───────────────────────────────────────────────────
     train_detector(
@@ -288,6 +333,7 @@ def main():
         distributed=distributed,
         validate=(not args.no_validate),
         timestamp=timestamp,
+        meta=meta,
     )
 
 
