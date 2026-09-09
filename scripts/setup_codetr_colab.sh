@@ -24,6 +24,10 @@
 
 set -euo pipefail
 
+# Accept Anaconda Terms of Service non-interactively in automated / Colab runs
+export CONDA_PLUGINS_AUTO_ACCEPT_TOS=yes
+export CONDA_AUTO_ACCEPT_TOS=yes
+
 # ──────────────────────────────────────────────────────────────────────────────
 # 0.  Colour helpers & logging
 # ──────────────────────────────────────────────────────────────────────────────
@@ -87,6 +91,17 @@ source "${CONDA_SH}"
 conda activate base 2>/dev/null || true
 info "Conda version: $(conda --version)"
 
+# Configure Conda to auto-accept Terms of Service non-interactively
+conda config --set plugins.auto_accept_tos yes 2>/dev/null || true
+
+# Explicitly accept ToS for default channels non-interactively if conda-anaconda-tos plugin is present
+if conda tos --help &>/dev/null; then
+  info "Accepting Anaconda channel Terms of Service non-interactively …"
+  conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main 2>/dev/null || true
+  conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r 2>/dev/null || true
+  conda tos accept 2>/dev/null || true
+fi
+
 # ──────────────────────────────────────────────────────────────────────────────
 # 3.  Create codetr Python 3.7.11 environment
 # ──────────────────────────────────────────────────────────────────────────────
@@ -99,7 +114,7 @@ if conda env list | grep -qE "^${ENV_NAME}\s"; then
   success "Conda environment '${ENV_NAME}' already exists — skipping creation."
 else
   info "Creating conda environment '${ENV_NAME}' with Python ${ENV_PYTHON_VERSION} …"
-  conda create -y -n "${ENV_NAME}" python="${ENV_PYTHON_VERSION}"
+  CONDA_PLUGINS_AUTO_ACCEPT_TOS=yes conda create -y -n "${ENV_NAME}" python="${ENV_PYTHON_VERSION}"
   success "Environment '${ENV_NAME}' created."
 fi
 
