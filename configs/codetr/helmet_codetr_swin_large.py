@@ -156,6 +156,7 @@ data = dict(
         img_prefix=data_root + 'train/images/',
         classes=CLASSES,
         pipeline=train_pipeline,
+        filter_empty_gt=False,
     ),
     val=dict(
         type=dataset_type,
@@ -238,6 +239,7 @@ model = dict(
         ),
         transformer=dict(
             type='CoDinoTransformer',
+            with_pos_coord=True,
             with_coord_feat=False,
             num_co_heads=2,
             num_feature_levels=5,
@@ -248,7 +250,7 @@ model = dict(
                 transformerlayers=dict(
                     type='BaseTransformerLayer',
                     attn_cfgs=dict(
-                        type='MultiScaleDeformAttn',
+                        type='MultiScaleDeformableAttention',
                         embed_dims=256,
                         num_levels=5,
                         dropout=0.0,
@@ -272,7 +274,7 @@ model = dict(
                             dropout=0.0,
                         ),
                         dict(
-                            type='MultiScaleDeformAttn',
+                            type='MultiScaleDeformableAttention',
                             embed_dims=256,
                             num_levels=5,
                             dropout=0.0,
@@ -295,10 +297,9 @@ model = dict(
             normalize=True,
         ),
         loss_cls=dict(
-            type='FocalLoss',
+            type='QualityFocalLoss',
             use_sigmoid=True,
-            gamma=2.0,
-            alpha=0.25,
+            beta=2.0,
             loss_weight=1.0,
         ),
         loss_bbox=dict(type='L1Loss', loss_weight=5.0),
@@ -323,9 +324,9 @@ model = dict(
         loss_cls=dict(
             type='CrossEntropyLoss',
             use_sigmoid=True,
-            loss_weight=1.0 * 2,
+            loss_weight=1.0 * 6 * 2.0,
         ),
-        loss_bbox=dict(type='L1Loss', loss_weight=1.0 * 2),
+        loss_bbox=dict(type='L1Loss', loss_weight=1.0 * 6 * 2.0),
     ),
     roi_head=[
         dict(
@@ -349,12 +350,13 @@ model = dict(
                     target_stds=[0.1, 0.1, 0.2, 0.2],
                 ),
                 reg_class_agnostic=False,
+                reg_decoded_bbox=True,
                 loss_cls=dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
-                    loss_weight=1.0 * 2,
+                    loss_weight=1.0 * 6 * 2.0,
                 ),
-                loss_bbox=dict(type='L1Loss', loss_weight=1.0 * 2),
+                loss_bbox=dict(type='GIoULoss', loss_weight=10.0 * 6 * 2.0),
             ),
         )
     ],
@@ -383,13 +385,13 @@ model = dict(
                 use_sigmoid=True,
                 gamma=2.0,
                 alpha=0.25,
-                loss_weight=1.0 * 2,
+                loss_weight=1.0 * 6 * 2.0,
             ),
-            loss_bbox=dict(type='GIoULoss', loss_weight=2.0 * 2),
+            loss_bbox=dict(type='GIoULoss', loss_weight=2.0 * 6 * 2.0),
             loss_centerness=dict(
                 type='CrossEntropyLoss',
                 use_sigmoid=True,
-                loss_weight=1.0 * 2,
+                loss_weight=1.0 * 6 * 2.0,
             ),
         ),
     ],
@@ -461,7 +463,10 @@ model = dict(
     ],
     test_cfg=[
         # Co-DINO query head
-        dict(max_per_img=300),
+        dict(
+            max_per_img=300,
+            nms=dict(type='soft_nms', iou_threshold=0.8),
+        ),
         # RPN/ROI
         dict(
             rpn=dict(
