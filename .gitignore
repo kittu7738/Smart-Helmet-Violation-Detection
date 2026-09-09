@@ -54,6 +54,20 @@ results/
 # Environment variables & secrets
 *.env
 .env*
+!.env.example
 *key.txt
 *token*
 secrets*
+
+# Node / Web Application
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+web/**/node_modules/
+web/**/dist/
+web/**/build/
+web/**/.vite/
+web/backend/uploads/*
+!web/backend/uploads/.gitkeep

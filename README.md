@@ -169,9 +169,72 @@ python tests/test_aicity_validation.py
 
 ---
 
-## 🌐 Application Interface (`app.py`)
+## 🌐 3D Web Application Foundation (`web/`)
+
+In addition to the AI research pipeline, the repository includes a modern, futuristic 3D web application foundation located in `web/`. It delivers a professional, dark-futuristic interface designed for intelligent traffic surveillance, live telemetry, and violation auditing.
+
+```
+React + Three.js Frontend (web/frontend)
+              │
+              ▼ (REST API / CORS)
+    Node.js Express Backend (web/backend)
+              │
+              ▼ (Future Integration Gateway)
+    Python Co-DETR Inference Service (:8000)
+              │
+              ▼
+   9-Class AI City Detection & Violation Log
+```
+
+### ✨ Features
+- **3D Digital Twin Viewer**: Real-time Three.js / React Three Fiber interactive motorcycle and rider model with dynamic holographic AI scan rings, ground radar grid, bounding bracket HUD tags, and smooth orbit controls.
+- **Live Detection Telemetry**: Active counters for motorcycles, riders, helmet compliance, violations, and instant focus target inspection.
+- **Video Detection Studio**: Drag-and-drop surveillance footage upload (`POST /api/detection/video`), progress milestone simulation, timeline violation flags, and frame-by-frame compliance breakdown.
+- **Violations Audit Registry**: Filterable and searchable records (search by license plate/location, filter by driver vs passenger, status).
+- **Computer Vision Analytics**: Responsive SVG charts tracking compliance rate against municipal targets, hourly rush-hour infraction volume, rider role ratio, and Co-DETR confidence distribution.
+- **System Configuration**: Real-time Node.js backend health monitoring, camera stream endpoints, detection sensitivity threshold controls, and future Python AI gateway configuration.
+
+---
+
+### 🚀 Running the Web Application
+
+#### Prerequisites
+- Node.js (v18+ recommended, v22+ verified)
+- npm (v9+)
+
+#### 1. Backend Setup (`web/backend`)
+```bash
+cd web/backend
+cp .env.example .env     # Optional: customize port (default: 5001)
+npm install
+npm run build           # Compiles TypeScript to dist/
+npm start               # Starts Express production server on :5001
+# Or for development:
+npm run dev             # Starts with tsx watch
+```
+Test health endpoint:
+```bash
+curl http://localhost:5001/api/health
+```
+
+#### 2. Frontend Setup (`web/frontend`)
+```bash
+cd web/frontend
+cp .env.example .env     # Sets VITE_API_URL=http://localhost:5001
+npm install
+npm run dev             # Starts Vite development server on http://localhost:5173
+```
+To create an optimized production build:
+```bash
+npm run build           # Type checks and builds to web/frontend/dist
+```
+
+---
+
+## 🌐 Legacy Application Interface (`app.py`)
 
 The repository retains `app.py` as a general Gradio web interface. In future phases, `app.py` will be connected to the trained Co-DETR model pipeline for interactive inference, video testing, and violation visualization.
+
 
 ---
 
