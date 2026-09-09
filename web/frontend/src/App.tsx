@@ -94,17 +94,17 @@ export const App: React.FC = () => {
         {activeTab === 'settings' && <SettingsPage />}
       </main>
 
-      {/* Futuristic Neon Footer */}
-      <footer className="border-t-2 border-[#00E5FF]/20 bg-[#060B19]/90 py-5 text-center text-xs text-slate-300 font-mono shadow-[0_-4px_20px_rgba(0,229,255,0.08)]">
+      {/* Clean Academic Project Footer */}
+      <footer className="border-t border-slate-800/80 bg-slate-950/80 py-4 text-center text-xs text-slate-400 font-mono">
         <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2 font-bold">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#00FF9C] shadow-neon-green animate-pulse" />
-            <span className="text-white">Smart Helmet Violation Detection System</span>
-            <span className="text-slate-500">|</span>
-            <span className="text-[#00E5FF] font-bold text-glow-cyan">Co-DETR & Swin-L Core</span>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="text-slate-300 font-medium">Smart Helmet AI Violation Detection System</span>
+            <span className="text-slate-600">|</span>
+            <span className="text-sky-400">Co-DETR Swin-L Vision Core</span>
           </div>
-          <div className="text-slate-400 font-medium">
-            IIITVICD AI City Challenge Research & Development
+          <div className="text-slate-400">
+            IIITVICD AI City Challenge Research & Development Demo
           </div>
         </div>
       </footer>

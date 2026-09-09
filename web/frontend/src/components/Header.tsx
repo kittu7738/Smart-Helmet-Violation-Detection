@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Wifi, Radio, Zap } from 'lucide-react';
+import { ShieldCheck, Radio, Wifi } from 'lucide-react';
 
 interface HeaderProps {
   backendConnected?: boolean;
@@ -7,65 +7,57 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ backendConnected = true }) => {
   return (
-    <header className="w-full border-b border-[#00E5FF]/30 bg-[#060B19]/90 backdrop-blur-2xl sticky top-0 z-40 shadow-[0_4px_30px_rgba(0,229,255,0.15)] transition-all">
-      <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 h-20 flex items-center justify-between">
+    <header className="w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40 transition-all">
+      <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 h-16 sm:h-20 flex items-center justify-between">
         {/* Brand & Subtitle */}
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#00E5FF]/30 via-[#1687FF]/25 to-[#00FF9C]/20 border-2 border-[#00E5FF] shadow-neon-cyan flex-shrink-0">
-            <ShieldCheck className="w-6 h-6 sm:w-7 sm:h-7 text-[#00E5FF] drop-shadow-[0_0_8px_#00E5FF]" />
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#00FF9C] rounded-full animate-ping" />
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#00FF9C] rounded-full shadow-[0_0_8px_#00FF9C]" />
+        <div className="flex items-center gap-3.5">
+          <div className="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-400 flex-shrink-0">
+            <ShieldCheck className="w-6 h-6" />
           </div>
 
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-2xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-[#00E5FF] via-[#00FF9C] to-[#1687FF] font-tech text-glow-cyan">
-                SMART HELMET AI
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white font-tech">
+                Smart Helmet AI
               </h1>
-              <span className="text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-md bg-[#00E5FF]/15 border border-[#00E5FF]/60 text-[#00E5FF] shadow-[0_0_10px_rgba(0,229,255,0.3)] hidden sm:inline-block">
-                V1.0-VISION
+              <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 hidden sm:inline-block">
+                Research Demo
               </span>
             </div>
-            <p className="text-[11px] sm:text-xs text-slate-300 font-medium tracking-wide hidden sm:block">
-              AI-Powered Motorcycle Safety & Violation Detection
+            <p className="text-xs text-slate-400 hidden sm:block">
+              Motorcycle Safety & Automated Violation Detection
             </p>
           </div>
         </div>
 
-        {/* Live System Status Indicator */}
-        <div className="flex items-center gap-2.5 sm:gap-3.5 flex-shrink-0">
-          {/* AI Pipeline Pill */}
-          <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#0A1226] border border-[#00E5FF]/40 text-xs font-mono shadow-[0_0_12px_rgba(0,229,255,0.15)]">
-            <Radio className="w-3.5 h-3.5 text-[#00E5FF] animate-pulse drop-shadow-[0_0_6px_#00E5FF]" />
-            <span className="text-slate-400 font-medium">PIPELINE:</span>
-            <span className="text-[#00E5FF] font-bold tracking-wide text-glow-cyan">CO-DETR SWIN-L</span>
+        {/* Status Indicators */}
+        <div className="flex items-center gap-3">
+          {/* Pipeline Badge */}
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300">
+            <Radio className="w-3.5 h-3.5 text-sky-400" />
+            <span className="text-slate-500">Pipeline:</span>
+            <span className="text-sky-400 font-medium">Co-DETR Swin-L</span>
           </div>
 
-          {/* System Online Badge */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#00FF9C]/15 border-2 border-[#00FF9C] text-xs font-mono text-[#00FF9C] shadow-neon-green whitespace-nowrap">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00FF9C] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#00FF9C] shadow-[0_0_8px_#00FF9C]"></span>
-            </span>
-            <span className="font-bold tracking-wider text-glow-green">
-              <span className="hidden sm:inline">SYSTEM </span>ONLINE
-            </span>
+          {/* System Online Status */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs font-mono text-emerald-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-semibold">System Online</span>
           </div>
 
-          {/* Backend Connection status */}
+          {/* Backend Status */}
           <div
             title={backendConnected ? 'Backend Connected' : 'Running in Offline / Mock Mode'}
-            className={`flex items-center justify-center p-2 rounded-lg border text-xs shadow-md transition-all ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-colors ${
               backendConnected
-                ? 'bg-[#00E5FF]/15 border-[#00E5FF]/60 text-[#00E5FF] shadow-neon-cyan'
-                : 'bg-[#FFD400]/15 border-[#FFD400]/60 text-[#FFD400] shadow-neon-amber'
+                ? 'bg-sky-500/10 border-sky-500/30 text-sky-400'
+                : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
             }`}
           >
-            {backendConnected ? (
-              <Wifi className="w-4 h-4 drop-shadow-[0_0_6px_#00E5FF]" />
-            ) : (
-              <Zap className="w-4 h-4 animate-bounce drop-shadow-[0_0_6px_#FFD400]" />
-            )}
+            <Wifi className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">
+              {backendConnected ? 'API Connected' : 'Mock Mode'}
+            </span>
           </div>
         </div>
       </div>

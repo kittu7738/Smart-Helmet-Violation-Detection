@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { MotorcycleScene } from './MotorcycleScene';
-import { RotateCw, Scan, Eye, Compass, ShieldCheck } from 'lucide-react';
+import { RotateCw, Scan, Eye, Compass } from 'lucide-react';
 
 interface SceneProps {
   highlightViolation?: boolean;
@@ -21,25 +21,25 @@ export const Scene: React.FC<SceneProps> = ({ highlightViolation = false }) => {
   };
 
   return (
-    <div className="relative w-full h-full min-h-[500px] sm:min-h-[560px] lg:min-h-[640px] xl:min-h-[680px] rounded-2xl overflow-hidden neon-glass-panel border-2 border-[#00E5FF]/45 shadow-[0_0_40px_rgba(0,229,255,0.25)] flex flex-col">
-      {/* Top HUD Bar with Controls & Live Pipeline Status */}
-      <div className="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
-        <div className="flex items-center gap-2.5 bg-[#060B19]/95 backdrop-blur-2xl px-4 py-2 rounded-xl border-2 border-[#00E5FF]/50 text-xs font-mono text-[#00E5FF] shadow-neon-cyan">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#00FF9C] shadow-neon-green animate-ping" />
-          <span className="font-black tracking-wider text-glow-cyan">3D DIGITAL TWIN SCANNER</span>
-          <span className="text-slate-500 hidden sm:inline">|</span>
-          <span className="text-[#00FF9C] font-bold hidden sm:inline">CO-DETR GEOMETRY HERO</span>
+    <div className="relative w-full h-full min-h-[480px] sm:min-h-[540px] lg:min-h-[600px] rounded-xl overflow-hidden bg-slate-900/70 border border-slate-800 shadow-xl flex flex-col">
+      {/* Top Bar: Title & Scene Controls */}
+      <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        <div className="flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3.5 py-1.5 rounded-lg border border-slate-700 text-xs font-mono text-slate-200">
+          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          <span className="font-semibold text-white">3D Vehicle & Rider Model</span>
+          <span className="text-slate-500 hidden sm:inline">•</span>
+          <span className="text-slate-400 text-[11px] hidden sm:inline">Co-DETR Detection Space</span>
         </div>
 
-        {/* Interactive Scene Action Toggles */}
-        <div className="flex items-center gap-2 pointer-events-auto bg-[#060B19]/95 backdrop-blur-2xl p-1.5 rounded-xl border-2 border-[#00E5FF]/40 text-xs shadow-lg">
+        {/* Clean Controls */}
+        <div className="flex items-center gap-1.5 pointer-events-auto bg-slate-900/90 backdrop-blur-md p-1 rounded-lg border border-slate-700 text-xs">
           <button
             onClick={() => setAutoRotate((prev) => !prev)}
             title="Toggle Auto Rotation"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold font-mono transition-all duration-200 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded font-medium transition-colors ${
               autoRotate
-                ? 'bg-[#00E5FF]/25 text-[#00E5FF] border border-[#00E5FF] shadow-neon-cyan'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             <RotateCw className={`w-3.5 h-3.5 ${autoRotate ? 'animate-spin' : ''}`} />
@@ -48,11 +48,11 @@ export const Scene: React.FC<SceneProps> = ({ highlightViolation = false }) => {
 
           <button
             onClick={() => setIsScanning((prev) => !prev)}
-            title="Toggle AI Scan Beam"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold font-mono transition-all duration-200 ${
+            title="Toggle Scan Line"
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded font-medium transition-colors ${
               isScanning
-                ? 'bg-[#00FF9C]/25 text-[#00FF9C] border border-[#00FF9C] shadow-neon-green'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             <Scan className="w-3.5 h-3.5" />
@@ -61,53 +61,40 @@ export const Scene: React.FC<SceneProps> = ({ highlightViolation = false }) => {
 
           <button
             onClick={handleResetCamera}
-            title="Reset Camera View"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent hover:border-slate-700 transition-all font-mono"
+            title="Reset View"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded text-slate-400 hover:text-white transition-colors"
           >
-            <Compass className="w-3.5 h-3.5 text-[#00E5FF]" />
+            <Compass className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Reset</span>
           </button>
         </div>
       </div>
 
-      {/* Bottom Left Touch Controls Guide */}
-      <div className="absolute bottom-4 left-4 z-10 pointer-events-none flex items-center gap-2 bg-[#060B19]/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl text-xs font-mono text-slate-200 border border-[#00E5FF]/40 shadow-md">
-        <Eye className="w-3.5 h-3.5 text-[#00E5FF] animate-pulse" />
-        <span>Orbit: Left-Drag • Zoom: Scroll/Pinch • Hero 3/4 View</span>
+      {/* Bottom Hint */}
+      <div className="absolute bottom-3 left-3 z-10 pointer-events-none flex items-center gap-2 bg-slate-900/80 backdrop-blur-sm px-3 py-1 rounded-md text-[11px] font-mono text-slate-400 border border-slate-800">
+        <Eye className="w-3.5 h-3.5 text-sky-400" />
+        <span>Drag to rotate • Scroll to zoom • Clean 3D view</span>
       </div>
 
-      {/* Bottom Right Live Telemetry Chip */}
-      <div className="absolute bottom-4 right-4 z-10 pointer-events-none hidden sm:flex items-center gap-2 bg-[#060B19]/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl text-xs font-mono text-[#00FF9C] border border-[#00FF9C]/50 shadow-neon-green">
-        <ShieldCheck className="w-3.5 h-3.5 text-[#00FF9C]" />
-        <span>3D SHADER ACTIVE • 60 FPS</span>
-      </div>
-
-      {/* 3D Canvas with High-Intensity Cinematic Lighting & Tight Hero Framing */}
+      {/* 3D Canvas with Clean Studio Lighting */}
       <Canvas
-        camera={{ position: [3.7, 2.2, 3.7], fov: 38 }}
+        camera={{ position: [3.6, 2.1, 3.6], fov: 38 }}
         className="w-full h-full flex-1 cursor-grab active:cursor-grabbing"
       >
-        {/* Background Color: Deep cosmic night */}
-        <color attach="background" args={['#030712']} />
+        {/* Simple deep background */}
+        <color attach="background" args={['#080e1a']} />
 
-        {/* Powerful Multi-Point Cinematic Lights */}
-        {/* 1. Purple / Violet Ambient Light */}
-        <ambientLight intensity={1.4} color="#6B21A8" />
+        {/* 1. Soft Ambient Light */}
+        <ambientLight intensity={1.5} color="#cbd5e1" />
 
-        {/* 2. Intense White Key Light (Top-Front Right) */}
-        <directionalLight position={[6, 9, 6]} intensity={3.8} color="#FFFFFF" />
+        {/* 2. Clean White Front Key Light */}
+        <directionalLight position={[5, 7, 5]} intensity={2.8} color="#ffffff" />
 
-        {/* 3. Intense Electric Cyan Accent Light (Left-Front) */}
-        <directionalLight position={[-5, 4, 3]} intensity={3.2} color="#00E5FF" />
+        {/* 3. Blue/Cyan Rim Light for Crisp Silhouette */}
+        <directionalLight position={[-4, 3, -4]} intensity={2.0} color="#38bdf8" />
 
-        {/* 4. Deep Neon Blue Rim Light (Back-Side) */}
-        <directionalLight position={[2, 3, -6]} intensity={3.0} color="#1687FF" />
-
-        {/* 5. Center Point Light directly illuminating the bike and platform */}
-        <pointLight position={[0, 4.2, 0]} intensity={4.2} color="#00E5FF" distance={14} />
-
-        {/* 6. Green Secondary Accent Light on rider front */}
-        <pointLight position={[0, 1.8, 3.0]} intensity={2.4} color="#00FF9C" distance={8} />
+        {/* 4. Platform Soft Center Light */}
+        <pointLight position={[0, 4, 0]} intensity={2.5} color="#bae6fd" distance={10} />
 
         <Suspense fallback={null}>
           <MotorcycleScene
@@ -116,17 +103,17 @@ export const Scene: React.FC<SceneProps> = ({ highlightViolation = false }) => {
           />
         </Suspense>
 
-        {/* Orbit Controls with Centered Target on the Motorcycle Engine/Rider */}
+        {/* Centered Controls */}
         <OrbitControls
           ref={controlsRef}
-          target={[0, 1.15, 0]}
+          target={[0, 1.0, 0]}
           enablePan={false}
           minDistance={2.0}
           maxDistance={7.0}
           minPolarAngle={Math.PI / 6}
           maxPolarAngle={Math.PI / 2.05}
           autoRotate={autoRotate}
-          autoRotateSpeed={0.9}
+          autoRotateSpeed={0.8}
           enableDamping
           dampingFactor={0.06}
         />

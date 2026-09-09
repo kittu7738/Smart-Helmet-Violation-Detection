@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, AlertCircle, CheckCircle2, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { Clock, CheckCircle2, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { RecentViolation } from '../types/detection';
 
 interface ViolationsTableProps {
@@ -15,28 +15,28 @@ export const ViolationsTable: React.FC<ViolationsTableProps> = ({
     switch (status) {
       case 'Detected':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-[#FF3158]/20 text-[#FF3158] border border-[#FF3158] shadow-neon-red">
-            <span className="w-2 h-2 rounded-full bg-[#FF3158] animate-ping" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-mono font-medium bg-red-500/10 text-red-400 border border-red-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
             Detected
           </span>
         );
       case 'Logged':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-[#FFD400]/20 text-[#FFD400] border border-[#FFD400] shadow-neon-amber">
-            <CheckCircle2 className="w-3.5 h-3.5" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-mono font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30">
+            <CheckCircle2 className="w-3 h-3" />
             Logged
           </span>
         );
       case 'Reviewed':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-[#1687FF]/20 text-[#1687FF] border border-[#1687FF] shadow-neon-blue">
-            <ShieldAlert className="w-3.5 h-3.5" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-mono font-medium bg-sky-500/10 text-sky-400 border border-sky-500/30">
+            <ShieldAlert className="w-3 h-3" />
             Reviewed
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-slate-800 text-slate-200 border border-slate-700">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-mono bg-slate-800 text-slate-300">
             {status}
           </span>
         );
@@ -44,54 +44,51 @@ export const ViolationsTable: React.FC<ViolationsTableProps> = ({
   };
 
   return (
-    <div className="w-full">
+    <div className={`w-full ${compact ? 'text-xs' : 'text-sm'}`}>
       {/* Desktop / Tablet Table View */}
       <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full text-left text-xs border-collapse">
+        <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b-2 border-[#00E5FF]/20 text-slate-300 font-mono text-xs uppercase tracking-wider">
-              <th className="py-3.5 px-4 font-bold">Time</th>
-              <th className="py-3.5 px-4 font-bold">Vehicle</th>
-              <th className="py-3.5 px-4 font-bold">Violation</th>
-              <th className="py-3.5 px-4 font-bold">Confidence</th>
-              <th className="py-3.5 px-4 text-right font-bold">Status</th>
+            <tr className="border-b border-slate-800 text-slate-400 font-mono text-xs uppercase">
+              <th className="py-3 px-4 font-semibold">Time</th>
+              <th className="py-3 px-4 font-semibold">Vehicle</th>
+              <th className="py-3 px-4 font-semibold">Violation</th>
+              <th className="py-3 px-4 font-semibold">Confidence</th>
+              <th className="py-3 px-4 text-right font-semibold">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/80">
-            {violations.map((item) => (
+          <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
+            {violations.map((v) => (
               <tr
-                key={item.id}
-                className="hover:bg-[#0A1632]/80 transition-colors duration-150 group"
+                key={v.id}
+                className="hover:bg-slate-800/40 transition-colors group"
               >
-                <td className="py-3.5 px-4 font-mono text-slate-200 whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-[#00E5FF]" />
-                    <span className="font-semibold">{item.time}</span>
+                <td className="py-3 px-4 text-slate-400 flex items-center gap-1.5 whitespace-nowrap">
+                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  <span>{v.time}</span>
+                </td>
+                <td className="py-3 px-4">
+                  <div className="font-tech font-bold text-white text-sm">
+                    {v.vehicle}
+                  </div>
+                  <div className="text-[11px] text-slate-400">{v.location}</div>
+                </td>
+                <td className="py-3 px-4">
+                  <div className="font-semibold text-red-400 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                    <span>{v.violation}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Role: <span className="text-slate-300">{v.riderType}</span>
                   </div>
                 </td>
-                <td className="py-3.5 px-4 font-medium whitespace-nowrap">
-                  <span className="text-white font-bold font-mono text-sm tracking-wide">
-                    {item.vehicle}
+                <td className="py-3 px-4">
+                  <span className="font-semibold text-sky-400">
+                    {v.confidence}%
                   </span>
-                  {!compact && item.location && (
-                    <div className="text-[11px] text-[#00E5FF] font-normal mt-0.5">
-                      {item.location}
-                    </div>
-                  )}
                 </td>
-                <td className="py-3.5 px-4">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-[#FF3158] flex-shrink-0 drop-shadow-[0_0_6px_#FF3158]" />
-                    <span className="font-bold text-[#FF3158] text-glow-red text-sm">
-                      {item.violation}
-                    </span>
-                  </div>
-                </td>
-                <td className="py-3.5 px-4 font-mono text-[#00E5FF] font-black text-sm whitespace-nowrap text-glow-cyan">
-                  {item.confidence}%
-                </td>
-                <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                  {getStatusBadge(item.status)}
+                <td className="py-3 px-4 text-right whitespace-nowrap">
+                  {getStatusBadge(v.status)}
                 </td>
               </tr>
             ))}
@@ -99,34 +96,30 @@ export const ViolationsTable: React.FC<ViolationsTableProps> = ({
         </table>
       </div>
 
-      {/* Mobile Card Stack */}
+      {/* Mobile Card View */}
       <div className="sm:hidden space-y-3">
-        {violations.map((item) => (
+        {violations.map((v) => (
           <div
-            key={item.id}
-            className="p-4 rounded-xl bg-gradient-to-r from-[#200812] to-[#12061A] border-2 border-[#FF3158]/60 shadow-neon-red space-y-2.5"
+            key={v.id}
+            className="p-3.5 rounded-lg bg-slate-900 border border-slate-800 space-y-2"
           >
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-white font-mono font-black text-sm">{item.vehicle}</span>
-              <span className="text-[#00E5FF] font-mono text-xs font-bold flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
-                {item.time}
-              </span>
-            </div>
-
             <div className="flex items-center justify-between">
-              <span className="text-[#FF3158] font-bold text-sm text-glow-red flex items-center gap-1.5">
-                <AlertTriangle className="w-4 h-4" />
-                {item.violation}
+              <span className="font-tech font-bold text-white text-base">
+                {v.vehicle}
               </span>
-              <span className="text-[#00E5FF] font-mono font-black text-sm text-glow-cyan">
-                {item.confidence}%
-              </span>
+              {getStatusBadge(v.status)}
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs">
-              <span className="text-slate-300 truncate max-w-[180px] font-medium">{item.location}</span>
-              {getStatusBadge(item.status)}
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-red-400 font-medium">
+                {v.violation}
+              </span>
+              <span className="text-sky-400 font-semibold">{v.confidence}%</span>
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-2 border-t border-slate-800">
+              <span>{v.location}</span>
+              <span>{v.time}</span>
             </div>
           </div>
         ))}

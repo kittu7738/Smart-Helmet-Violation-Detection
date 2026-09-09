@@ -1,8 +1,8 @@
 import React from 'react';
-import { Activity, TrendingUp, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Activity } from 'lucide-react';
 
 export const TrafficFlowChart: React.FC = () => {
-  // 12 5-minute intervals across the last 1 hour with full realistic data
+  // 12 visible 5-minute intervals across the last 1 hour
   const intervals = [
     { time: '10:00', total: 38, compliant: 35, violations: 3 },
     { time: '10:05', total: 44, compliant: 41, violations: 3 },
@@ -21,71 +21,44 @@ export const TrafficFlowChart: React.FC = () => {
   const maxVal = 80;
 
   return (
-    <div className="neon-glass-panel rounded-2xl p-6 sm:p-7 border-2 border-[#00E5FF]/35 shadow-[0_0_30px_rgba(0,229,255,0.18)] relative overflow-hidden">
-      {/* Background cyan glow flare */}
-      <div className="absolute top-0 right-1/4 w-96 h-32 bg-[#00E5FF]/10 blur-3xl pointer-events-none" />
-
-      {/* Header, Quick KPI Summary & Legend */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 pb-4 border-b border-[#00E5FF]/25">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-[#00E5FF]/20 border-2 border-[#00E5FF] text-[#00E5FF] shadow-neon-cyan flex-shrink-0">
-            <Activity className="w-6 h-6 drop-shadow-[0_0_8px_#00E5FF]" />
+    <div className="rounded-xl p-5 sm:p-6 bg-slate-900/80 border border-slate-800 shadow-md">
+      {/* Header & Legend */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3 border-b border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
+            <Activity className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2.5">
-              <h3 className="font-tech text-lg sm:text-xl font-black tracking-wider text-white uppercase text-glow-cyan">
-                REAL-TIME TRAFFIC FLOW & COMPLIANCE
-              </h3>
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#00FF9C]/20 border border-[#00FF9C] text-[#00FF9C] shadow-neon-green">
-                1-HR BUFFER
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-300 font-medium mt-0.5">
-              5-minute telemetry intervals • Automated helmet classification & violation triage
+            <h3 className="font-tech text-base sm:text-lg font-bold tracking-wide text-white uppercase">
+              Traffic Flow & Compliance (Last 1 Hour)
+            </h3>
+            <p className="text-xs text-slate-400">
+              5-minute telemetry intervals comparing total traffic vs detected violations
             </p>
           </div>
         </div>
 
-        {/* Real-time Summary Pills & Legend */}
-        <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-mono font-bold">
-          {/* Quick Metrics */}
-          <div className="flex items-center gap-2 bg-[#0A1A35]/80 px-3 py-1.5 rounded-lg border border-[#00E5FF]/40 text-[#00E5FF]">
-            <TrendingUp className="w-4 h-4" />
-            <span>PEAK: 76 BIKES/5-MIN</span>
+        {/* Clean Legend */}
+        <div className="flex items-center gap-4 text-xs font-mono">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-sky-500" />
+            <span className="text-slate-300">Total Traffic</span>
           </div>
-
-          <div className="flex items-center gap-2 bg-[#062419]/80 px-3 py-1.5 rounded-lg border border-[#00FF9C]/40 text-[#00FF9C]">
-            <ShieldCheck className="w-4 h-4" />
-            <span>92.2% COMPLIANT</span>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
+            <span className="text-slate-300">Compliant</span>
           </div>
-
-          <div className="flex items-center gap-2 bg-[#2D0914]/80 px-3 py-1.5 rounded-lg border border-[#FF3158]/40 text-[#FF3158]">
-            <AlertTriangle className="w-4 h-4" />
-            <span>57 VIOLATIONS</span>
-          </div>
-
-          {/* Color Legend */}
-          <div className="flex items-center gap-3 pl-2 border-l border-slate-700">
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-[#00E5FF] shadow-[0_0_8px_#00E5FF]" />
-              <span className="text-slate-200">Total</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-[#00FF9C] shadow-[0_0_8px_#00FF9C]" />
-              <span className="text-slate-200">Compliant</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-[#FF3158] shadow-[0_0_8px_#FF3158]" />
-              <span className="text-slate-200">Violation</span>
-            </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-red-500" />
+            <span className="text-slate-300">Violations</span>
           </div>
         </div>
       </div>
 
-      {/* Bar Chart with Y-Axis and High Visibility Bars */}
+      {/* Bar Chart with Y-Axis */}
       <div className="w-full flex gap-3">
-        {/* Y-Axis Labels */}
-        <div className="h-64 sm:h-72 flex flex-col justify-between items-end text-[11px] font-mono text-slate-400 pb-8 pr-1 flex-shrink-0 select-none">
+        {/* Y-Axis */}
+        <div className="h-56 flex flex-col justify-between items-end text-[10px] font-mono text-slate-500 pb-6 pr-1 select-none">
           <span>80</span>
           <span>60</span>
           <span>40</span>
@@ -93,15 +66,15 @@ export const TrafficFlowChart: React.FC = () => {
           <span>0</span>
         </div>
 
-        {/* Grid Bars Area */}
-        <div className="h-64 sm:h-72 flex-1 flex flex-col justify-end">
-          <div className="relative flex-1 w-full flex items-end justify-between gap-1.5 sm:gap-3 px-2 border-b-2 border-[#00E5FF]/40">
+        {/* Bars Container */}
+        <div className="h-56 flex-1 flex flex-col justify-end">
+          <div className="relative flex-1 w-full flex items-end justify-between gap-1 sm:gap-2 px-1 border-b border-slate-800">
             {/* Horizontal Grid lines */}
-            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-25">
-              <div className="w-full border-b border-dashed border-[#00E5FF]" />
-              <div className="w-full border-b border-dashed border-[#00E5FF]" />
-              <div className="w-full border-b border-dashed border-[#00E5FF]" />
-              <div className="w-full border-b border-dashed border-[#00E5FF]" />
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
+              <div className="w-full border-b border-slate-700" />
+              <div className="w-full border-b border-slate-700" />
+              <div className="w-full border-b border-slate-700" />
+              <div className="w-full border-b border-slate-700" />
             </div>
 
             {intervals.map((item, idx) => {
@@ -115,36 +88,32 @@ export const TrafficFlowChart: React.FC = () => {
                   className="flex-1 flex flex-col items-center group relative h-full justify-end"
                 >
                   {/* Tooltip on hover */}
-                  <div className="opacity-0 group-hover:opacity-100 absolute -top-16 bg-[#060B19]/95 border-2 border-[#00E5FF] text-white text-xs font-mono px-3 py-1.5 rounded-xl pointer-events-none transition-all z-30 whitespace-nowrap shadow-neon-cyan flex flex-col items-center">
-                    <span className="font-bold text-[#00E5FF] text-xs">{item.time}</span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[#00E5FF]">{item.total} total</span>
-                      <span className="text-[#00FF9C]">{item.compliant} safe</span>
-                      <span className="text-[#FF3158] font-bold">{item.violations} viol.</span>
-                    </div>
+                  <div className="opacity-0 group-hover:opacity-100 absolute -top-12 bg-slate-950 border border-slate-700 text-white text-[11px] font-mono px-2.5 py-1 rounded-md pointer-events-none transition-opacity z-20 whitespace-nowrap shadow-md flex flex-col items-center">
+                    <span className="font-semibold text-sky-400">{item.time}</span>
+                    <span className="text-slate-300">{item.total} total • <span className="text-red-400 font-medium">{item.violations} viol.</span></span>
                   </div>
 
-                  {/* Triple Bar Group with Neon Glow */}
-                  <div className="w-full max-w-[42px] flex items-end justify-center gap-1 sm:gap-1.5 h-full pb-0.5">
-                    {/* Total Traffic Bar */}
+                  {/* Clean Bar Group */}
+                  <div className="w-full max-w-[28px] flex items-end justify-center gap-0.5 sm:gap-1 h-full pb-0.5">
+                    {/* Total Bar */}
                     <div
-                      className="w-1/3 bg-gradient-to-t from-[#0052CC] via-[#0099FF] to-[#00E5FF] rounded-t-sm shadow-[0_0_10px_rgba(0,229,255,0.5)] group-hover:brightness-125 transition-all relative"
+                      className="w-1/3 bg-sky-500/80 hover:bg-sky-400 rounded-t-sm transition-colors"
                       style={{ height: `${totalHeight}%` }}
                     />
                     {/* Compliant Bar */}
                     <div
-                      className="w-1/3 bg-gradient-to-t from-[#064E3B] via-[#059669] to-[#00FF9C] rounded-t-sm shadow-[0_0_10px_rgba(0,255,156,0.5)] group-hover:brightness-125 transition-all relative"
+                      className="w-1/3 bg-emerald-500/80 hover:bg-emerald-400 rounded-t-sm transition-colors"
                       style={{ height: `${compliantHeight}%` }}
                     />
                     {/* Violation Bar */}
                     <div
-                      className="w-1/3 bg-gradient-to-t from-[#7F1D1D] via-[#DC2626] to-[#FF3158] rounded-t-sm shadow-[0_0_10px_rgba(255,49,88,0.7)] group-hover:brightness-125 transition-all relative"
+                      className="w-1/3 bg-red-500/80 hover:bg-red-400 rounded-t-sm transition-colors"
                       style={{ height: `${Math.max(violationHeight, 6)}%` }}
                     />
                   </div>
 
-                  {/* Bottom Time Stamp */}
-                  <span className="text-[10px] sm:text-xs font-mono text-slate-300 font-bold mt-2.5 tracking-tighter sm:tracking-normal group-hover:text-[#00E5FF] transition-colors">
+                  {/* Time Stamp */}
+                  <span className="text-[10px] sm:text-[11px] font-mono text-slate-400 mt-2">
                     {item.time}
                   </span>
                 </div>
