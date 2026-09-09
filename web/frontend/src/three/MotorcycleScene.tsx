@@ -308,7 +308,7 @@ export const MotorcycleScene: React.FC<MotorcycleSceneProps> = ({
       {/* ================= 3D HUD OVERLAYS / LABELS ================= */}
       {/* Rider / Helmet Detection Tag */}
       <Html position={[0.65, 1.85, 0.2]} center distanceFactor={6}>
-        <div className="select-none pointer-events-none whitespace-nowrap bg-slate-950/80 backdrop-blur-md border border-cyan-500/50 rounded px-3 py-1.5 shadow-lg shadow-cyan-500/20 text-xs font-mono">
+        <div className="select-none pointer-events-none whitespace-nowrap bg-slate-950/80 backdrop-blur-md border border-cyan-500/50 rounded px-2.5 sm:px-3 py-1 sm:py-1.5 shadow-lg shadow-cyan-500/20 text-[11px] sm:text-xs font-mono transform scale-80 sm:scale-100 origin-center">
           <div className="flex items-center gap-1.5 font-bold tracking-wider text-cyan-400">
             <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
             <span>RIDER [DRIVER]</span>
@@ -324,7 +324,7 @@ export const MotorcycleScene: React.FC<MotorcycleSceneProps> = ({
 
       {/* Motorcycle Vehicle Detection Tag */}
       <Html position={[-0.75, 0.85, 0.8]} center distanceFactor={6}>
-        <div className="select-none pointer-events-none whitespace-nowrap bg-slate-950/80 backdrop-blur-md border border-blue-500/50 rounded px-3 py-1.5 shadow-lg shadow-blue-500/20 text-xs font-mono">
+        <div className="select-none pointer-events-none whitespace-nowrap bg-slate-950/80 backdrop-blur-md border border-blue-500/50 rounded px-2.5 sm:px-3 py-1 sm:py-1.5 shadow-lg shadow-blue-500/20 text-[11px] sm:text-xs font-mono transform scale-80 sm:scale-100 origin-center">
           <div className="flex items-center gap-1.5 font-bold tracking-wider text-blue-400">
             <span className="inline-block w-2 h-2 rounded-full bg-blue-400" />
             <span>MOTORCYCLE</span>
@@ -337,6 +337,7 @@ export const MotorcycleScene: React.FC<MotorcycleSceneProps> = ({
           </div>
         </div>
       </Html>
+
 
       {/* Simulated 3D Bounding Bracket Wireframe around Helmet */}
       <mesh position={[0, 1.73, 0.08]}>

@@ -9,13 +9,37 @@ import { SettingsPage } from './pages/SettingsPage';
 import { api } from './services/api';
 import { DashboardStats, LiveDetectionSummary, RecentViolation } from './types/detection';
 import { mockDashboardStats, mockLiveDetection, mockRecentViolations } from './data/mockDashboard';
-
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const getInitialTab = (): NavTab => {
+    const hash = window.location.hash.replace('#', '') as NavTab;
+    const validTabs: NavTab[] = ['dashboard', 'detection', 'violations', 'analytics', 'settings'];
+    return validTabs.includes(hash) ? hash : 'dashboard';
+  };
+
+  const [activeTab, setActiveTabState] = useState<NavTab>(getInitialTab);
+
+  const setActiveTab = (tab: NavTab) => {
+    setActiveTabState(tab);
+    window.location.hash = tab;
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '') as NavTab;
+      const validTabs: NavTab[] = ['dashboard', 'detection', 'violations', 'analytics', 'settings'];
+      if (validTabs.includes(hash)) {
+        setActiveTabState(hash);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   const [stats, setStats] = useState<DashboardStats>(mockDashboardStats);
   const [live, setLive] = useState<LiveDetectionSummary>(mockLiveDetection);
   const [violations, setViolations] = useState<RecentViolation[]>(mockRecentViolations);
   const [backendConnected, setBackendConnected] = useState(false);
+
 
   useEffect(() => {
     // Initial fetch from API (falls back gracefully to mock data if backend is offline)

@@ -41,10 +41,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-end sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => setHighlightViolation((prev) => !prev)}
-            className={`px-3 py-1.5 rounded-lg font-mono text-xs transition-all flex items-center gap-1.5 ${
+            className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg font-mono text-xs transition-all flex items-center justify-center gap-1.5 ${
               highlightViolation
                 ? 'bg-rose-950/60 text-rose-300 border border-rose-500/50 shadow-neon-red'
                 : 'bg-slate-900/60 text-slate-300 border border-slate-700 hover:border-cyan-500/40'
@@ -56,12 +56,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
           <button
             onClick={onNavigateToDetection}
-            className="px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition-all font-mono flex items-center gap-1"
+            className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition-all font-mono flex items-center justify-center gap-1"
           >
             <span>Analyze Video</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </button>
         </div>
+
       </div>
 
       {/* Primary Statistics Grid */}
