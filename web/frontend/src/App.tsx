@@ -62,7 +62,7 @@ export const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#080c14] text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="min-h-screen flex flex-col bg-[#040711] text-white selection:bg-[#00E5FF]/30 selection:text-[#00E5FF]">
       {/* Top Header */}
       <Header backendConnected={backendConnected} />
 
@@ -74,7 +74,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-10">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-7 pb-24 md:pb-12">
         {activeTab === 'dashboard' && (
           <DashboardPage
             stats={stats}
@@ -94,21 +94,22 @@ export const App: React.FC = () => {
         {activeTab === 'settings' && <SettingsPage />}
       </main>
 
-      {/* Futuristic Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/60 py-6 text-center text-xs text-slate-400 font-mono">
+      {/* Futuristic Neon Footer */}
+      <footer className="border-t-2 border-[#00E5FF]/20 bg-[#060B19]/90 py-6 text-center text-xs text-slate-300 font-mono shadow-[0_-4px_20px_rgba(0,229,255,0.08)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-cyan-400" />
-            <span>Smart Helmet Violation Detection System</span>
+          <div className="flex items-center gap-2 font-bold">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#00FF9C] shadow-neon-green animate-pulse" />
+            <span className="text-white">Smart Helmet Violation Detection System</span>
             <span className="text-slate-500">|</span>
-            <span className="text-cyan-400">Co-DETR & Swin-L Core</span>
+            <span className="text-[#00E5FF] font-bold text-glow-cyan">Co-DETR & Swin-L Core</span>
           </div>
-          <div className="text-slate-400">
+          <div className="text-slate-400 font-medium">
             IIITVICD AI City Challenge Research & Development
           </div>
         </div>
       </footer>
     </div>
+
   );
 };
 

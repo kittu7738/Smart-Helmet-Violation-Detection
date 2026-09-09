@@ -40,93 +40,92 @@ export const ViolationsPage: React.FC = () => {
     }
   };
 
-  // Metrics derived from list
   const totalViolations = violations.length;
   const driverViolations = violations.filter((v) => v.riderType === 'DRIVER').length;
   const passengerViolations = violations.filter((v) => v.riderType === 'PASSENGER').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b-2 border-[#00E5FF]/20">
         <div>
-          <h1 className="font-tech text-2xl font-bold tracking-wider text-slate-100 uppercase">
+          <h1 className="font-tech text-2xl sm:text-3xl font-black tracking-wider text-white uppercase text-glow-cyan">
             Helmet Violations Database
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400">
+          <p className="text-xs sm:text-sm text-slate-300 font-medium">
             Real-time audit log of non-compliant motorcycle operators and pillion passengers.
           </p>
         </div>
         <button
           onClick={() => alert('Exporting violation audit report as CSV...')}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-850 border border-slate-700 text-xs font-mono text-slate-200 transition-colors self-start sm:self-auto"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#00E5FF] to-[#006CFF] text-white font-mono font-black text-xs shadow-neon-cyan hover:shadow-neon-cyan-lg hover:scale-105 transition-all self-start sm:self-auto border border-[#00E5FF]"
         >
-          <Download className="w-3.5 h-3.5 text-cyan-400" />
+          <Download className="w-4 h-4 text-white" />
           <span>EXPORT CSV</span>
         </button>
       </div>
 
-      {/* Metrics Header Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="glass-card rounded-xl p-4 border-slate-800">
+      {/* Metrics Header Summary (4 Vibrant Cards) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="neon-glass-card rounded-2xl p-5 border-2 border-[#FF3158] shadow-neon-red">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-mono text-slate-400 uppercase">Total Violations</span>
-            <AlertTriangle className="w-4 h-4 text-rose-400" />
+            <span className="text-xs font-mono font-bold text-slate-300 uppercase">Total Violations</span>
+            <AlertTriangle className="w-5 h-5 text-[#FF3158] drop-shadow-[0_0_6px_#FF3158]" />
           </div>
-          <div className="text-2xl font-bold font-tech text-rose-400">{totalViolations}</div>
-          <span className="text-[10px] text-slate-500 font-mono">Matched current filter</span>
+          <div className="text-3xl font-black font-tech text-[#FF3158] text-glow-red">{totalViolations}</div>
+          <span className="text-[11px] text-slate-300 font-mono font-semibold">Matched current filter</span>
         </div>
 
-        <div className="glass-card rounded-xl p-4 border-slate-800">
+        <div className="neon-glass-card rounded-2xl p-5 border-2 border-[#FFD400] shadow-neon-amber">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-mono text-slate-400 uppercase">Driver Violations</span>
-            <User className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-mono font-bold text-slate-300 uppercase">Driver Violations</span>
+            <User className="w-5 h-5 text-[#FFD400] drop-shadow-[0_0_6px_#FFD400]" />
           </div>
-          <div className="text-2xl font-bold font-tech text-amber-400">{driverViolations}</div>
-          <span className="text-[10px] text-slate-500 font-mono">No helmet on driver</span>
+          <div className="text-3xl font-black font-tech text-[#FFD400] drop-shadow-[0_0_8px_#FFD400]">{driverViolations}</div>
+          <span className="text-[11px] text-slate-300 font-mono font-semibold">No helmet on driver</span>
         </div>
 
-        <div className="glass-card rounded-xl p-4 border-slate-800">
+        <div className="neon-glass-card rounded-2xl p-5 border-2 border-[#00E5FF] shadow-neon-cyan">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-mono text-slate-400 uppercase">Passenger Violations</span>
-            <Users className="w-4 h-4 text-cyan-400" />
+            <span className="text-xs font-mono font-bold text-slate-300 uppercase">Passenger Violations</span>
+            <Users className="w-5 h-5 text-[#00E5FF] drop-shadow-[0_0_6px_#00E5FF]" />
           </div>
-          <div className="text-2xl font-bold font-tech text-cyan-300">{passengerViolations}</div>
-          <span className="text-[10px] text-slate-500 font-mono">Pillion rider without helmet</span>
+          <div className="text-3xl font-black font-tech text-[#00E5FF] text-glow-cyan">{passengerViolations}</div>
+          <span className="text-[11px] text-slate-300 font-mono font-semibold">Pillion rider violation</span>
         </div>
 
-        <div className="glass-card rounded-xl p-4 border-slate-800">
+        <div className="neon-glass-card rounded-2xl p-5 border-2 border-[#00FF9C] shadow-neon-green">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-mono text-slate-400 uppercase">Audit Interval</span>
-            <Calendar className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-mono font-bold text-slate-300 uppercase">Audit Interval</span>
+            <Calendar className="w-5 h-5 text-[#00FF9C] drop-shadow-[0_0_6px_#00FF9C]" />
           </div>
-          <div className="text-lg font-bold font-tech text-slate-200">TODAY</div>
-          <span className="text-[10px] text-slate-500 font-mono">Continuous 24h cycle</span>
+          <div className="text-2xl font-black font-tech text-[#00FF9C] text-glow-green">TODAY</div>
+          <span className="text-[11px] text-slate-300 font-mono font-semibold">24h surveillance cycle</span>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="glass-panel rounded-xl p-4 border-slate-800 space-y-3">
-        <div className="flex flex-col sm:flex-row gap-3">
+      <div className="neon-glass-panel rounded-2xl p-4 sm:p-5 border-2 border-[#00E5FF]/30 shadow-md space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3.5">
           {/* Search Box */}
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+            <Search className="absolute left-3.5 top-3 w-4 h-4 text-[#00E5FF]" />
             <input
               type="text"
               placeholder="Search by license plate, vehicle ID, location..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-900/80 border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+              className="w-full pl-10 pr-4 py-2.5 bg-[#060D1F] border-2 border-[#00E5FF]/40 rounded-xl text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#00E5FF] focus:shadow-neon-cyan transition-all font-mono font-medium"
             />
           </div>
 
           {/* Rider Type Selector */}
-          <div className="flex items-center gap-2">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
+          <div className="flex items-center gap-2.5">
+            <Filter className="w-4 h-4 text-[#00E5FF]" />
             <select
               value={riderFilter}
               onChange={(e) => setRiderFilter(e.target.value as any)}
-              className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/50"
+              className="bg-[#060D1F] border-2 border-[#00E5FF]/40 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white font-mono font-bold focus:outline-none focus:border-[#00E5FF] shadow-sm cursor-pointer"
             >
               <option value="ALL">All Roles</option>
               <option value="DRIVER">Drivers Only</option>
@@ -137,7 +136,7 @@ export const ViolationsPage: React.FC = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/50"
+              className="bg-[#060D1F] border-2 border-[#00E5FF]/40 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white font-mono font-bold focus:outline-none focus:border-[#00E5FF] shadow-sm cursor-pointer"
             >
               <option value="ALL">All Statuses</option>
               <option value="Detected">Detected</option>
@@ -148,19 +147,19 @@ export const ViolationsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Violations List / Table Container */}
-      <div className="glass-panel rounded-xl p-5 border-slate-800">
+      {/* Violations List Container */}
+      <div className="neon-glass-panel rounded-2xl p-6 border-2 border-[#00E5FF]/30 shadow-[0_0_30px_rgba(0,229,255,0.12)]">
         {loading ? (
-          <div className="text-center py-12 font-mono text-xs text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping inline-block mr-2" />
+          <div className="text-center py-12 font-mono text-sm text-[#00E5FF] font-bold">
+            <span className="w-3 h-3 rounded-full bg-[#00E5FF] animate-ping inline-block mr-2" />
             Scanning database records...
           </div>
         ) : violations.length > 0 ? (
           <ViolationsTable violations={violations} compact={false} />
         ) : (
-          <div className="text-center py-12 text-slate-500 space-y-2">
-            <ShieldAlert className="w-8 h-8 mx-auto text-slate-600" />
-            <p className="text-xs font-mono">No violations match the specified criteria</p>
+          <div className="text-center py-12 text-slate-400 space-y-3">
+            <ShieldAlert className="w-10 h-10 mx-auto text-[#00E5FF]/40" />
+            <p className="text-sm font-mono font-bold text-white">No violations match the specified criteria</p>
           </div>
         )}
       </div>

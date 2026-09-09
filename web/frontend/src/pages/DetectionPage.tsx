@@ -10,7 +10,8 @@ import {
   Bike,
   Percent,
   Sparkles,
-  RefreshCw
+  RefreshCw,
+  ShieldCheck
 } from 'lucide-react';
 import { api } from '../services/api';
 import { VideoDetectionResult } from '../types/detection';
@@ -34,7 +35,6 @@ export const DetectionPage: React.FC = () => {
     setResult(null);
     setProgress(0);
 
-    // Create object URL for local video preview
     const url = URL.createObjectURL(file);
     setVideoPreviewUrl(url);
   };
@@ -65,7 +65,6 @@ export const DetectionPage: React.FC = () => {
     setProgress(5);
     setCurrentStep('Extracting video frames and initializing Co-DETR model pipeline...');
 
-    // Progress simulation while API call executes
     let currentP = 5;
     progressIntervalRef.current = window.setInterval(() => {
       currentP += 5;
@@ -112,28 +111,28 @@ export const DetectionPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b-2 border-[#00E5FF]/20">
         <div>
-          <h1 className="font-tech text-2xl font-bold tracking-wider text-slate-100 uppercase">
+          <h1 className="font-tech text-2xl sm:text-3xl font-black tracking-wider text-white uppercase text-glow-cyan">
             AI Video Detection Pipeline
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400">
+          <p className="text-xs sm:text-sm text-slate-300 font-medium">
             Upload traffic surveillance footage to identify motorcycles, riders, and helmet violations.
           </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <span className="text-xs font-mono px-3 py-1 rounded bg-slate-900 border border-slate-700 text-slate-300">
+          <span className="text-xs font-mono font-bold px-3.5 py-1.5 rounded-lg bg-[#00E5FF]/15 border-2 border-[#00E5FF] text-[#00E5FF] shadow-neon-cyan">
             API: POST /api/detection/video
           </span>
         </div>
       </div>
 
       {errorMsg && (
-        <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-500/50 text-rose-300 text-xs flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
-          <span>{errorMsg}</span>
+        <div className="p-4 rounded-xl bg-[#FF3158]/20 border-2 border-[#FF3158] text-[#FF3158] text-xs font-mono flex items-center gap-2.5 shadow-neon-red">
+          <AlertTriangle className="w-5 h-5 text-[#FF3158] flex-shrink-0 animate-bounce" />
+          <span className="font-bold">{errorMsg}</span>
         </div>
       )}
 
@@ -149,10 +148,10 @@ export const DetectionPage: React.FC = () => {
               onDragOver={handleDrag}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className={`p-8 rounded-xl border-2 border-dashed text-center cursor-pointer transition-all duration-200 ${
+              className={`p-8 sm:p-10 rounded-2xl border-2 border-dashed text-center cursor-pointer transition-all duration-300 ${
                 dragActive
-                  ? 'border-cyan-400 bg-cyan-950/30 shadow-neon-cyan'
-                  : 'border-slate-700 hover:border-cyan-500/50 bg-slate-950/40 hover:bg-slate-900/40'
+                  ? 'border-[#00E5FF] bg-[#00E5FF]/20 shadow-neon-cyan scale-[1.02]'
+                  : 'border-[#00E5FF]/40 hover:border-[#00E5FF] bg-[#060D1F]/80 hover:bg-[#0A1632]/90 shadow-[0_0_20px_rgba(0,229,255,0.1)]'
               }`}
             >
               <input
@@ -166,43 +165,43 @@ export const DetectionPage: React.FC = () => {
                   }
                 }}
               />
-              <div className="flex flex-col items-center justify-center space-y-3">
-                <div className="p-3.5 rounded-full bg-cyan-950/50 border border-cyan-500/30 text-cyan-400">
-                  <UploadCloud className="w-8 h-8" />
+              <div className="flex flex-col items-center justify-center space-y-3.5">
+                <div className="p-4 rounded-2xl bg-[#00E5FF]/20 border-2 border-[#00E5FF] text-[#00E5FF] shadow-neon-cyan animate-pulse">
+                  <UploadCloud className="w-9 h-9 drop-shadow-[0_0_8px_#00E5FF]" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold text-slate-200">
+                  <p className="text-base font-bold text-white tracking-wide">
                     Drag & drop surveillance video here
                   </p>
-                  <p className="text-xs text-slate-400">
-                    or <span className="text-cyan-400 underline">browse your files</span>
+                  <p className="text-xs text-slate-300 font-medium">
+                    or <span className="text-[#00E5FF] underline font-bold">browse your files</span>
                   </p>
                 </div>
-                <span className="text-[10px] font-mono text-slate-500">
-                  Supported formats: MP4, AVI, MOV, MKV (Up to 100MB)
+                <span className="text-[11px] font-mono text-[#00FF9C] font-semibold bg-[#00FF9C]/10 px-2.5 py-1 rounded border border-[#00FF9C]/30">
+                  Supported: MP4, AVI, MOV, MKV (Up to 100MB)
                 </span>
               </div>
             </div>
           ) : (
-            <div className="glass-panel rounded-xl p-4 border-slate-800 space-y-3">
+            <div className="neon-glass-panel rounded-2xl p-5 border-2 border-[#00E5FF]/40 shadow-neon-cyan space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-lg bg-cyan-950/50 border border-cyan-500/30 text-cyan-400">
-                    <FileVideo className="w-5 h-5" />
+                  <div className="p-3 rounded-xl bg-[#00E5FF]/20 border-2 border-[#00E5FF] text-[#00E5FF] shadow-neon-cyan">
+                    <FileVideo className="w-6 h-6 drop-shadow-[0_0_6px_#00E5FF]" />
                   </div>
                   <div>
-                    <div className="text-xs font-semibold text-slate-200 truncate max-w-[200px] sm:max-w-[260px]">
+                    <div className="text-sm font-bold text-white truncate max-w-[200px] sm:max-w-[260px]">
                       {selectedFile.name}
                     </div>
-                    <div className="text-[10px] font-mono text-slate-400">
-                      {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                    <div className="text-xs font-mono text-[#00E5FF] font-semibold">
+                      {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • READY
                     </div>
                   </div>
                 </div>
                 <button
                   onClick={handleReset}
                   disabled={isProcessing}
-                  className="p-1.5 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 text-xs"
+                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700 transition-colors"
                   title="Remove video"
                 >
                   <RefreshCw className="w-4 h-4" />
@@ -210,11 +209,11 @@ export const DetectionPage: React.FC = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-3 pt-2">
                 {!isProcessing ? (
                   <button
                     onClick={handleStartDetection}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-950 font-semibold text-xs font-mono shadow-neon-cyan hover:opacity-95 transition-opacity"
+                    className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-gradient-to-r from-[#00E5FF] via-[#00FF9C] to-[#1687FF] text-slate-950 font-black text-xs sm:text-sm font-mono shadow-neon-cyan hover:shadow-neon-cyan-lg hover:scale-[1.02] transition-all"
                   >
                     <Play className="w-4 h-4 fill-current" />
                     <span>START AI DETECTION</span>
@@ -222,7 +221,7 @@ export const DetectionPage: React.FC = () => {
                 ) : (
                   <button
                     onClick={handleStopDetection}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs font-mono transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-gradient-to-r from-[#FF3158] to-[#FF8A00] text-white font-black text-xs sm:text-sm font-mono shadow-neon-red hover:shadow-neon-red-lg transition-all"
                   >
                     <Square className="w-4 h-4 fill-current" />
                     <span>STOP DETECTION</span>
@@ -234,22 +233,22 @@ export const DetectionPage: React.FC = () => {
 
           {/* Progress & Pipeline Step Feedback */}
           {(isProcessing || progress > 0) && (
-            <div className="glass-panel rounded-xl p-4 border-slate-800 space-y-3">
+            <div className="neon-glass-panel rounded-2xl p-5 border-2 border-[#00E5FF]/40 shadow-neon-cyan space-y-3.5">
               <div className="flex justify-between items-center text-xs font-mono">
-                <span className="text-slate-300 font-semibold">PIPELINE EXECUTION</span>
-                <span className="text-cyan-400 font-bold">{progress}%</span>
+                <span className="text-white font-bold tracking-wider">PIPELINE EXECUTION</span>
+                <span className="text-[#00E5FF] font-black text-sm text-glow-cyan">{progress}%</span>
               </div>
 
               {/* Progress Bar */}
-              <div className="w-full h-2.5 rounded-full bg-slate-900 overflow-hidden border border-slate-800">
+              <div className="w-full h-3 rounded-full bg-slate-950 overflow-hidden border border-[#00E5FF]/50 p-0.5">
                 <div
-                  className="h-full bg-gradient-to-r from-cyan-500 via-teal-400 to-blue-500 transition-all duration-300"
+                  className="h-full bg-gradient-to-r from-[#00E5FF] via-[#00FF9C] to-[#1687FF] rounded-full transition-all duration-300 shadow-neon-cyan"
                   style={{ width: `${progress}%` }}
                 />
               </div>
 
-              <div className="text-[11px] font-mono text-cyan-300 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              <div className="text-xs font-mono text-[#00FF9C] flex items-center gap-2 font-bold">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#00FF9C] animate-ping" />
                 <span>{currentStep}</span>
               </div>
             </div>
@@ -258,49 +257,49 @@ export const DetectionPage: React.FC = () => {
 
         {/* Right Column: Video Preview and AI Detection Overlay (7 cols) */}
         <div className="lg:col-span-7">
-          <div className="glass-panel rounded-xl p-4 border-slate-800 h-full flex flex-col">
+          <div className="neon-glass-panel rounded-2xl p-5 border-2 border-[#00E5FF]/35 shadow-[0_0_25px_rgba(0,229,255,0.15)] h-full flex flex-col">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-xs font-mono uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <div className="text-xs font-mono uppercase tracking-wider text-slate-300 font-bold flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#00E5FF]" />
                 SURVEILLANCE FEED MONITOR
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
+              <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded bg-[#00E5FF]/15 text-[#00E5FF] border border-[#00E5FF]/50 shadow-neon-cyan">
                 CCTV PROJECTION
               </span>
             </div>
 
             {/* Video Viewport */}
-            <div className="relative flex-1 min-h-[300px] sm:min-h-[360px] bg-slate-950 rounded-lg overflow-hidden border border-slate-800 flex items-center justify-center">
+            <div className="relative flex-1 min-h-[320px] sm:min-h-[380px] bg-slate-950 rounded-xl overflow-hidden border-2 border-[#00E5FF]/30 flex items-center justify-center">
               {videoPreviewUrl ? (
                 <video
                   src={videoPreviewUrl}
                   controls
-                  className="w-full h-full object-contain max-h-[440px]"
+                  className="w-full h-full object-contain max-h-[460px]"
                 />
               ) : (
-                <div className="text-center p-6 text-slate-500 space-y-2">
-                  <FileVideo className="w-12 h-12 mx-auto text-slate-600" />
-                  <p className="text-xs font-mono">No video loaded for monitoring</p>
-                  <p className="text-[11px] text-slate-600">
-                    Upload a traffic footage clip above to initiate detection
+                <div className="text-center p-6 text-slate-400 space-y-3">
+                  <FileVideo className="w-14 h-14 mx-auto text-[#00E5FF]/40" />
+                  <p className="text-sm font-mono font-bold text-white">No video loaded for monitoring</p>
+                  <p className="text-xs text-slate-400">
+                    Upload a traffic footage clip above to initiate Co-DETR detection
                   </p>
                 </div>
               )}
 
               {/* Simulated Hologram Bounding Box Overlay if processing */}
               {isProcessing && (
-                <div className="absolute inset-0 pointer-events-none border border-cyan-500/40 scanline-overlay">
-                  <div className="absolute top-4 left-4 bg-slate-950/80 px-2.5 py-1 rounded border border-cyan-500/50 text-[10px] font-mono text-cyan-400 animate-pulse">
+                <div className="absolute inset-0 pointer-events-none border-2 border-[#00E5FF] scanline-overlay">
+                  <div className="absolute top-4 left-4 bg-slate-950/90 px-3 py-1.5 rounded-lg border-2 border-[#00E5FF] text-xs font-mono font-bold text-[#00E5FF] shadow-neon-cyan animate-pulse">
                     CO-DETR INFERENCE ACTIVE
                   </div>
-                  {/* Mock Bounding Box 1 */}
-                  <div className="absolute top-1/3 left-1/4 w-32 h-44 border-2 border-dashed border-cyan-400 rounded">
-                    <span className="absolute -top-5 left-0 bg-cyan-950 text-cyan-300 text-[9px] px-1 font-mono">
-                      Bike [98.2%]
+                  {/* Bounding Box 1 */}
+                  <div className="absolute top-1/3 left-1/4 w-36 h-48 border-2 border-dashed border-[#00E5FF] rounded shadow-[0_0_12px_#00E5FF]">
+                    <span className="absolute -top-6 left-0 bg-[#00E5FF] text-slate-950 font-black text-[10px] px-1.5 py-0.5 font-mono rounded">
+                      Motorbike [98.2%]
                     </span>
                   </div>
-                  {/* Mock Bounding Box 2 (Helmet) */}
-                  <div className="absolute top-[28%] left-[28%] w-12 h-12 border-2 border-rose-500 rounded-full animate-ping opacity-60" />
+                  {/* Bounding Box 2 (Helmet) */}
+                  <div className="absolute top-[26%] left-[28%] w-14 h-14 border-2 border-[#FF3158] rounded-full shadow-neon-red animate-ping opacity-75" />
                 </div>
               )}
             </div>
@@ -310,80 +309,81 @@ export const DetectionPage: React.FC = () => {
 
       {/* Detection Results Area */}
       {result && (
-        <div className="glass-panel rounded-xl p-5 border-cyan-500/30 shadow-2xl space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <h2 className="font-tech text-lg font-bold tracking-wider text-slate-100 uppercase">
+        <div className="neon-glass-panel rounded-2xl p-6 border-2 border-[#00FF9C]/60 shadow-[0_0_35px_rgba(0,255,156,0.25)] space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b-2 border-white/10">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-6 h-6 text-[#00FF9C] drop-shadow-[0_0_8px_#00FF9C]" />
+              <h2 className="font-tech text-xl sm:text-2xl font-black tracking-wider text-white uppercase text-glow-green">
                 Detection Results & Violation Audit
               </h2>
             </div>
-            <span className="text-xs font-mono text-slate-400">
-              Processed: {new Date(result.processedAt).toLocaleTimeString()}
+            <span className="text-xs font-mono font-bold text-[#00E5FF] bg-[#00E5FF]/15 px-3 py-1 rounded-md border border-[#00E5FF]/40">
+              PROCESSED: {new Date(result.processedAt).toLocaleTimeString()}
             </span>
           </div>
 
           {/* KPI Summary Cards for this video */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3">
-              <div className="text-slate-400 text-xs flex items-center gap-1 mb-1">
-                <Bike className="w-3.5 h-3.5 text-cyan-400" /> Motorcycles Detected
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-[#0A1A35]/90 border-2 border-[#00E5FF] rounded-xl p-4 shadow-neon-cyan">
+              <div className="text-slate-300 text-xs font-semibold flex items-center gap-1.5 mb-1">
+                <Bike className="w-4 h-4 text-[#00E5FF]" /> Motorcycles Detected
               </div>
-              <div className="text-2xl font-bold font-tech text-cyan-300">
+              <div className="text-3xl font-black font-tech text-[#00E5FF] text-glow-cyan">
                 {result.totalMotorcycles}
               </div>
             </div>
 
-            <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3">
-              <div className="text-slate-400 text-xs flex items-center gap-1 mb-1">
-                <AlertTriangle className="w-3.5 h-3.5 text-rose-400" /> Violations Found
+            <div className="bg-[#2D0914]/90 border-2 border-[#FF3158] rounded-xl p-4 shadow-neon-red">
+              <div className="text-slate-300 text-xs font-semibold flex items-center gap-1.5 mb-1">
+                <AlertTriangle className="w-4 h-4 text-[#FF3158]" /> Violations Found
               </div>
-              <div className="text-2xl font-bold font-tech text-rose-400">
+              <div className="text-3xl font-black font-tech text-[#FF3158] text-glow-red">
                 {result.totalViolations}
               </div>
             </div>
 
-            <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3">
-              <div className="text-slate-400 text-xs flex items-center gap-1 mb-1">
-                <Percent className="w-3.5 h-3.5 text-emerald-400" /> Compliance Rate
+            <div className="bg-[#062419]/90 border-2 border-[#00FF9C] rounded-xl p-4 shadow-neon-green">
+              <div className="text-slate-300 text-xs font-semibold flex items-center gap-1.5 mb-1">
+                <Percent className="w-4 h-4 text-[#00FF9C]" /> Compliance Rate
               </div>
-              <div className="text-2xl font-bold font-tech text-emerald-400">
+              <div className="text-3xl font-black font-tech text-[#00FF9C] text-glow-green">
                 {result.complianceRate}%
               </div>
             </div>
 
-            <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3">
-              <div className="text-slate-400 text-xs flex items-center gap-1 mb-1">
-                <Clock className="w-3.5 h-3.5 text-blue-400" /> Frames Evaluated
+            <div className="bg-[#1A0A33]/90 border-2 border-[#B44CFF] rounded-xl p-4 shadow-neon-purple">
+              <div className="text-slate-300 text-xs font-semibold flex items-center gap-1.5 mb-1">
+                <Clock className="w-4 h-4 text-[#B44CFF]" /> Frames Evaluated
               </div>
-              <div className="text-2xl font-bold font-tech text-slate-200">
+              <div className="text-3xl font-black font-tech text-white">
                 {result.framesProcessed} <span className="text-xs font-normal text-slate-400">({result.fps} FPS)</span>
               </div>
             </div>
           </div>
 
           {/* Timeline violation events */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-mono uppercase tracking-wider text-slate-400">
+          <div className="space-y-3">
+            <h3 className="text-xs font-mono uppercase tracking-wider text-white font-bold flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-[#00E5FF]" />
               Video Timestamp Infraction Markers
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {result.violationsBreakdown.map((item, idx) => (
                 <div
                   key={idx}
-                  className="p-3 rounded-lg bg-slate-900/90 border border-rose-500/30 space-y-1.5"
+                  className="p-4 rounded-xl bg-gradient-to-br from-[#2D0914] to-[#17050A] border-2 border-[#FF3158] shadow-neon-red space-y-2"
                 >
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-mono text-rose-400 font-bold flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" />
+                    <span className="font-mono text-[#FF3158] font-black text-sm flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4" />
                       {item.time}
                     </span>
-                    <span className="font-mono text-cyan-300 text-[11px]">{item.confidence}% Conf</span>
+                    <span className="font-mono text-[#00E5FF] font-black text-xs text-glow-cyan">{item.confidence}% CONF</span>
                   </div>
-                  <div className="text-xs font-semibold text-slate-200">{item.violation}</div>
-                  <div className="text-[10px] text-slate-400 font-mono flex justify-between">
-                    <span>{item.vehicle}</span>
-                    <span className="text-slate-500">{item.location}</span>
+                  <div className="text-sm font-bold text-white">{item.violation}</div>
+                  <div className="text-xs text-slate-300 font-mono flex justify-between pt-1 border-t border-white/10">
+                    <span className="font-bold text-white">{item.vehicle}</span>
+                    <span className="text-[#00E5FF]">{item.location}</span>
                   </div>
                 </div>
               ))}
