@@ -21,36 +21,36 @@ export const TrafficFlowChart: React.FC = () => {
   const maxVal = 80;
 
   return (
-    <div className="rounded-xl p-5 sm:p-6 bg-slate-900/80 border border-slate-800 shadow-md">
+    <div className="rounded-xl p-5 sm:p-6 bg-white border border-slate-200 shadow-sm flex flex-col justify-between h-full">
       {/* Header & Legend */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
+          <div className="p-2 rounded-lg bg-blue-50 text-blue-600 border border-blue-100">
             <Activity className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-tech text-base sm:text-lg font-bold tracking-wide text-white uppercase">
-              Traffic Flow & Compliance (Last 1 Hour)
+            <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 uppercase">
+              TRAFFIC FLOW & COMPLIANCE
             </h3>
-            <p className="text-xs text-slate-400">
-              5-minute telemetry intervals comparing total traffic vs detected violations
+            <p className="text-xs text-slate-500">
+              5-minute intervals (Last 1 hour) • Total volume vs helmet infractions
             </p>
           </div>
         </div>
 
-        {/* Clean Legend */}
-        <div className="flex items-center gap-4 text-xs font-mono">
+        {/* Legend */}
+        <div className="flex items-center gap-4 text-xs font-medium">
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-sky-500" />
-            <span className="text-slate-300">Total Traffic</span>
+            <span className="w-3 h-3 rounded-sm bg-blue-600" />
+            <span className="text-slate-700">Total Traffic</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
-            <span className="text-slate-300">Compliant</span>
+            <span className="w-3 h-3 rounded-sm bg-green-600" />
+            <span className="text-slate-700">Compliant</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-red-500" />
-            <span className="text-slate-300">Violations</span>
+            <span className="w-3 h-3 rounded-sm bg-red-600" />
+            <span className="text-slate-700">Violations</span>
           </div>
         </div>
       </div>
@@ -58,7 +58,7 @@ export const TrafficFlowChart: React.FC = () => {
       {/* Bar Chart with Y-Axis */}
       <div className="w-full flex gap-3">
         {/* Y-Axis */}
-        <div className="h-56 flex flex-col justify-between items-end text-[10px] font-mono text-slate-500 pb-6 pr-1 select-none">
+        <div className="h-56 flex flex-col justify-between items-end text-[11px] font-mono text-slate-400 pb-6 pr-1 select-none">
           <span>80</span>
           <span>60</span>
           <span>40</span>
@@ -68,13 +68,13 @@ export const TrafficFlowChart: React.FC = () => {
 
         {/* Bars Container */}
         <div className="h-56 flex-1 flex flex-col justify-end">
-          <div className="relative flex-1 w-full flex items-end justify-between gap-1 sm:gap-2 px-1 border-b border-slate-800">
-            {/* Horizontal Grid lines */}
-            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
-              <div className="w-full border-b border-slate-700" />
-              <div className="w-full border-b border-slate-700" />
-              <div className="w-full border-b border-slate-700" />
-              <div className="w-full border-b border-slate-700" />
+          <div className="relative flex-1 w-full flex items-end justify-between gap-1 sm:gap-2 px-1 border-b border-slate-200">
+            {/* Horizontal Light Grid lines */}
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-40">
+              <div className="w-full border-b border-slate-200" />
+              <div className="w-full border-b border-slate-200" />
+              <div className="w-full border-b border-slate-200" />
+              <div className="w-full border-b border-slate-200" />
             </div>
 
             {intervals.map((item, idx) => {
@@ -88,32 +88,32 @@ export const TrafficFlowChart: React.FC = () => {
                   className="flex-1 flex flex-col items-center group relative h-full justify-end"
                 >
                   {/* Tooltip on hover */}
-                  <div className="opacity-0 group-hover:opacity-100 absolute -top-12 bg-slate-950 border border-slate-700 text-white text-[11px] font-mono px-2.5 py-1 rounded-md pointer-events-none transition-opacity z-20 whitespace-nowrap shadow-md flex flex-col items-center">
-                    <span className="font-semibold text-sky-400">{item.time}</span>
-                    <span className="text-slate-300">{item.total} total • <span className="text-red-400 font-medium">{item.violations} viol.</span></span>
+                  <div className="opacity-0 group-hover:opacity-100 absolute -top-12 bg-slate-900 text-white text-[11px] font-mono px-2.5 py-1 rounded-md pointer-events-none transition-opacity z-20 whitespace-nowrap shadow-lg flex flex-col items-center">
+                    <span className="font-semibold text-blue-400">{item.time}</span>
+                    <span>{item.total} total • <span className="text-red-400 font-bold">{item.violations} viol.</span></span>
                   </div>
 
                   {/* Clean Bar Group */}
                   <div className="w-full max-w-[28px] flex items-end justify-center gap-0.5 sm:gap-1 h-full pb-0.5">
-                    {/* Total Bar */}
+                    {/* Total Bar (Blue) */}
                     <div
-                      className="w-1/3 bg-sky-500/80 hover:bg-sky-400 rounded-t-sm transition-colors"
+                      className="w-1/3 bg-blue-600 hover:bg-blue-700 rounded-t-sm transition-colors"
                       style={{ height: `${totalHeight}%` }}
                     />
-                    {/* Compliant Bar */}
+                    {/* Compliant Bar (Green) */}
                     <div
-                      className="w-1/3 bg-emerald-500/80 hover:bg-emerald-400 rounded-t-sm transition-colors"
+                      className="w-1/3 bg-green-600 hover:bg-green-700 rounded-t-sm transition-colors"
                       style={{ height: `${compliantHeight}%` }}
                     />
-                    {/* Violation Bar */}
+                    {/* Violation Bar (Red) */}
                     <div
-                      className="w-1/3 bg-red-500/80 hover:bg-red-400 rounded-t-sm transition-colors"
+                      className="w-1/3 bg-red-600 hover:bg-red-700 rounded-t-sm transition-colors"
                       style={{ height: `${Math.max(violationHeight, 6)}%` }}
                     />
                   </div>
 
                   {/* Time Stamp */}
-                  <span className="text-[10px] sm:text-[11px] font-mono text-slate-400 mt-2">
+                  <span className="text-[10px] sm:text-[11px] font-mono text-slate-500 mt-2 font-medium">
                     {item.time}
                   </span>
                 </div>

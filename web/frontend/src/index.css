@@ -5,17 +5,21 @@
 @layer base {
   body {
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #0A0F1D;
+    background-color: #F8FAFC;
+    color: #0F172A;
     background-image: 
-      radial-gradient(circle at 20% 10%, rgba(14, 116, 144, 0.15) 0%, transparent 40%),
-      radial-gradient(circle at 80% 20%, rgba(30, 58, 138, 0.15) 0%, transparent 40%),
-      radial-gradient(circle at 50% 90%, rgba(15, 23, 42, 0.8) 0%, transparent 60%);
+      radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.03) 0%, transparent 40%),
+      radial-gradient(circle at 90% 20%, rgba(14, 165, 233, 0.03) 0%, transparent 40%);
     background-attachment: fixed;
-    color: #f8fafc;
   }
 
-  h1, h2, h3, .font-tech {
-    font-family: 'Chakra Petch', system-ui, sans-serif;
+  h1, h2, h3 {
+    font-family: 'Inter', system-ui, sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  .font-tech {
+    font-family: 'Inter', system-ui, sans-serif;
   }
 
   .font-mono-code {
@@ -23,78 +27,74 @@
   }
 }
 
-/* Clean Custom Scrollbars */
+/* Clean Custom Scrollbars for Light Theme */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0A0F1D;
+  background: #F1F5F9;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: #CBD5E1;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #94A3B8;
 }
 
-/* Clean Professional Glass Panels */
+/* Clean Professional Light Cards */
 .neon-glass-panel {
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(51, 65, 85, 0.8);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
 }
 
 .neon-glass-card {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(51, 65, 85, 0.7);
-  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.4);
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
 }
 
 .neon-card-hover {
   transition: all 0.2s ease-in-out;
 }
 .neon-card-hover:hover {
-  transform: translateY(-2px);
-  border-color: rgba(56, 189, 248, 0.5);
+  border-color: #CBD5E1;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
 }
 
 /* Subtle clean border accents */
 .neon-border-cyan {
-  border: 1px solid rgba(6, 182, 212, 0.5);
+  border: 1px solid #BAE6FD;
 }
 
 .neon-border-green {
-  border: 1px solid rgba(16, 185, 129, 0.5);
+  border: 1px solid #BBF7D0;
 }
 
 .neon-border-red {
-  border: 1px solid rgba(239, 68, 68, 0.6);
+  border: 1px solid #FECACA;
 }
 
 .neon-border-purple {
-  border: 1px solid rgba(168, 85, 247, 0.5);
+  border: 1px solid #E9D5FF;
 }
 
 .neon-border-amber {
-  border: 1px solid rgba(245, 158, 11, 0.5);
+  border: 1px solid #FDE68A;
 }
 
-/* Crisp readable text accents without excessive blur */
+/* Clean accessible text colors without glowing blur */
 .text-glow-cyan {
-  color: #38bdf8;
+  color: #0284C7;
 }
 .text-glow-green {
-  color: #34d399;
+  color: #16A34A;
 }
 .text-glow-red {
-  color: #f87171;
+  color: #DC2626;
 }
 .text-glow-purple {
-  color: #c084fc;
+  color: #7C3AED;
 }

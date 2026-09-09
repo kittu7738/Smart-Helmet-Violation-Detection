@@ -9,6 +9,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { api } from './services/api';
 import { DashboardStats, LiveDetectionSummary, RecentViolation } from './types/detection';
 import { mockDashboardStats, mockLiveDetection, mockRecentViolations } from './data/mockDashboard';
+
 export const App: React.FC = () => {
   const getInitialTab = (): NavTab => {
     const hash = window.location.hash.replace('#', '') as NavTab;
@@ -40,9 +41,7 @@ export const App: React.FC = () => {
   const [violations, setViolations] = useState<RecentViolation[]>(mockRecentViolations);
   const [backendConnected, setBackendConnected] = useState(false);
 
-
   useEffect(() => {
-    // Initial fetch from API (falls back gracefully to mock data if backend is offline)
     const loadData = async () => {
       const health = await api.getHealth();
       setBackendConnected(health.isConnected);
@@ -56,25 +55,24 @@ export const App: React.FC = () => {
     };
 
     loadData();
-    // Periodic refresh
     const interval = setInterval(loadData, 10000);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#040711] text-white selection:bg-[#00E5FF]/30 selection:text-[#00E5FF]">
-      {/* Top Header */}
+    <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-slate-900 selection:bg-blue-100 selection:text-blue-900">
+      {/* Clean White Header */}
       <Header backendConnected={backendConnected} />
 
-      {/* Navigation */}
+      {/* Clean Navigation Bar */}
       <Navigation
         activeTab={activeTab}
         onTabChange={setActiveTab}
         violationsCount={stats.violations}
       />
 
-      {/* Main Content Area: High-Impact Full-Screen Width */}
-      <main className="flex-1 w-full max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 py-6 pb-24 md:pb-12">
+      {/* Main Content Area */}
+      <main className="flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 pb-24 md:pb-12">
         {activeTab === 'dashboard' && (
           <DashboardPage
             stats={stats}
@@ -94,22 +92,21 @@ export const App: React.FC = () => {
         {activeTab === 'settings' && <SettingsPage />}
       </main>
 
-      {/* Clean Academic Project Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-950/80 py-4 text-center text-xs text-slate-400 font-mono">
+      {/* Clean Professional Footer */}
+      <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
         <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="text-slate-300 font-medium">Smart Helmet AI Violation Detection System</span>
-            <span className="text-slate-600">|</span>
-            <span className="text-sky-400">Co-DETR Swin-L Vision Core</span>
+            <span className="w-2 h-2 rounded-full bg-green-500" />
+            <span className="font-semibold text-slate-700">Smart Helmet AI Violation Detection System</span>
+            <span className="text-slate-300">|</span>
+            <span className="text-blue-600 font-medium">Co-DETR Swin-L Vision Core</span>
           </div>
-          <div className="text-slate-400">
-            IIITVICD AI City Challenge Research & Development Demo
+          <div className="text-slate-500">
+            IIITVICD AI City Challenge Research Project
           </div>
         </div>
       </footer>
     </div>
-
   );
 };
 
