@@ -177,7 +177,7 @@ data = dict(
 # ------------------------------------------------------------------
 # Evaluation
 # ------------------------------------------------------------------
-evaluation = dict(interval=1, metric='bbox')
+evaluation = dict(interval=1, metric='bbox', save_best='bbox_mAP')
 
 # ------------------------------------------------------------------
 # Model  (Co-DINO / Co-DETR with Swin-L backbone – 5-scale FPN)
@@ -522,7 +522,7 @@ runner = dict(type='EpochBasedRunner', max_epochs=max_epochs)
 # ------------------------------------------------------------------
 # Logging, checkpointing, and work directory
 # ------------------------------------------------------------------
-checkpoint_config = dict(interval=1)
+checkpoint_config = dict(interval=1, max_keep_ckpts=3)
 log_config = dict(
     interval=50,
     hooks=[

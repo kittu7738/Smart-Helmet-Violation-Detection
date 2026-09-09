@@ -80,6 +80,11 @@ def _parse_args():
         help="Checkpoint .pth to resume training from.",
     )
     parser.add_argument(
+        "--auto-resume",
+        action="store_true",
+        help="Automatically resume from work_dir/latest.pth if it exists.",
+    )
+    parser.add_argument(
         "--load-from",
         default=None,
         help="Checkpoint .pth to load weights from (no optimizer state).",
@@ -243,6 +248,16 @@ def main():
     # ── 4. Optional checkpoint loading / resuming ─────────────────────────────
     if args.resume_from:
         cfg.resume_from = args.resume_from
+    elif args.auto_resume:
+        latest_ckpt = os.path.join(work_dir, "latest.pth")
+        if os.path.isfile(latest_ckpt):
+            cfg.resume_from = latest_ckpt
+            print(f"[INFO] Auto-resuming from: {latest_ckpt}")
+        else:
+            print(
+                f"[INFO] --auto-resume requested, but {latest_ckpt} does not exist yet. "
+                "Starting fresh training from epoch 1."
+            )
     if args.load_from:
         cfg.load_from = args.load_from
 
