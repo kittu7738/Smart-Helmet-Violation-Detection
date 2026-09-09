@@ -83,7 +83,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
       {cards.map((card, idx) => {
         const Icon = card.icon;
 
@@ -91,12 +91,12 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
         const points = card.sparkline;
         const maxVal = Math.max(...points);
         const minVal = Math.min(...points) - 5;
-        const width = 120;
-        const height = 36;
+        const width = 130;
+        const height = 44;
         const polylinePoints = points
           .map((val, i) => {
             const x = (i / (points.length - 1)) * width;
-            const y = height - ((val - minVal) / (maxVal - minVal || 1)) * (height - 6) - 3;
+            const y = height - ((val - minVal) / (maxVal - minVal || 1)) * (height - 8) - 4;
             return `${x},${y}`;
           })
           .join(' ');
@@ -104,36 +104,36 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
         return (
           <div
             key={idx}
-            className={`relative rounded-2xl p-5 sm:p-6 border-2 bg-gradient-to-br ${card.bgGradient} ${card.borderColor} ${card.glowShadow} backdrop-blur-xl transition-all duration-300 hover:-translate-y-1.5 overflow-hidden group`}
+            className={`relative rounded-2xl p-6 sm:p-7 border-2 bg-gradient-to-br ${card.bgGradient} ${card.borderColor} ${card.glowShadow} backdrop-blur-2xl transition-all duration-300 hover:-translate-y-2 overflow-hidden group min-h-[175px] flex flex-col justify-between`}
           >
             {/* Ambient corner light flare */}
             <div
-              className="absolute -top-10 -right-10 w-32 h-32 rounded-full blur-2xl opacity-40 group-hover:opacity-75 transition-opacity pointer-events-none"
+              className="absolute -top-12 -right-12 w-36 h-36 rounded-full blur-3xl opacity-50 group-hover:opacity-85 transition-opacity pointer-events-none"
               style={{ backgroundColor: card.sparklineColor }}
             />
 
             {/* Header: Title and Icon */}
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-mono font-bold tracking-wider text-slate-200 uppercase">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-xs sm:text-sm font-mono font-bold tracking-widest text-slate-200 uppercase">
                 {card.title}
               </span>
-              <div className={`p-2.5 rounded-xl ${card.iconBox}`}>
-                <Icon className="w-5 h-5 drop-shadow-md" />
+              <div className={`p-3 rounded-xl ${card.iconBox}`}>
+                <Icon className="w-5 h-5 sm:w-6 sm:h-6 drop-shadow-md" />
               </div>
             </div>
 
-            {/* Metric Value */}
-            <div className="flex items-baseline justify-between gap-2">
-              <div className={`text-3xl sm:text-4xl font-black font-tech tracking-tight ${card.textColor} ${card.textGlow}`}>
+            {/* Metric Value & Sparkline */}
+            <div className="flex items-end justify-between gap-2 my-1">
+              <div className={`text-4xl sm:text-5xl font-black font-tech tracking-tight ${card.textColor} ${card.textGlow}`}>
                 {card.value}
               </div>
 
               {/* Mini Sparkline Graph */}
-              <div className="w-24 h-8">
+              <div className="w-28 h-10 flex-shrink-0">
                 <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
                   <defs>
                     <linearGradient id={`grad-${idx}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={card.sparklineColor} stopOpacity="0.4" />
+                      <stop offset="0%" stopColor={card.sparklineColor} stopOpacity="0.45" />
                       <stop offset="100%" stopColor={card.sparklineColor} stopOpacity="0" />
                     </linearGradient>
                   </defs>
@@ -144,7 +144,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
                   <polyline
                     fill="none"
                     stroke={card.sparklineColor}
-                    strokeWidth="2.5"
+                    strokeWidth="3"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     points={polylinePoints}
@@ -154,18 +154,17 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
             </div>
 
             {/* Subtext and Trend Indicator */}
-            <div className="mt-3 pt-2.5 border-t border-white/10 flex flex-wrap items-center justify-between gap-1 text-xs">
-              <span className="text-slate-300 font-medium text-[11px]">{card.unit}</span>
-              <span className={`flex items-center gap-1 font-mono text-[11px] font-bold px-2 py-0.5 rounded-md ${card.badgeBg} whitespace-nowrap`}>
+            <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="text-slate-300 font-medium text-xs tracking-wide">{card.unit}</span>
+              <span className={`flex items-center gap-1 font-mono text-xs font-bold px-2.5 py-1 rounded-md ${card.badgeBg} whitespace-nowrap shadow-sm`}>
                 {card.isPositive ? (
-                  <ArrowUpRight className="w-3 h-3 flex-shrink-0" />
+                  <ArrowUpRight className="w-3.5 h-3.5 flex-shrink-0" />
                 ) : (
-                  <ArrowDownRight className="w-3 h-3 flex-shrink-0" />
+                  <ArrowDownRight className="w-3.5 h-3.5 flex-shrink-0" />
                 )}
-                <span className="truncate max-w-[130px] sm:max-w-none">{card.change}</span>
+                <span>{card.change}</span>
               </span>
             </div>
-
           </div>
         );
       })}

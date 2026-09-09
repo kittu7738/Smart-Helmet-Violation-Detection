@@ -5,11 +5,15 @@
 @layer base {
   body {
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #040711;
+    background-color: #030712;
     background-image: 
-      radial-gradient(circle at 15% 15%, rgba(0, 229, 255, 0.08) 0%, transparent 40%),
-      radial-gradient(circle at 85% 25%, rgba(180, 76, 255, 0.07) 0%, transparent 40%),
-      radial-gradient(circle at 50% 85%, rgba(0, 255, 156, 0.05) 0%, transparent 50%);
+      radial-gradient(circle at 18% 12%, rgba(0, 229, 255, 0.12) 0%, transparent 45%),
+      radial-gradient(circle at 82% 28%, rgba(22, 135, 255, 0.10) 0%, transparent 45%),
+      radial-gradient(circle at 50% 75%, rgba(180, 76, 255, 0.08) 0%, transparent 50%),
+      radial-gradient(circle at 30% 90%, rgba(0, 255, 156, 0.06) 0%, transparent 45%),
+      linear-gradient(rgba(0, 229, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 229, 255, 0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 48px 48px, 48px 48px;
     background-attachment: fixed;
     color: #ffffff;
   }

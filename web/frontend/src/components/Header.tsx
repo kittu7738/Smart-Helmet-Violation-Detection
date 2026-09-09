@@ -8,7 +8,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ backendConnected = true }) => {
   return (
     <header className="w-full border-b border-[#00E5FF]/30 bg-[#060B19]/90 backdrop-blur-2xl sticky top-0 z-40 shadow-[0_4px_30px_rgba(0,229,255,0.15)] transition-all">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 h-20 flex items-center justify-between">
         {/* Brand & Subtitle */}
         <div className="flex items-center gap-3 sm:gap-4">
           <div className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#00E5FF]/30 via-[#1687FF]/25 to-[#00FF9C]/20 border-2 border-[#00E5FF] shadow-neon-cyan flex-shrink-0">

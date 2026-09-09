@@ -37,7 +37,7 @@ export const Navigation: React.FC<NavigationProps> = ({
     <>
       {/* Desktop & Tablet Navigation Bar */}
       <nav className="hidden md:block w-full border-b border-[#00E5FF]/20 bg-[#060B19]/80 backdrop-blur-md sticky top-20 z-30 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
           <div className="flex space-x-2 sm:space-x-3 py-3">
             {tabs.map((tab) => {
               const Icon = tab.icon;
