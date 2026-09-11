@@ -84,9 +84,6 @@ train_pipeline = [
                         (736, 1333),
                         (768, 1333),
                         (800, 1333),
-                        (864, 1333),
-                        (928, 1333),
-                        (960, 1333),
                     ],
                     multiscale_mode='value',
                     keep_ratio=True,
@@ -119,9 +116,6 @@ train_pipeline = [
                         (736, 1333),
                         (768, 1333),
                         (800, 1333),
-                        (864, 1333),
-                        (928, 1333),
-                        (960, 1333),
                     ],
                     multiscale_mode='value',
                     override=True,
@@ -540,7 +534,7 @@ runner = dict(type='EpochBasedRunner', max_epochs=max_epochs)
 # ------------------------------------------------------------------
 checkpoint_config = dict(interval=1, max_keep_ckpts=3)
 log_config = dict(
-    interval=50,
+    interval=10,
     hooks=[
         dict(type='TextLoggerHook'),
     ],

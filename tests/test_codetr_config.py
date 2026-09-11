@@ -58,10 +58,11 @@ def test_config_generalization_improvements():
     has_pmd = any(step.get("type") == "PhotoMetricDistortion" for step in pipeline)
     assert has_pmd is True, "PhotoMetricDistortion must be enabled in train_pipeline"
 
-    # 2. Multi-scale scale expansion
+    # 2. Multi-scale scale bounded to 800 to prevent Tesla T4 VRAM thrashing
     auto_aug = [s for s in pipeline if s.get("type") == "AutoAugment"][0]
     scales_policy0 = auto_aug["policies"][0][0]["img_scale"]
-    assert (960, 1333) in scales_policy0, "Expected scale (960, 1333) in AutoAugment policy 0"
+    assert (800, 1333) in scales_policy0, "Expected scale (800, 1333) in AutoAugment policy 0"
+    assert (960, 1333) not in scales_policy0, "Scale (960, 1333) must not be in policy 0 (causes T4 thrashing)"
 
     # 3. Regularization: Weight decay >= 0.01
     assert cfg["optimizer"]["weight_decay"] == 0.01
@@ -69,6 +70,9 @@ def test_config_generalization_improvements():
     # 4. IoU precision enhancement
     assert cfg["model"]["query_head"]["loss_iou"]["loss_weight"] == 3.0
     assert cfg["model"]["train_cfg"][0]["assigner"]["iou_cost"]["weight"] == 3.0
+
+    # 5. Fast iteration logging
+    assert cfg["log_config"]["interval"] == 10
 
 
 def test_config_evaluation_and_checkpointing():
@@ -241,5 +245,83 @@ def test_sanity_check_dataset_control_flow(tmp_path):
         json.dump(dummy_coco_empty, f)
     res_empty = check_dataset_func(cfg, str(data_root))
     assert res_empty is False
+
+
+def test_train_py_performance_arguments():
+    module = runpy.run_path(TRAIN_PY_PATH)
+    parse_args_func = module["_parse_args"]
+
+    orig_argv = sys.argv
+    try:
+        sys.argv = [
+            "train.py",
+            "--config", CONFIG_PATH,
+            "--log-interval", "15",
+            "--workers-per-gpu", "1",
+            "--no-stage-data",
+            "--stage-dir", "/tmp/custom_stage",
+            "--swin-pretrained", "/tmp/custom_swin.pth",
+        ]
+        args = parse_args_func()
+        assert args.log_interval == 15
+        assert args.workers_per_gpu == 1
+        assert args.no_stage_data is True
+        assert args.stage_dir == "/tmp/custom_stage"
+        assert args.swin_pretrained == "/tmp/custom_swin.pth"
+    finally:
+        sys.argv = orig_argv
+
+
+def test_stage_dataset_if_needed(tmp_path):
+    module = runpy.run_path(TRAIN_PY_PATH)
+    stage_func = module["stage_dataset_if_needed"]
+
+    # Create mock source dataset pretending to be on Google Drive
+    src_dir = tmp_path / "content" / "drive" / "MyDrive" / "data"
+    os.makedirs(src_dir / "train" / "images", exist_ok=True)
+    with open(src_dir / "train" / "instances_train.json", "w") as f:
+        f.write('{"test": 1}')
+    with open(src_dir / "train" / "images" / "001.jpg", "wb") as f:
+        f.write(b"mock_image_bytes")
+
+    dst_dir = tmp_path / "content" / "dataset_local"
+
+    # Stage dataset
+    staged_path = stage_func(str(src_dir), stage_dir=str(dst_dir), enabled=True)
+    assert staged_path == str(dst_dir)
+    assert os.path.isfile(dst_dir / "train" / "instances_train.json")
+    assert os.path.isfile(dst_dir / "train" / "images" / "001.jpg")
+
+    # Calling again (idempotent)
+    staged_path_2 = stage_func(str(src_dir), stage_dir=str(dst_dir), enabled=True)
+    assert staged_path_2 == str(dst_dir)
+
+    # Calling with enabled=False should return src_dir untouched
+    res = stage_func(str(src_dir), stage_dir=str(dst_dir), enabled=False)
+    assert res == str(src_dir)
+
+
+def test_resolve_swin_backbone(tmp_path):
+    from types import SimpleNamespace
+    module = runpy.run_path(TRAIN_PY_PATH)
+    resolve_func = module["_resolve_swin_backbone"]
+
+    # 1. Test when swin_arg points to an existing file
+    local_swin = tmp_path / "swin.pth"
+    local_swin.write_bytes(b"0" * 1024)
+
+    cfg = SimpleNamespace(
+        model=SimpleNamespace(
+            backbone=SimpleNamespace(
+                init_cfg={
+                    "type": "Pretrained",
+                    "checkpoint": str(local_swin),
+                }
+            )
+        )
+    )
+    resolve_func(cfg)
+    assert cfg.model.backbone.init_cfg["checkpoint"] == str(local_swin)
+
 
 

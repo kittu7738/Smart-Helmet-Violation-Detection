@@ -37,8 +37,15 @@ See docs/colab_codetr_setup.md for full Colab setup instructions.
 import argparse
 import copy
 import os
+import shutil
 import sys
 import time
+
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+except (AttributeError, Exception):
+    pass
 
 # ---------------------------------------------------------------------------
 # Ensure Co-DETR source is on sys.path before importing mmdet / Co-DETR.
@@ -111,6 +118,34 @@ def _parse_args():
         type=int,
         default=0,
         help="(Set automatically by torch.distributed.launch)",
+    )
+    # Performance & Colab optimizations
+    parser.add_argument(
+        "--log-interval",
+        type=int,
+        default=None,
+        help="Logging interval in iterations (overrides config log_config.interval).",
+    )
+    parser.add_argument(
+        "--workers-per-gpu",
+        type=int,
+        default=None,
+        help="DataLoader workers per GPU (overrides config data.workers_per_gpu).",
+    )
+    parser.add_argument(
+        "--no-stage-data",
+        action="store_true",
+        help="Do not automatically stage Google Drive dataset to local disk.",
+    )
+    parser.add_argument(
+        "--stage-dir",
+        default="/content/dataset_local",
+        help="Local directory to stage dataset into when on Google Drive (default: /content/dataset_local).",
+    )
+    parser.add_argument(
+        "--swin-pretrained",
+        default=None,
+        help="Path to local Swin-L backbone checkpoint .pth.",
     )
     # Allow passing arbitrary MMDetection cfg-options as KEY=VALUE pairs.
     parser.add_argument(
@@ -190,8 +225,129 @@ def _validate_and_patch_data_root(cfg, data_root):
             )
 
 
+def _copy_tree_compat(src, dst):
+    """Recursively copy files from src to dst in a Python 3.7+ compatible manner."""
+    os.makedirs(dst, exist_ok=True)
+    count = 0
+    size = 0
+    for item in os.listdir(src):
+        s = os.path.join(src, item)
+        d = os.path.join(dst, item)
+        if os.path.isdir(s):
+            c, sz = _copy_tree_compat(s, d)
+            count += c
+            size += sz
+        else:
+            if not os.path.exists(d) or os.path.getmtime(s) > os.path.getmtime(d):
+                shutil.copy2(s, d)
+            count += 1
+            size += os.path.getsize(d)
+    return count, size
+
+
+def stage_dataset_if_needed(data_root, stage_dir="/content/dataset_local", enabled=True):
+    """
+    Stage dataset from slow Google Drive FUSE storage to fast local storage.
+    Prevents DataLoader multi-process deadlocks and massive I/O delays.
+    """
+    if not enabled or not data_root:
+        return data_root
+
+    # Only auto-stage if data_root appears to be on Google Drive (or if forced via env)
+    is_gdrive = data_root.startswith("/content/drive/") or "/MyDrive" in data_root
+    if not is_gdrive and not os.environ.get("CODETR_FORCE_STAGE"):
+        return data_root
+
+    stage_dir = os.path.abspath(stage_dir)
+    if os.path.abspath(data_root) == stage_dir:
+        return data_root
+
+    print(f"[INFO] Google Drive dataset detected at: {data_root}", flush=True)
+    print(f"[INFO] Staging dataset to local fast disk: {stage_dir} ...", flush=True)
+    start_time = time.time()
+
+    os.makedirs(stage_dir, exist_ok=True)
+    copied_files, total_bytes = _copy_tree_compat(data_root, stage_dir)
+    elapsed = time.time() - start_time
+    mb = total_bytes / (1024 * 1024)
+    print(
+        f"[INFO] Staging complete: {copied_files} files ({mb:.1f} MB) in {elapsed:.2f}s.",
+        flush=True,
+    )
+    return stage_dir
+
+
+def _resolve_swin_backbone(cfg, swin_arg=None):
+    """
+    Ensure the Swin-L backbone weights are located locally to prevent long download freezes.
+    """
+    if not hasattr(cfg, "model") or not hasattr(cfg.model, "backbone"):
+        return
+    if not hasattr(cfg.model.backbone, "init_cfg"):
+        return
+
+    init_cfg = cfg.model.backbone.init_cfg
+    if not isinstance(init_cfg, dict) or init_cfg.get("type") != "Pretrained":
+        return
+
+    checkpoint = init_cfg.get("checkpoint")
+    if not checkpoint:
+        return
+
+    # If already a local file that exists, nothing to do
+    if os.path.isfile(checkpoint):
+        print(f"[INFO] Using local Swin-L backbone checkpoint: {checkpoint}", flush=True)
+        return
+
+    # Candidate locations on Google Drive or local cache
+    candidates = []
+    if swin_arg and os.path.isfile(swin_arg):
+        candidates.append(swin_arg)
+
+    env_swin = os.environ.get("SWIN_PRETRAINED")
+    if env_swin and os.path.isfile(env_swin):
+        candidates.append(env_swin)
+
+    hub_cache = os.path.expanduser("~/.cache/torch/hub/checkpoints/swin_large_patch4_window12_384_22k.pth")
+    candidates.extend([
+        hub_cache,
+        "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/swin_large_patch4_window12_384_22k.pth",
+        "/content/drive/MyDrive/swin_large_patch4_window12_384_22k.pth",
+        "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs/helmet_codetr_swin_large/swin_large_patch4_window12_384_22k.pth",
+        "/content/drive/MyDrive/checkpoints/swin_large_patch4_window12_384_22k.pth",
+        "/content/drive/MyDrive/weights/swin_large_patch4_window12_384_22k.pth",
+    ])
+
+    found_local = None
+    for cand in candidates:
+        if cand and os.path.isfile(cand) and os.path.getsize(cand) > 500 * 1024 * 1024:
+            found_local = cand
+            break
+
+    if found_local:
+        print(f"[INFO] Found local Swin-L checkpoint: {found_local}", flush=True)
+        if found_local != hub_cache and not os.path.isfile(hub_cache):
+            try:
+                os.makedirs(os.path.dirname(hub_cache), exist_ok=True)
+                print(f"[INFO] Caching Swin-L weights to local SSD: {hub_cache} ...", flush=True)
+                shutil.copy2(found_local, hub_cache)
+                init_cfg["checkpoint"] = hub_cache
+            except Exception as e:
+                print(f"[WARNING] Could not copy to cache ({e}), pointing directly to {found_local}", flush=True)
+                init_cfg["checkpoint"] = found_local
+        else:
+            init_cfg["checkpoint"] = found_local
+    else:
+        print(
+            f"[INFO] Swin-L backbone will be fetched from: {checkpoint}\n"
+            "       Note: First download (~768MB) may take several minutes if not cached.",
+            flush=True,
+        )
+
+
 def main():
     args = _parse_args()
+    print("[INFO] Starting Smart Helmet Co-DETR training runner...", flush=True)
 
     # -- Late import so the script can be imported without mmdet installed. --
     try:
@@ -231,7 +387,23 @@ def main():
 
     # ── 2. Resolve and patch dataset root ─────────────────────────────────────
     data_root = _resolve_data_root(args)
+    data_root = stage_dataset_if_needed(
+        data_root,
+        stage_dir=args.stage_dir,
+        enabled=(not args.no_stage_data),
+    )
     _validate_and_patch_data_root(cfg, data_root)
+
+    # Apply any CLI performance overrides
+    if args.log_interval is not None:
+        if hasattr(cfg, "log_config"):
+            cfg.log_config.interval = args.log_interval
+            print(f"[INFO] Set log_config.interval = {args.log_interval}", flush=True)
+
+    if args.workers_per_gpu is not None:
+        if hasattr(cfg, "data"):
+            cfg.data.workers_per_gpu = args.workers_per_gpu
+            print(f"[INFO] Set data.workers_per_gpu = {args.workers_per_gpu}", flush=True)
 
     # ── 3. Work directory ─────────────────────────────────────────────────────
     work_dir = _resolve_work_dir(args)
@@ -308,10 +480,13 @@ def main():
         datasets.append(build_dataset(val_dataset))
 
     # ── 9. Build model ────────────────────────────────────────────────────────
+    print("[INFO] Initializing model weights ...", flush=True)
+    _resolve_swin_backbone(cfg, args.swin_pretrained)
     model = build_detector(cfg.model, train_cfg=cfg.get("train_cfg"),
                            test_cfg=cfg.get("test_cfg"))
     model.init_weights()
     model.CLASSES = datasets[0].CLASSES
+    print("[INFO] Model weights initialized successfully.", flush=True)
 
     # Set up checkpoint meta expected by MMDetection 2.x
     if cfg.get("checkpoint_config") is not None:
@@ -334,6 +509,15 @@ def main():
     meta['exp_name'] = os.path.basename(args.config)
 
     # ── 10. Launch training ───────────────────────────────────────────────────
+    log_int = cfg.log_config.get("interval", "N/A") if hasattr(cfg, "log_config") else "N/A"
+    samples_gpu = cfg.data.get("samples_per_gpu", "N/A") if hasattr(cfg, "data") else "N/A"
+    workers_gpu = cfg.data.get("workers_per_gpu", "N/A") if hasattr(cfg, "data") else "N/A"
+    print(
+        f"[INFO] Starting training detector: max_epochs={cfg.runner.max_epochs}, "
+        f"log_interval={log_int}, samples_per_gpu={samples_gpu}, "
+        f"workers_per_gpu={workers_gpu} ...",
+        flush=True,
+    )
     train_detector(
         model,
         datasets,
