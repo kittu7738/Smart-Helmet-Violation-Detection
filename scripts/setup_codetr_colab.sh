@@ -27,6 +27,10 @@ set -euo pipefail
 # Accept Anaconda Terms of Service non-interactively in automated / Colab runs
 export CONDA_PLUGINS_AUTO_ACCEPT_TOS=yes
 export CONDA_AUTO_ACCEPT_TOS=yes
+export CONDA_ALWAYS_YES=true
+export PIP_NO_INPUT=1
+export DEBIAN_FRONTEND=noninteractive
+export PYTHONUNBUFFERED=1
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 0.  Colour helpers & logging
@@ -93,13 +97,16 @@ info "Conda version: $(conda --version)"
 
 # Configure Conda to auto-accept Terms of Service non-interactively
 conda config --set plugins.auto_accept_tos yes 2>/dev/null || true
+conda config --set always_yes true 2>/dev/null || true
+conda config --set notify_outdated_conda false 2>/dev/null || true
+conda config --set auto_activate_base false 2>/dev/null || true
 
 # Explicitly accept ToS for default channels non-interactively if conda-anaconda-tos plugin is present
 if conda tos --help &>/dev/null; then
   info "Accepting Anaconda channel Terms of Service non-interactively …"
-  conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main 2>/dev/null || true
-  conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r 2>/dev/null || true
-  conda tos accept 2>/dev/null || true
+  yes | conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main 2>/dev/null || true
+  yes | conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r 2>/dev/null || true
+  yes | conda tos accept 2>/dev/null || true
 fi
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -109,18 +116,32 @@ header "Step 3 / 7 — codetr conda environment (Python 3.7.11)"
 
 ENV_NAME="codetr"
 ENV_PYTHON_VERSION="3.7.11"
+ENV_DIR="${CONDA_ROOT}/envs/${ENV_NAME}"
+PYTHON="${ENV_DIR}/bin/python"
+PIP="${ENV_DIR}/bin/pip"
 
-if conda env list | grep -qE "^${ENV_NAME}\s"; then
-  success "Conda environment '${ENV_NAME}' already exists — skipping creation."
+# Check if environment exists AND python binary is executable
+if [[ -x "${PYTHON}" ]] && "${PYTHON}" -c "import sys; assert sys.version_info[:2] == (3, 7)" 2>/dev/null; then
+  success "Conda environment '${ENV_NAME}' already exists and contains Python $("${PYTHON}" --version 2>&1) — skipping creation."
 else
+  if [[ -d "${ENV_DIR}" ]]; then
+    warn "Conda environment directory '${ENV_DIR}' exists but python binary is missing or broken. Recreating cleanly …"
+    rm -rf "${ENV_DIR}"
+  fi
   info "Creating conda environment '${ENV_NAME}' with Python ${ENV_PYTHON_VERSION} …"
-  CONDA_PLUGINS_AUTO_ACCEPT_TOS=yes conda create -y -n "${ENV_NAME}" python="${ENV_PYTHON_VERSION}"
+  CONDA_PLUGINS_AUTO_ACCEPT_TOS=yes conda create -y -n "${ENV_NAME}" python="${ENV_PYTHON_VERSION}" -c defaults
+  if [[ ! -x "${PYTHON}" ]]; then
+    warn "Defaults channel resolution failed; attempting creation via conda-forge channel …"
+    CONDA_PLUGINS_AUTO_ACCEPT_TOS=yes conda create -y -n "${ENV_NAME}" python="${ENV_PYTHON_VERSION}" -c conda-forge
+  fi
+  if [[ ! -x "${PYTHON}" ]]; then
+    fail "Fatal: Failed to create conda environment '${ENV_NAME}' with Python ${ENV_PYTHON_VERSION}."
+    exit 1
+  fi
   success "Environment '${ENV_NAME}' created."
 fi
 
-conda activate "${ENV_NAME}"
-PYTHON="${CONDA_ROOT}/envs/${ENV_NAME}/bin/python"
-PIP="${CONDA_ROOT}/envs/${ENV_NAME}/bin/pip"
+conda activate "${ENV_NAME}" 2>/dev/null || true
 
 info "Active Python: $("${PYTHON}" --version 2>&1)"
 
@@ -129,8 +150,7 @@ info "Active Python: $("${PYTHON}" --version 2>&1)"
 # ──────────────────────────────────────────────────────────────────────────────
 header "Step 4 / 7 — Install dependencies"
 
-# Helper: check whether a pip package (with optional version) is already
-# installed.  Usage:  pkg_installed "torch" "1.11.0"
+# Helper: check whether a pip package (with optional version) is already installed
 pkg_installed() {
   local pkg="${1}"
   local ver="${2:-}"
@@ -151,12 +171,11 @@ if pkg_installed "torch" "1.11.0"; then
   success "PyTorch 1.11.0+cu113 already installed — skipping."
 else
   info "Installing PyTorch 1.11.0+cu113 …"
-  "${PIP}" install \
+  "${PIP}" install --no-input \
     torch==1.11.0+cu113 \
     torchvision==0.12.0+cu113 \
     torchaudio==0.11.0+cu113 \
-    --extra-index-url https://download.pytorch.org/whl/cu113 \
-    --quiet
+    --extra-index-url https://download.pytorch.org/whl/cu113
   success "PyTorch stack installed."
 fi
 
@@ -164,11 +183,14 @@ fi
 if pkg_installed "mmcv-full" "1.5.0"; then
   success "mmcv-full 1.5.0 already installed — skipping."
 else
-  info "Installing mmcv-full 1.5.0 (cu113 / torch1.11) …"
-  "${PIP}" install \
-    mmcv-full==1.5.0 \
-    -f https://download.openmmlab.com/mmcv/dist/cu113/torch1.11.0/index.html \
-    --quiet
+  info "Installing mmcv-full 1.5.0 (cu113 / torch1.11 pre-built wheel) …"
+  MMCV_WHEEL="https://download.openmmlab.com/mmcv/dist/cu113/torch1.11.0/mmcv_full-1.5.0-cp37-cp37m-manylinux1_x86_64.whl"
+  if ! "${PIP}" install --no-input "${MMCV_WHEEL}"; then
+    warn "Direct wheel download failed; trying find-links fallback …"
+    "${PIP}" install --no-input mmcv-full==1.5.0 \
+      -f https://download.openmmlab.com/mmcv/dist/cu113/torch1.11.0/index.html \
+      --only-binary mmcv-full
+  fi
   success "mmcv-full installed."
 fi
 
@@ -177,12 +199,13 @@ if pkg_installed "mmdet" "2.25.3"; then
   success "mmdet 2.25.3 already installed — skipping."
 else
   info "Installing mmdet 2.25.3 …"
-  "${PIP}" install mmdet==2.25.3 --quiet
+  "${PIP}" install --no-input mmdet==2.25.3
   success "mmdet installed."
 fi
 
 # ── 4d. Supplementary packages ───────────────────────────────────────────────
 declare -A EXTRA_PKGS=(
+  ["ninja"]=""
   ["timm"]="0.6.13"
   ["fairscale"]="0.4.6"
   ["scipy"]="1.7.3"
@@ -200,10 +223,10 @@ for pkg in "${!EXTRA_PKGS[@]}"; do
   else
     if [[ -n "${ver}" ]]; then
       info "Installing ${pkg}==${ver} …"
-      "${PIP}" install "${pkg}==${ver}" --quiet
+      "${PIP}" install --no-input "${pkg}==${ver}"
     else
       info "Installing ${pkg} (latest compatible) …"
-      "${PIP}" install "${pkg}" --quiet
+      "${PIP}" install --no-input "${pkg}"
     fi
     success "${pkg} installed."
   fi
@@ -216,7 +239,7 @@ header "Step 5 / 7 — Co-DETR repository"
 
 CODETR_DIR="/content/Co-DETR"
 CODETR_REPO="https://github.com/Sense-X/Co-DETR.git"
-CODETR_COMMIT="main"   # use the stable main branch; pin to a tag if desired
+CODETR_COMMIT="main"
 
 if [[ -d "${CODETR_DIR}/.git" ]]; then
   success "Co-DETR already cloned at ${CODETR_DIR} — skipping clone."
@@ -233,7 +256,6 @@ fi
 # ──────────────────────────────────────────────────────────────────────────────
 header "Step 6 / 7 — Install Co-DETR (editable, no-deps)"
 
-# We check for the presence of the installed package or the egg-link.
 CODETR_INSTALLED=false
 if "${PIP}" show mmdet 2>/dev/null | grep -q "Location.*Co-DETR\|Co.DETR"; then
   CODETR_INSTALLED=true
@@ -245,13 +267,11 @@ fi
 if [[ "${CODETR_INSTALLED}" == "true" ]]; then
   success "Co-DETR already installed into '${ENV_NAME}' — skipping."
 else
-  info "Installing Co-DETR in editable mode (this does NOT modify the repo) …"
-  # --no-build-isolation avoids pip trying to upgrade setuptools in an
-  # incompatible way inside the Python 3.7 environment.
+  info "Installing Co-DETR in editable mode …"
   "${PIP}" install -e "${CODETR_DIR}" \
     --no-deps \
     --no-build-isolation \
-    --quiet
+    --no-input
   success "Co-DETR installed (editable, no-deps)."
 fi
 
@@ -295,7 +315,6 @@ eval "${TORCH_CHECK}" 2>/dev/null || true
 if [[ -n "${TORCH_VER:-}" && "${TORCH_VER}" == 1.11.* ]]; then
   success "PyTorch ${TORCH_VER}"
 else
-  # Fall back to direct parsing
   TORCH_VER=$("${PYTHON}" -c "import torch; print(torch.__version__)" 2>/dev/null || echo "NOT_FOUND")
   if [[ "${TORCH_VER}" == 1.11.* ]]; then
     success "PyTorch ${TORCH_VER}"
@@ -312,7 +331,6 @@ if [[ "${CUDA_AVAIL}" == "True" ]]; then
 else
   warn "CUDA not available (GPU may not be enabled in this Colab runtime)."
   warn "Go to Runtime > Change runtime type > T4 GPU and re-run."
-  # Not a hard failure — environment is still correct.
 fi
 
 # ── 7c. MMCV ─────────────────────────────────────────────────────────────────
@@ -354,6 +372,17 @@ else
   warn "Co-DETR detector import failed (may be benign if Co-DETR is not fully set up)."
 fi
 
+# ── 7g. MMCV CUDA custom op check ─────────────────────────────────────────────
+if "${PYTHON}" -c "
+import mmcv
+from mmcv.ops.multi_scale_deform_attn import MultiScaleDeformableAttention
+print('MultiScaleDeformableAttention verified')
+" 2>/dev/null; then
+  success "MMCV CUDA operations (MultiScaleDeformableAttention) functional"
+else
+  warn "MultiScaleDeformableAttention check warning"
+fi
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Final Summary
 # ──────────────────────────────────────────────────────────────────────────────
@@ -370,9 +399,8 @@ if [[ "${VERIFY_PASS}" == "true" ]]; then
   echo -e "  ${CYAN}Co-DETR    :${RESET} ${CODETR_DIR}"
   echo ""
   echo -e "  ${YELLOW}Next steps:${RESET}"
-  echo -e "  • Mount your AI City 2024 Track 5 dataset from Google Drive."
-  echo -e "  • Run: bash Smart-Helmet-Violation-Detection/data/validate_aicity.py"
-  echo -e "  • Start training with the configs in configs/codetr/"
+  echo -e "  • Mount your dataset and checkpoints from Google Drive."
+  echo -e "  • Run evaluation: python evaluation/codetr/evaluate.py --split test"
 else
   echo -e "${RED}${BOLD}  ❌  Co-DETR environment setup FAILED${RESET}"
   echo ""
