@@ -141,17 +141,20 @@ def check_dataset(cfg, data_root):
     train_info = report.get("train", {})
     val_info = report.get("val", {})
 
+    all_valid = True
     for sname, sinfo in [("Train", train_info), ("Val", val_info)]:
         if sinfo.get("ann_exists"):
             _ok(f"{sname} annotations: {sinfo['ann_path']} ({sinfo.get('num_images', 0)} images, {sinfo.get('num_annotations', 0)} annotations)")
         else:
             _fail(f"{sname} annotations NOT FOUND under {data_root}")
+            all_valid = False
         if sinfo.get("img_exists"):
             _ok(f"{sname} images dir: {sinfo['img_path']}")
         else:
             _fail(f"{sname} images dir NOT FOUND under {data_root}")
+            all_valid = False
 
-    if not (train_info.get("valid") and val_info.get("valid")):
+    if not (train_info.get("valid") and val_info.get("valid")) or not all_valid:
         return False
 
     ann_train = train_info["ann_path"]
@@ -193,29 +196,29 @@ def check_dataset(cfg, data_root):
 
     # ── Try loading one image ─────────────────────────────────────────────
     _header("4. Image loading")
-    if images:
-        first_img = images[0]
-        img_path = os.path.join(img_train, first_img["file_name"])
-        if os.path.isfile(img_path):
-            try:
-                import cv2
-                img = cv2.imread(img_path)
-                if img is not None:
-                    h, w = img.shape[:2]
-                    _ok(f"Loaded {first_img['file_name']}: {w}x{h}")
-                else:
-                    _fail(f"cv2.imread returned None for {img_path}")
-                    ok = False
-            except ImportError:
-                _warn("OpenCV not available — skipping pixel load test")
-        else:
-            _fail(f"First image not found at {img_path}")
-            ok = False
-    else:
+    if not images:
         _fail("Annotation file has no images")
-        ok = False
+        return False
 
-    return ok
+    first_img = images[0]
+    img_path = os.path.join(img_train, first_img["file_name"])
+    if not os.path.isfile(img_path):
+        _fail(f"First image not found at {img_path}")
+        return False
+
+    try:
+        import cv2
+        img = cv2.imread(img_path)
+        if img is not None:
+            h, w = img.shape[:2]
+            _ok(f"Loaded {first_img['file_name']}: {w}x{h}")
+            return True
+        else:
+            _fail(f"cv2.imread returned None for {img_path}")
+            return False
+    except ImportError:
+        _warn("OpenCV not available — skipping pixel load test")
+        return True
 
 
 def check_gpu():

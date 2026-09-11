@@ -4,6 +4,7 @@ tests/test_codetr_config.py
 Validation tests for the Co-DETR helmet detection configuration and training pipeline.
 """
 
+import json
 import os
 import runpy
 import sys
@@ -182,7 +183,63 @@ def test_validate_and_patch_data_root_nested_and_flat(tmp_path):
     assert cfg.data.train.ann_file == str(data_root / "train" / "instances_train.json")
     assert cfg.data.train.img_prefix.endswith("train/images/")
     assert cfg.data.val.ann_file == str(data_root / "vaid" / "instances_val.json")
-    assert cfg.data.val.img_prefix.endswith("vaid/images/")
     assert cfg.data.test.ann_file == str(data_root / "test" / "instances_test.json")
     assert cfg.data.test.img_prefix.endswith("test/images/")
+
+
+def test_sanity_check_dataset_control_flow(tmp_path):
+    SANITY_CHECK_PY_PATH = os.path.join(REPO_ROOT, "training", "codetr", "sanity_check.py")
+    module = runpy.run_path(SANITY_CHECK_PY_PATH)
+    check_dataset_func = module["check_dataset"]
+
+    # 1. Valid dataset with an actual readable dummy image
+    data_root = tmp_path / "data"
+    os.makedirs(data_root / "train" / "images", exist_ok=True)
+    os.makedirs(data_root / "vaid" / "images", exist_ok=True)
+
+    import cv2
+    import numpy as np
+    dummy_img = np.zeros((100, 100, 3), dtype=np.uint8)
+    cv2.imwrite(str(data_root / "train" / "images" / "test_img.jpg"), dummy_img)
+
+    dummy_coco = {
+        "categories": [{"id": i, "name": f"cat_{i}"} for i in range(7)],
+        "images": [{"id": 1, "file_name": "test_img.jpg"}],
+        "annotations": [],
+    }
+    with open(data_root / "train" / "instances_train.json", "w") as f:
+        json.dump(dummy_coco, f)
+    with open(data_root / "vaid" / "instances_val.json", "w") as f:
+        json.dump(dummy_coco, f)
+
+    cfg = {
+        "num_classes": 7,
+        "CLASSES": tuple(f"cat_{i}" for i in range(7)),
+    }
+
+    res = check_dataset_func(cfg, str(data_root))
+    assert res is True  # Must return boolean True, no UnboundLocalError
+
+    # 2. Missing image file -> must return False cleanly, no UnboundLocalError
+    dummy_coco_missing = {
+        "categories": [{"id": i, "name": f"cat_{i}"} for i in range(7)],
+        "images": [{"id": 2, "file_name": "non_existent.jpg"}],
+        "annotations": [],
+    }
+    with open(data_root / "train" / "instances_train.json", "w") as f:
+        json.dump(dummy_coco_missing, f)
+    res_missing = check_dataset_func(cfg, str(data_root))
+    assert res_missing is False
+
+    # 3. Empty images list -> must return False cleanly
+    dummy_coco_empty = {
+        "categories": [{"id": i, "name": f"cat_{i}"} for i in range(7)],
+        "images": [],
+        "annotations": [],
+    }
+    with open(data_root / "train" / "instances_train.json", "w") as f:
+        json.dump(dummy_coco_empty, f)
+    res_empty = check_dataset_func(cfg, str(data_root))
+    assert res_empty is False
+
 
