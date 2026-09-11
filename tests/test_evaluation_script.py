@@ -12,10 +12,12 @@ import numpy as np
 import pytest
 
 from evaluation.codetr.evaluate import (
+    DEFAULT_MINORITY_THRESHOLDS,
     EXPECTED_CLASSES,
     _parse_args,
     _patch_config_data_root,
     _sanitize_float,
+    apply_minority_optimizer,
     extract_coco_metrics,
     find_best_checkpoint,
     format_metrics_tables,
@@ -305,3 +307,72 @@ def test_safe_extract_metrics_nan_resilience_and_json_serialization(tmp_path):
     loaded = json.loads(json_str)
     assert loaded["overall"]["mAP"] == 0.0
     assert loaded["overall"]["AP50"] == 0.5
+
+
+def test_apply_minority_optimizer():
+    # 7 classes
+    # class 1 (bike): score 0.25 (below bike thr 0.30 -> filtered out)
+    # class 3 (passenger_with_helmet): score 0.18 (above p_w_h thr 0.15 -> kept)
+    mock_img_results = [
+        np.array([[10, 10, 50, 50, 0.22]]),  # 0: driver_with_helmet (thr 0.20 -> kept)
+        np.array([[20, 20, 80, 80, 0.25]]),  # 1: bike (thr 0.30 -> dropped)
+        np.array([[30, 30, 70, 70, 0.32]]),  # 2: driver (thr 0.30 -> kept)
+        np.array([[15, 15, 45, 45, 0.18]]),  # 3: passenger_with_helmet (thr 0.15 -> kept)
+        np.array([]),                         # 4: passenger (empty)
+        np.array([[10, 10, 40, 40, 0.19]]),  # 5: driver_without_helmet (thr 0.20 -> dropped)
+        np.array([[12, 12, 42, 42, 0.16]]),  # 6: passenger_without_helmet (thr 0.15 -> kept)
+    ]
+    outputs = [mock_img_results]
+
+    filtered = apply_minority_optimizer(outputs, classes=EXPECTED_CLASSES)
+    assert len(filtered) == 1
+    res = filtered[0]
+
+    # class 0: kept
+    assert len(res[0]) == 1
+    # class 1: dropped (0.25 < 0.30)
+    assert len(res[1]) == 0
+    # class 2: kept (0.32 >= 0.30)
+    assert len(res[2]) == 1
+    # class 3: kept (0.18 >= 0.15) - minority class preserved!
+    assert len(res[3]) == 1
+    # class 5: dropped (0.19 < 0.20)
+    assert len(res[5]) == 0
+    # class 6: kept (0.16 >= 0.15) - minority class preserved!
+    assert len(res[6]) == 1
+
+
+def test_filter_and_format_detections_with_minority_thresholds():
+    mock_results = [
+        np.array([[10, 20, 50, 60, 0.22]]),  # 0: driver_with_helmet
+        np.array([[15, 25, 55, 65, 0.28]]),  # 1: bike
+        np.array([[30, 40, 70, 80, 0.35]]),  # 2: driver
+        np.array([[12, 18, 48, 58, 0.17]]),  # 3: passenger_with_helmet
+    ]
+
+    custom_thrs = {
+        "bike": 0.30,
+        "driver": 0.30,
+        "driver_with_helmet": 0.20,
+        "passenger_with_helmet": 0.15,
+    }
+
+    # With default uniform threshold 0.3, only driver (score 0.35) passes
+    dets_uniform = filter_and_format_detections(mock_results, score_thr=0.3, classes=EXPECTED_CLASSES)
+    assert len(dets_uniform) == 1
+    assert dets_uniform[0]["class_name"] == "driver"
+
+    # With minority thresholds, bike (0.28 < 0.30) drops, but driver, driver_with_helmet, and passenger_with_helmet pass
+    dets_calibrated = filter_and_format_detections(
+        mock_results,
+        score_thr=0.3,
+        classes=EXPECTED_CLASSES,
+        minority_thresholds=custom_thrs,
+    )
+    assert len(dets_calibrated) == 3
+    passed_names = {d["class_name"] for d in dets_calibrated}
+    assert "driver" in passed_names
+    assert "driver_with_helmet" in passed_names
+    assert "passenger_with_helmet" in passed_names
+    assert "bike" not in passed_names
+

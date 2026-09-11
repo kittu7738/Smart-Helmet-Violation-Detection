@@ -84,6 +84,9 @@ train_pipeline = [
                         (736, 1333),
                         (768, 1333),
                         (800, 1333),
+                        (864, 1333),
+                        (928, 1333),
+                        (960, 1333),
                     ],
                     multiscale_mode='value',
                     keep_ratio=True,
@@ -116,6 +119,9 @@ train_pipeline = [
                         (736, 1333),
                         (768, 1333),
                         (800, 1333),
+                        (864, 1333),
+                        (928, 1333),
+                        (960, 1333),
                     ],
                     multiscale_mode='value',
                     override=True,
@@ -123,6 +129,13 @@ train_pipeline = [
                 ),
             ],
         ],
+    ),
+    dict(
+        type='PhotoMetricDistortion',
+        brightness_delta=32,
+        contrast_range=(0.5, 1.5),
+        saturation_range=(0.5, 1.5),
+        hue_delta=18,
     ),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
@@ -303,7 +316,7 @@ model = dict(
             loss_weight=1.0,
         ),
         loss_bbox=dict(type='L1Loss', loss_weight=5.0),
-        loss_iou=dict(type='GIoULoss', loss_weight=2.0),
+        loss_iou=dict(type='GIoULoss', loss_weight=3.0),
     ),
     rpn_head=dict(
         type='RPNHead',
@@ -402,7 +415,7 @@ model = dict(
                 type='HungarianAssigner',
                 cls_cost=dict(type='FocalLossCost', weight=2.0),
                 reg_cost=dict(type='BBoxL1Cost', weight=5.0, box_format='xywh'),
-                iou_cost=dict(type='IoUCost', iou_mode='giou', weight=2.0),
+                iou_cost=dict(type='IoUCost', iou_mode='giou', weight=3.0),
             ),
         ),
         # RPN
@@ -498,7 +511,7 @@ model = dict(
 optimizer = dict(
     type='AdamW',
     lr=1e-4,
-    weight_decay=0.0001,
+    weight_decay=0.01,
     paramwise_cfg=dict(
         custom_keys={
             'backbone': dict(lr_mult=0.1),
@@ -511,9 +524,12 @@ optimizer_config = dict(
     grad_clip=dict(max_norm=0.1, norm_type=2),
 )
 
-# 1× schedule (12 epochs)
+# 1× schedule (12 epochs) with linear warmup
 lr_config = dict(
     policy='step',
+    warmup='linear',
+    warmup_iters=250,
+    warmup_ratio=0.001,
     step=[8, 11],
 )
 max_epochs = 12

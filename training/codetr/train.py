@@ -158,42 +158,36 @@ def _resolve_work_dir(args):
     )
 
 
-def _validate_data_root(data_root):
-    """Check that the required COCO files exist under data_root."""
-    required = [
-        "instances_train.json",
-        "instances_val.json",
-    ]
-    required_dirs = ["train/images", "vaid/images"]
-
-    missing = []
-    for f in required:
-        if not os.path.isfile(os.path.join(data_root, f)):
-            missing.append(os.path.join(data_root, f))
-    for d in required_dirs:
-        if not os.path.isdir(os.path.join(data_root, d)):
-            missing.append(os.path.join(data_root, d) + "/")
-
-    if missing:
-        raise FileNotFoundError(
-            "Dataset not found. The following required paths are missing:\n"
-            + "\n".join(f"  {p}" for p in missing)
-            + "\n\nSet --data-root or CODETR_DATA_ROOT to the correct path."
-        )
+from evaluation.codetr.evaluate import verify_dataset_paths
 
 
-def _patch_config_data_root(cfg, data_root):
-    """Override data.{train,val,test}.ann_file and img_prefix in the config."""
-    splits = {
-        "train": ("instances_train.json", "train/images/"),
-        "val": ("instances_val.json", "vaid/images/"),
-        "test": ("instances_test.json", "test/images/"),
-    }
-    for split, (ann_file, img_prefix) in splits.items():
+def _validate_and_patch_data_root(cfg, data_root):
+    """
+    Verify dataset paths for train and val splits (supporting both flat and nested layouts)
+    and patch the MMDetection config accordingly.
+    """
+    ok, report = verify_dataset_paths(data_root)
+    for split in ["train", "val", "test"]:
         if hasattr(cfg.data, split):
+            sinfo = report.get(split, {})
+            if split in ["train", "val"] and not sinfo.get("valid", False):
+                raise FileNotFoundError(
+                    f"Required dataset split '{split}' is invalid or missing under {data_root}.\n"
+                    f"Annotation exists: {sinfo.get('ann_exists')} ({sinfo.get('ann_path')})\n"
+                    f"Image dir exists: {sinfo.get('img_exists')} ({sinfo.get('img_path')})\n"
+                    "Ensure data_root contains instances_{split}.json or {split}/instances_{split}.json."
+                )
             split_cfg = getattr(cfg.data, split)
-            split_cfg.ann_file = os.path.join(data_root, ann_file)
-            split_cfg.img_prefix = os.path.join(data_root, img_prefix)
+            if sinfo.get("ann_exists"):
+                split_cfg.ann_file = sinfo["ann_path"]
+            if sinfo.get("img_exists"):
+                img_p = sinfo["img_path"]
+                split_cfg.img_prefix = img_p + ("" if img_p.endswith("/") else "/")
+            print(
+                f"[INFO] Configured '{split}' split: ann_file={split_cfg.ann_file} "
+                f"({sinfo.get('num_images', 0)} images, {sinfo.get('num_annotations', 0)} annotations), "
+                f"img_prefix={split_cfg.img_prefix}"
+            )
 
 
 def main():
@@ -237,8 +231,7 @@ def main():
 
     # ── 2. Resolve and patch dataset root ─────────────────────────────────────
     data_root = _resolve_data_root(args)
-    _validate_data_root(data_root)
-    _patch_config_data_root(cfg, data_root)
+    _validate_and_patch_data_root(cfg, data_root)
 
     # ── 3. Work directory ─────────────────────────────────────────────────────
     work_dir = _resolve_work_dir(args)

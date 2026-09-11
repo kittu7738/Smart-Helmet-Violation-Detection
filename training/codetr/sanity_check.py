@@ -91,7 +91,7 @@ def _parse_args():
 # Individual checks
 # ──────────────────────────────────────────────────────────────────────────────
 def check_config(config_path):
-    """Check 1: Config file can be parsed."""
+    """Check 1: Config file can be parsed and audited for training improvements."""
     _header("1. Config file")
     if not os.path.isfile(config_path):
         _fail(f"Config not found: {config_path}")
@@ -106,6 +106,25 @@ def check_config(config_path):
             _ok(f"num_classes = {num_cls}")
         if classes is not None:
             _ok(f"CLASSES ({len(classes)}): {classes}")
+
+        # Check generalization improvements
+        train_pipeline = cfg.get("train_pipeline", [])
+        has_pmd = any(step.get("type") == "PhotoMetricDistortion" for step in train_pipeline)
+        if has_pmd:
+            _ok("Data Augmentation: PhotoMetricDistortion is enabled.")
+        else:
+            _warn("Data Augmentation: PhotoMetricDistortion not found in train_pipeline.")
+
+        lr_cfg = cfg.get("lr_config", {})
+        if lr_cfg.get("warmup") == "linear":
+            _ok(f"Learning Rate Warmup: linear warmup enabled ({lr_cfg.get('warmup_iters')} iters).")
+        else:
+            _warn("Learning Rate Warmup: no linear warmup configured in lr_config.")
+
+        opt = cfg.get("optimizer", {})
+        wd = opt.get("weight_decay", 0.0)
+        _ok(f"Optimizer: {opt.get('type')} (lr={opt.get('lr')}, weight_decay={wd})")
+
         return cfg
     except Exception:
         _fail(f"Failed to parse config:\n{traceback.format_exc()}")
@@ -116,28 +135,27 @@ def check_dataset(cfg, data_root):
     """Check 2–4: Dataset files exist, class count matches, images loadable."""
     _header("2. Dataset files")
 
-    # Patch data root into config
-    ann_train = os.path.join(data_root, "instances_train.json")
-    ann_val = os.path.join(data_root, "instances_val.json")
-    img_train = os.path.join(data_root, "train", "images")
-    img_val = os.path.join(data_root, "vaid", "images")
+    from evaluation.codetr.evaluate import verify_dataset_paths
+    ds_ok, report = verify_dataset_paths(data_root)
 
-    ok = True
-    for path, label in [
-        (ann_train, "Train annotations"),
-        (ann_val, "Val annotations"),
-        (img_train, "Train images dir"),
-        (img_val, "Val images dir"),
-    ]:
-        exists = os.path.isfile(path) if not label.endswith("dir") else os.path.isdir(path)
-        if exists:
-            _ok(f"{label}: {path}")
+    train_info = report.get("train", {})
+    val_info = report.get("val", {})
+
+    for sname, sinfo in [("Train", train_info), ("Val", val_info)]:
+        if sinfo.get("ann_exists"):
+            _ok(f"{sname} annotations: {sinfo['ann_path']} ({sinfo.get('num_images', 0)} images, {sinfo.get('num_annotations', 0)} annotations)")
         else:
-            _fail(f"{label}: {path} NOT FOUND")
-            ok = False
+            _fail(f"{sname} annotations NOT FOUND under {data_root}")
+        if sinfo.get("img_exists"):
+            _ok(f"{sname} images dir: {sinfo['img_path']}")
+        else:
+            _fail(f"{sname} images dir NOT FOUND under {data_root}")
 
-    if not ok:
+    if not (train_info.get("valid") and val_info.get("valid")):
         return False
+
+    ann_train = train_info["ann_path"]
+    img_train = train_info["img_path"]
 
     # ── Inspect annotation JSON ───────────────────────────────────────────
     _header("3. Annotation contents")
@@ -167,7 +185,7 @@ def check_dataset(cfg, data_root):
                 f"Category count ({len(categories)}) does NOT match "
                 f"config num_classes ({cfg_num})"
             )
-            ok = False
+            return False
 
     except Exception:
         _fail(f"Failed to read annotations:\n{traceback.format_exc()}")

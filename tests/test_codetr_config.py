@@ -44,6 +44,30 @@ def test_config_schedule_and_epochs():
     assert cfg["runner"]["max_epochs"] == 12
     assert cfg["lr_config"]["policy"] == "step"
     assert cfg["lr_config"]["step"] == [8, 11]
+    assert cfg["lr_config"]["warmup"] == "linear"
+    assert cfg["lr_config"]["warmup_iters"] == 250
+    assert cfg["lr_config"]["warmup_ratio"] == 0.001
+
+
+def test_config_generalization_improvements():
+    cfg = runpy.run_path(CONFIG_PATH)
+
+    # 1. PhotoMetricDistortion in train_pipeline
+    pipeline = cfg["train_pipeline"]
+    has_pmd = any(step.get("type") == "PhotoMetricDistortion" for step in pipeline)
+    assert has_pmd is True, "PhotoMetricDistortion must be enabled in train_pipeline"
+
+    # 2. Multi-scale scale expansion
+    auto_aug = [s for s in pipeline if s.get("type") == "AutoAugment"][0]
+    scales_policy0 = auto_aug["policies"][0][0]["img_scale"]
+    assert (960, 1333) in scales_policy0, "Expected scale (960, 1333) in AutoAugment policy 0"
+
+    # 3. Regularization: Weight decay >= 0.01
+    assert cfg["optimizer"]["weight_decay"] == 0.01
+
+    # 4. IoU precision enhancement
+    assert cfg["model"]["query_head"]["loss_iou"]["loss_weight"] == 3.0
+    assert cfg["model"]["train_cfg"][0]["assigner"]["iou_cost"]["weight"] == 3.0
 
 
 def test_config_evaluation_and_checkpointing():
@@ -123,3 +147,42 @@ def test_train_py_argument_parser():
         assert args.resume_from is None
     finally:
         sys.argv = orig_argv
+
+
+def test_validate_and_patch_data_root_nested_and_flat(tmp_path):
+    import json
+    from types import SimpleNamespace
+
+    module = runpy.run_path(TRAIN_PY_PATH)
+    patch_func = module["_validate_and_patch_data_root"]
+
+    # Test nested layout (Google Drive structure)
+    data_root = tmp_path / "data"
+    os.makedirs(data_root / "train" / "images", exist_ok=True)
+    os.makedirs(data_root / "vaid" / "images", exist_ok=True)
+    os.makedirs(data_root / "test" / "images", exist_ok=True)
+
+    dummy_coco = {"images": [{"id": 1}], "annotations": []}
+    with open(data_root / "train" / "instances_train.json", "w") as f:
+        json.dump(dummy_coco, f)
+    with open(data_root / "vaid" / "instances_val.json", "w") as f:
+        json.dump(dummy_coco, f)
+    with open(data_root / "test" / "instances_test.json", "w") as f:
+        json.dump(dummy_coco, f)
+
+    cfg = SimpleNamespace(
+        data=SimpleNamespace(
+            train=SimpleNamespace(ann_file="", img_prefix=""),
+            val=SimpleNamespace(ann_file="", img_prefix=""),
+            test=SimpleNamespace(ann_file="", img_prefix=""),
+        )
+    )
+
+    patch_func(cfg, str(data_root))
+    assert cfg.data.train.ann_file == str(data_root / "train" / "instances_train.json")
+    assert cfg.data.train.img_prefix.endswith("train/images/")
+    assert cfg.data.val.ann_file == str(data_root / "vaid" / "instances_val.json")
+    assert cfg.data.val.img_prefix.endswith("vaid/images/")
+    assert cfg.data.test.ann_file == str(data_root / "test" / "instances_test.json")
+    assert cfg.data.test.img_prefix.endswith("test/images/")
+

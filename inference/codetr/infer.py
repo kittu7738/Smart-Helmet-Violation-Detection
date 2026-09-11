@@ -91,6 +91,11 @@ def _parse_args():
         help="Score threshold for bounding box filtering (default: 0.3).",
     )
     p.add_argument(
+        "--minority-optimizer",
+        action="store_true",
+        help="Use class-calibrated confidence thresholds to boost recall for rare helmet classes.",
+    )
+    p.add_argument(
         "--fp16",
         action="store_true",
         help="Use torch.cuda.amp.autocast for half-precision speedup.",
@@ -137,21 +142,24 @@ def load_processed_image_ids(out_path):
     return processed
 
 
-def filter_and_format_detections(raw_results, score_thr=0.3, classes=EXPECTED_CLASSES):
+def filter_and_format_detections(raw_results, score_thr=0.3, classes=EXPECTED_CLASSES, minority_thresholds=None):
     """
     Filter raw MMDetection bbox results and format into structured dict:
     raw_results is a list of arrays (one per class), where array shape is [N, 5] (x1, y1, x2, y2, score).
+    Supports optional class-calibrated minority_thresholds (Minority Optimizer).
     """
     detections = []
     for cls_idx, cls_bboxes in enumerate(raw_results):
         if cls_bboxes is None or len(cls_bboxes) == 0:
             continue
+        cname = classes[cls_idx] if cls_idx < len(classes) else f"class_{cls_idx}"
+        thr = minority_thresholds.get(cname, score_thr) if minority_thresholds else score_thr
         for box in cls_bboxes:
             score = float(box[4])
-            if score >= score_thr:
+            if score >= thr:
                 detections.append({
                     "class_id": cls_idx,
-                    "class_name": classes[cls_idx] if cls_idx < len(classes) else f"class_{cls_idx}",
+                    "class_name": cname,
                     "bbox": [round(float(coord), 2) for coord in box[:4]],
                     "score": round(score, 4),
                 })
@@ -245,6 +253,12 @@ def main():
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
 
+    thresholds = None
+    if args.minority_optimizer:
+        from evaluation.codetr.evaluate import DEFAULT_MINORITY_THRESHOLDS
+        thresholds = DEFAULT_MINORITY_THRESHOLDS
+        print("[INFO] Minority Optimizer enabled: using class-calibrated confidence thresholds.")
+
     start_time = time.time()
     processed_count = 0
 
@@ -257,7 +271,12 @@ def main():
                 else:
                     result = inference_detector(model, img_path)
 
-                detections = filter_and_format_detections(result, score_thr=args.score_thr, classes=model.CLASSES)
+                detections = filter_and_format_detections(
+                    result,
+                    score_thr=args.score_thr,
+                    classes=model.CLASSES,
+                    minority_thresholds=thresholds,
+                )
 
                 record = {
                     "image_file": os.path.basename(img_path),

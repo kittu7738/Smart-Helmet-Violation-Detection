@@ -65,6 +65,46 @@ EXPECTED_CLASSES = (
 )
 
 # ---------------------------------------------------------------------------
+# Default class-calibrated confidence thresholds for Minority Optimizer
+# (Vo et al., "Robust Motorcycle Helmet Detection in Real-World Scenarios", CVPRW 2024)
+# ---------------------------------------------------------------------------
+DEFAULT_MINORITY_THRESHOLDS = {
+    "bike": 0.30,
+    "driver": 0.30,
+    "passenger": 0.25,
+    "driver_with_helmet": 0.20,
+    "driver_without_helmet": 0.20,
+    "passenger_with_helmet": 0.15,
+    "passenger_without_helmet": 0.15,
+}
+
+
+def apply_minority_optimizer(outputs, classes=EXPECTED_CLASSES, thresholds=None):
+    """
+    Apply class-calibrated confidence filtering (Minority Optimizer) to prediction outputs.
+    Adjusts retention thresholds to prevent suppressing rare helmet/passenger classes.
+    """
+    if thresholds is None:
+        thresholds = DEFAULT_MINORITY_THRESHOLDS
+
+    filtered_outputs = []
+    for img_res in outputs:
+        img_filtered = []
+        for k, cname in enumerate(classes):
+            if k < len(img_res):
+                cls_dets = img_res[k]
+                thr = thresholds.get(cname, 0.20)
+                if cls_dets is not None and len(cls_dets) > 0:
+                    keep = cls_dets[:, 4] >= thr
+                    img_filtered.append(cls_dets[keep])
+                else:
+                    img_filtered.append(cls_dets if cls_dets is not None else np.zeros((0, 5), dtype=np.float32))
+            else:
+                img_filtered.append(np.zeros((0, 5), dtype=np.float32))
+        filtered_outputs.append(img_filtered)
+    return filtered_outputs
+
+# ---------------------------------------------------------------------------
 # Ensure Co-DETR source is on sys.path
 # ---------------------------------------------------------------------------
 _CODETR_REPO = os.environ.get("CODETR_REPO", "/content/Co-DETR")
@@ -123,6 +163,11 @@ def _parse_args():
         "--out-metrics",
         default=None,
         help="Output .json file for final structured evaluation metrics.",
+    )
+    parser.add_argument(
+        "--minority-optimizer",
+        action="store_true",
+        help="Apply class-calibrated confidence thresholding for minority helmet classes (Vo et al., CVPRW 2024).",
     )
     parser.add_argument(
         "--audit-only",
@@ -892,6 +937,10 @@ def main():
             os.makedirs(out_dir, exist_ok=True)
         print(f"[INFO] Saving raw predictions to: {args.out}")
         mmcv.dump(outputs, args.out)
+
+    if args.minority_optimizer:
+        print("[INFO] Applying Minority Optimizer (class-calibrated confidence thresholding)...")
+        outputs = apply_minority_optimizer(outputs, classes=EXPECTED_CLASSES)
 
     print(f"\n[INFO] Computing COCO evaluation metrics (classwise=True)...")
     eval_kwargs = {"metric": args.eval, "classwise": True}
