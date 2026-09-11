@@ -45,6 +45,7 @@ Usage (Google Colab / Local):
 import argparse
 import glob
 import json
+import math
 import os
 import re
 import sys
@@ -458,47 +459,76 @@ def verify_checkpoint(checkpoint_path, expected_classes=EXPECTED_CLASSES):
     return is_valid, details
 
 
+def _sanitize_float(val, default=0.0):
+    """
+    Ensure value is a standard JSON-serializable float, replacing NaN, inf, or negative sentinel (-1) with default.
+    """
+    try:
+        f = float(val)
+        if math.isnan(f) or math.isinf(f) or f < 0.0:
+            return default
+        return round(f, 4)
+    except (TypeError, ValueError):
+        return default
+
+
 def extract_coco_metrics(coco_eval, classes=EXPECTED_CLASSES):
     """
     Extract exact overall and per-class metrics from pycocotools COCOeval object.
     """
-    stats = coco_eval.stats
+    stats = getattr(coco_eval, "stats", None)
+    if stats is None or len(stats) == 0:
+        stats = [0.0] * 12
+
+    def _get_stat(idx):
+        if idx < len(stats):
+            return _sanitize_float(stats[idx])
+        return 0.0
 
     overall = {
-        "mAP": float(stats[0]),          # AP @ IoU 0.50:0.95
-        "AP50": float(stats[1]),         # AP @ IoU 0.50
-        "AP75": float(stats[2]),         # AP @ IoU 0.75
-        "mAP_small": float(stats[3]),
-        "mAP_medium": float(stats[4]),
-        "mAP_large": float(stats[5]),
-        "AR_1": float(stats[6]),
-        "AR_10": float(stats[7]),
-        "AR": float(stats[8]),           # AR @ maxDets=100 (Primary Recall)
-        "AR_small": float(stats[9]),
-        "AR_medium": float(stats[10]),
-        "AR_large": float(stats[11]),
+        "mAP": _get_stat(0),          # AP @ IoU 0.50:0.95
+        "AP50": _get_stat(1),         # AP @ IoU 0.50
+        "AP75": _get_stat(2),         # AP @ IoU 0.75
+        "mAP_small": _get_stat(3),
+        "mAP_medium": _get_stat(4),
+        "mAP_large": _get_stat(5),
+        "AR_1": _get_stat(6),
+        "AR_10": _get_stat(7),
+        "AR": _get_stat(8),           # AR @ maxDets=100 (Primary Recall)
+        "AR_small": _get_stat(9),
+        "AR_medium": _get_stat(10),
+        "AR_large": _get_stat(11),
     }
 
     classwise = {}
-    precisions = coco_eval.eval["precision"]  # [T, R, K, A, M]
-    recalls = coco_eval.eval["recall"]        # [T, K, A, M]
+    eval_dict = getattr(coco_eval, "eval", {}) or {}
+    precisions = eval_dict.get("precision")  # [T, R, K, A, M]
+    recalls = eval_dict.get("recall")        # [T, K, A, M]
 
     for k, name in enumerate(classes):
-        p = precisions[:, :, k, 0, 2]
-        p_valid = p[p > -1]
-        ap = float(np.mean(p_valid)) if len(p_valid) > 0 else 0.0
+        ap, ap50, ap75, ar = 0.0, 0.0, 0.0, 0.0
 
-        p50 = precisions[0, :, k, 0, 2]
-        p50_valid = p50[p50 > -1]
-        ap50 = float(np.mean(p50_valid)) if len(p50_valid) > 0 else 0.0
+        if precisions is not None and k < precisions.shape[2]:
+            p = precisions[:, :, k, 0, 2]
+            p_valid = p[(p > -1) & ~np.isnan(p)]
+            if len(p_valid) > 0:
+                ap = _sanitize_float(np.mean(p_valid))
 
-        p75 = precisions[5, :, k, 0, 2]
-        p75_valid = p75[p75 > -1]
-        ap75 = float(np.mean(p75_valid)) if len(p75_valid) > 0 else 0.0
+            p50 = precisions[0, :, k, 0, 2]
+            p50_valid = p50[(p50 > -1) & ~np.isnan(p50)]
+            if len(p50_valid) > 0:
+                ap50 = _sanitize_float(np.mean(p50_valid))
 
-        r = recalls[:, k, 0, 2]
-        r_valid = r[r > -1]
-        ar = float(np.mean(r_valid)) if len(r_valid) > 0 else 0.0
+            p75 = precisions[5, :, k, 0, 2]
+            p75_valid = p75[(p75 > -1) & ~np.isnan(p75)]
+            if len(p75_valid) > 0:
+                ap75 = _sanitize_float(np.mean(p75_valid))
+
+        if recalls is not None and k < recalls.shape[1]:
+            r = recalls[:, k, 0, 2]
+            r_valid = r[(r > -1) & ~np.isnan(r)]
+            if len(r_valid) > 0:
+                ar = _sanitize_float(np.mean(r_valid))
 
         classwise[name] = {
             "class_id": k,
@@ -508,6 +538,129 @@ def extract_coco_metrics(coco_eval, classes=EXPECTED_CLASSES):
             "AP75": ap75,
             "AR": ar,
         }
+
+    return overall, classwise
+
+
+def safe_extract_metrics(dataset, raw_eval_results, captured_coco_eval=None, classes=EXPECTED_CLASSES):
+    """
+    Robustly extract overall and classwise metrics, prioritizing direct pycocotools
+    COCOeval results and falling back safely to raw_eval_results without IndexError.
+    """
+    # 1. Direct pycocotools COCOeval candidates
+    candidate_coco_eval = None
+    if captured_coco_eval is not None and hasattr(captured_coco_eval, "stats"):
+        candidate_coco_eval = captured_coco_eval
+    elif hasattr(dataset, "coco_eval"):
+        d_ce = getattr(dataset, "coco_eval", None)
+        if isinstance(d_ce, dict) and "bbox" in d_ce:
+            candidate_coco_eval = d_ce["bbox"]
+        elif hasattr(d_ce, "stats"):
+            candidate_coco_eval = d_ce
+
+    if candidate_coco_eval is not None and getattr(candidate_coco_eval, "stats", None) is not None:
+        try:
+            return extract_coco_metrics(candidate_coco_eval, classes)
+        except Exception as exc:
+            print(f"[WARNING] extract_coco_metrics failed ({exc}); falling back to raw results.")
+
+    # 2. Robust fallback from raw_eval_results dict
+    raw = raw_eval_results or {}
+    copypaste = str(raw.get("bbox_mAP_copypaste", "")).strip()
+    tokens = copypaste.split()
+
+    # Extract AR safely without assuming copypaste length
+    ar_val = 0.0
+    if len(tokens) > 8:
+        try:
+            ar_val = _sanitize_float(tokens[8])
+        except (ValueError, IndexError):
+            ar_val = 0.0
+    elif "bbox_AR@100" in raw:
+        ar_val = _sanitize_float(raw["bbox_AR@100"])
+    elif "bbox_mAP_recall" in raw:
+        ar_val = _sanitize_float(raw["bbox_mAP_recall"])
+    elif "bbox_AR" in raw:
+        ar_val = _sanitize_float(raw["bbox_AR"])
+
+    overall = {
+        "mAP": _sanitize_float(raw.get("bbox_mAP", tokens[0] if len(tokens) > 0 else 0.0)),
+        "AP50": _sanitize_float(raw.get("bbox_mAP_50", tokens[1] if len(tokens) > 1 else 0.0)),
+        "AP75": _sanitize_float(raw.get("bbox_mAP_75", tokens[2] if len(tokens) > 2 else 0.0)),
+        "mAP_small": _sanitize_float(raw.get("bbox_mAP_s", tokens[3] if len(tokens) > 3 else 0.0)),
+        "mAP_medium": _sanitize_float(raw.get("bbox_mAP_m", tokens[4] if len(tokens) > 4 else 0.0)),
+        "mAP_large": _sanitize_float(raw.get("bbox_mAP_l", tokens[5] if len(tokens) > 5 else 0.0)),
+        "AR": ar_val,
+        "AR_1": _sanitize_float(raw.get("bbox_AR@1", tokens[6] if len(tokens) > 6 else 0.0)),
+        "AR_10": _sanitize_float(raw.get("bbox_AR@10", tokens[7] if len(tokens) > 7 else 0.0)),
+        "AR_small": _sanitize_float(raw.get("bbox_AR_s", tokens[9] if len(tokens) > 9 else 0.0)),
+        "AR_medium": _sanitize_float(raw.get("bbox_AR_m", tokens[10] if len(tokens) > 10 else 0.0)),
+        "AR_large": _sanitize_float(raw.get("bbox_AR_l", tokens[11] if len(tokens) > 11 else 0.0)),
+    }
+
+    classwise = {}
+    class_recalls = []
+    for idx, cname in enumerate(classes):
+        # Candidate keys for class AP
+        ap_candidates = [
+            f"{cname}_precision",
+            f"bbox_mAP_{cname}",
+            cname,
+            f"AP_{cname}",
+            f"{cname}_mAP",
+        ]
+        ap_val = 0.0
+        for k in ap_candidates:
+            if k in raw:
+                ap_val = _sanitize_float(raw[k])
+                break
+
+        ap50_candidates = [
+            f"{cname}_precision_50",
+            f"bbox_mAP_50_{cname}",
+            f"AP50_{cname}",
+        ]
+        ap50_val = 0.0
+        for k in ap50_candidates:
+            if k in raw:
+                ap50_val = _sanitize_float(raw[k])
+                break
+
+        ap75_candidates = [
+            f"{cname}_precision_75",
+            f"bbox_mAP_75_{cname}",
+            f"AP75_{cname}",
+        ]
+        ap75_val = 0.0
+        for k in ap75_candidates:
+            if k in raw:
+                ap75_val = _sanitize_float(raw[k])
+                break
+
+        ar_candidates = [
+            f"{cname}_recall",
+            f"bbox_AR_{cname}",
+            f"AR_{cname}",
+        ]
+        c_ar_val = 0.0
+        for k in ar_candidates:
+            if k in raw:
+                c_ar_val = _sanitize_float(raw[k])
+                class_recalls.append(c_ar_val)
+                break
+
+        classwise[cname] = {
+            "class_id": idx,
+            "name": cname,
+            "AP": ap_val,
+            "AP50": ap50_val,
+            "AP75": ap75_val,
+            "AR": c_ar_val,
+        }
+
+    # If overall AR is missing from tokens/keys but per-class recalls exist, average them
+    if overall["AR"] == 0.0 and len(class_recalls) == len(classes):
+        overall["AR"] = _sanitize_float(sum(class_recalls) / len(class_recalls))
 
     return overall, classwise
 
@@ -734,40 +887,55 @@ def main():
     )
 
     if args.out:
+        out_dir = os.path.dirname(os.path.abspath(args.out))
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
         print(f"[INFO] Saving raw predictions to: {args.out}")
         mmcv.dump(outputs, args.out)
 
     print(f"\n[INFO] Computing COCO evaluation metrics (classwise=True)...")
     eval_kwargs = {"metric": args.eval, "classwise": True}
-    raw_eval_results = dataset.evaluate(outputs, **eval_kwargs)
 
-    coco_eval = getattr(dataset, "coco_eval", {}).get("bbox")
-    if coco_eval is not None:
-        overall, classwise = extract_coco_metrics(coco_eval, EXPECTED_CLASSES)
-    else:
-        overall = {
-            "mAP": float(raw_eval_results.get("bbox_mAP", 0.0)),
-            "AP50": float(raw_eval_results.get("bbox_mAP_50", 0.0)),
-            "AP75": float(raw_eval_results.get("bbox_mAP_75", 0.0)),
-            "mAP_small": float(raw_eval_results.get("bbox_mAP_s", 0.0)),
-            "mAP_medium": float(raw_eval_results.get("bbox_mAP_m", 0.0)),
-            "mAP_large": float(raw_eval_results.get("bbox_mAP_l", 0.0)),
-            "AR": float(raw_eval_results.get("bbox_mAP_copypaste", "").split()[8]) if "bbox_mAP_copypaste" in raw_eval_results else 0.0,
-            "AR_1": 0.0, "AR_10": 0.0, "AR_small": 0.0, "AR_medium": 0.0, "AR_large": 0.0,
-        }
-        classwise = {}
-        for idx, cname in enumerate(EXPECTED_CLASSES):
-            classwise[cname] = {
-                "class_id": idx,
-                "name": cname,
-                "AP": float(raw_eval_results.get(f"{cname}_precision", raw_eval_results.get(f"bbox_mAP_{cname}", 0.0))),
-                "AP50": 0.0, "AP75": 0.0, "AR": 0.0,
-            }
+    captured_evals = {}
+    try:
+        from pycocotools.cocoeval import COCOeval
+        orig_summarize = COCOeval.summarize
+
+        def _capturing_summarize(self):
+            orig_summarize(self)
+            iou_type = getattr(self.params, "iouType", "bbox")
+            captured_evals[iou_type] = self
+
+        COCOeval.summarize = _capturing_summarize
+        try:
+            raw_eval_results = dataset.evaluate(outputs, **eval_kwargs)
+        finally:
+            COCOeval.summarize = orig_summarize
+    except Exception as exc:
+        print(f"[NOTE] COCOeval hook notice: {exc}")
+        raw_eval_results = dataset.evaluate(outputs, **eval_kwargs)
+
+    # Attach captured evals to dataset if not already present
+    if captured_evals:
+        try:
+            dataset.coco_eval = captured_evals
+        except Exception:
+            pass
+
+    overall, classwise = safe_extract_metrics(
+        dataset,
+        raw_eval_results,
+        captured_coco_eval=captured_evals.get("bbox"),
+        classes=EXPECTED_CLASSES,
+    )
 
     report_text = format_metrics_tables(overall, classwise, split=args.split, ckpt_name=os.path.basename(target_ckpt))
     print(report_text)
 
     if args.out_metrics:
+        out_metrics_dir = os.path.dirname(os.path.abspath(args.out_metrics))
+        if out_metrics_dir:
+            os.makedirs(out_metrics_dir, exist_ok=True)
         out_data = {
             "checkpoint": target_ckpt,
             "split": args.split,

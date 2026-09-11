@@ -15,10 +15,12 @@ from evaluation.codetr.evaluate import (
     EXPECTED_CLASSES,
     _parse_args,
     _patch_config_data_root,
+    _sanitize_float,
     extract_coco_metrics,
     find_best_checkpoint,
     format_metrics_tables,
     parse_training_logs,
+    safe_extract_metrics,
     verify_dataset_paths,
 )
 from inference.codetr.infer import (
@@ -206,3 +208,100 @@ def test_inference_helpers(tmp_path):
     assert "img1.jpg" in done
     assert "img2.jpg" in done
     assert len(done) == 2
+
+
+def test_sanitize_float():
+    assert _sanitize_float(0.123456) == 0.1235
+    assert _sanitize_float(float("nan")) == 0.0
+    assert _sanitize_float(float("inf")) == 0.0
+    assert _sanitize_float(-1.0) == 0.0
+    assert _sanitize_float("invalid") == 0.0
+    assert _sanitize_float(None) == 0.0
+
+
+def test_safe_extract_metrics_short_copypaste_no_index_error():
+    """
+    Regression test: In MMDet 2.25.3, bbox_mAP_copypaste has only 6 tokens:
+    '0.321 0.714 0.226 0.255 0.348 0.447'.
+    Prior code crashed with IndexError: list index out of range when indexing [8].
+    This test verifies that safe_extract_metrics handles 6 tokens, empty string,
+    and missing copypaste without any IndexError, and recovers AR from alternate keys.
+    """
+    # 6 tokens: standard MMDet 2.25.3 copypaste output
+    raw_6_tokens = {
+        "bbox_mAP": 0.321,
+        "bbox_mAP_50": 0.714,
+        "bbox_mAP_75": 0.226,
+        "bbox_mAP_s": 0.255,
+        "bbox_mAP_m": 0.348,
+        "bbox_mAP_l": 0.447,
+        "bbox_mAP_copypaste": "0.321 0.714 0.226 0.255 0.348 0.447",
+        "bbox_AR@100": 0.615,
+        "driver_with_helmet_precision": 0.287,
+        "bike_precision": 0.431,
+        "driver_precision": 0.379,
+        "passenger_with_helmet_precision": 0.215,
+        "passenger_precision": 0.354,
+        "driver_without_helmet_precision": 0.313,
+        "passenger_without_helmet_precision": 0.273,
+    }
+
+    overall, classwise = safe_extract_metrics(None, raw_6_tokens, classes=EXPECTED_CLASSES)
+    assert overall["mAP"] == 0.321
+    assert overall["AP50"] == 0.714
+    assert overall["AP75"] == 0.226
+    assert overall["AR"] == 0.615  # safely extracted from bbox_AR@100
+    assert classwise["driver_with_helmet"]["AP"] == 0.287
+    assert classwise["bike"]["AP"] == 0.431
+    assert classwise["passenger_without_helmet"]["AP"] == 0.273
+
+    # Empty raw results
+    overall_empty, classwise_empty = safe_extract_metrics(None, {}, classes=EXPECTED_CLASSES)
+    assert overall_empty["mAP"] == 0.0
+    assert overall_empty["AR"] == 0.0
+    assert len(classwise_empty) == 7
+
+    # Non-empty copypaste with no AR key
+    raw_no_ar = {
+        "bbox_mAP_copypaste": "0.100 0.200 0.050",
+    }
+    overall_no_ar, _ = safe_extract_metrics(None, raw_no_ar, classes=EXPECTED_CLASSES)
+    assert overall_no_ar["mAP"] == 0.100
+    assert overall_no_ar["AR"] == 0.0
+
+
+def test_safe_extract_metrics_nan_resilience_and_json_serialization(tmp_path):
+    """
+    Verify that if precision or recall arrays contain NaNs or negative numbers,
+    they are safely sanitized and json.dump produces compliant JSON.
+    """
+    class MockNaNCOCOeval:
+        stats = np.array([float("nan"), 0.5, -1.0, float("inf")] + [0.0] * 8)
+        eval = {
+            "precision": np.full((10, 101, 7, 4, 3), float("nan")),
+            "recall": np.full((10, 7, 4, 3), -1.0),
+        }
+
+    mock_eval = MockNaNCOCOeval()
+    overall, classwise = safe_extract_metrics(None, {}, captured_coco_eval=mock_eval, classes=EXPECTED_CLASSES)
+
+    assert overall["mAP"] == 0.0
+    assert overall["AP50"] == 0.5
+    assert overall["AP75"] == 0.0
+
+    for cname in EXPECTED_CLASSES:
+        assert classwise[cname]["AP"] == 0.0
+        assert classwise[cname]["AR"] == 0.0
+
+    # Ensure JSON serializability (standard json.dumps without NaN)
+    out_file = tmp_path / "metrics_test.json"
+    payload = {
+        "overall": overall,
+        "classwise": classwise,
+    }
+    json_str = json.dumps(payload, indent=2)
+    assert "NaN" not in json_str
+    assert "Infinity" not in json_str
+    loaded = json.loads(json_str)
+    assert loaded["overall"]["mAP"] == 0.0
+    assert loaded["overall"]["AP50"] == 0.5
