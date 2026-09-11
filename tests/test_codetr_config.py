@@ -324,4 +324,36 @@ def test_resolve_swin_backbone(tmp_path):
     assert cfg.model.backbone.init_cfg["checkpoint"] == str(local_swin)
 
 
+def test_stage_marker(capsys):
+    module = runpy.run_path(TRAIN_PY_PATH)
+    marker_func = module["stage_marker"]
+
+    marker_func(1, 8, "Testing stage", detail="detail_info", elapsed=1.23)
+    captured = capsys.readouterr()
+    assert "[Stage 1/8] Testing stage [detail_info] in 1.23s" in captured.out
+
+
+def test_stage_dataset_fast_path_skip(tmp_path, capsys):
+    module = runpy.run_path(TRAIN_PY_PATH)
+    stage_func = module["stage_dataset_if_needed"]
+
+    # Pre-populate dst_dir with >=300 mock images and annotations
+    dst_dir = tmp_path / "content" / "dataset_local"
+    img_dir = dst_dir / "train" / "images"
+    os.makedirs(img_dir, exist_ok=True)
+    with open(dst_dir / "instances_train.json", "w") as f:
+        f.write("{}")
+    for i in range(305):
+        (img_dir / f"{i:04d}.jpg").write_bytes(b"x")
+
+    src_dir = tmp_path / "content" / "drive" / "MyDrive" / "data"
+    os.makedirs(src_dir, exist_ok=True)
+
+    res = stage_func(str(src_dir), stage_dir=str(dst_dir), enabled=True)
+    assert res == str(dst_dir)
+    captured = capsys.readouterr()
+    assert "skipping re-copy" in captured.out
+
+
+
 
