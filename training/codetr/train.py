@@ -428,7 +428,7 @@ def _resolve_swin_backbone(cfg, swin_arg=None):
         return
 
     checkpoint = init_cfg.get("checkpoint")
-    if not checkpoint:
+    if not checkpoint or "swin" not in checkpoint.lower():
         return
 
     # If already a local file that exists, nothing to do
@@ -532,15 +532,21 @@ def main():
         from mmdet.models import build_detector
         from mmdet.utils import collect_env, get_root_logger
 
-        # Explicitly import Co-DETR projects module to register the model
-        import projects
+        # Explicitly import Co-DETR projects module to register the model if available
+        try:
+            import projects
+        except ImportError:
+            pass
 
         # Patch: Register mmcv's MultiScaleDeformableAttention as MultiScaleDeformAttn
         # to match the config's expectations without duplicating code.
-        from mmcv.cnn.bricks.registry import ATTENTION
-        from mmcv.ops.multi_scale_deform_attn import MultiScaleDeformableAttention
-        if 'MultiScaleDeformAttn' not in ATTENTION:
-            ATTENTION.register_module(name='MultiScaleDeformAttn', module=MultiScaleDeformableAttention)
+        try:
+            from mmcv.cnn.bricks.registry import ATTENTION
+            from mmcv.ops.multi_scale_deform_attn import MultiScaleDeformableAttention
+            if 'MultiScaleDeformAttn' not in ATTENTION:
+                ATTENTION.register_module(name='MultiScaleDeformAttn', module=MultiScaleDeformableAttention)
+        except Exception:
+            pass
 
         from mmcv.runner.hooks import HOOKS, Hook
         if 'StartupLivenessHook' not in HOOKS:

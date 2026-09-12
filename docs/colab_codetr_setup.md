@@ -142,7 +142,54 @@ bash run_codetr.sh training/codetr/train.py \
 
 ---
 
-## 4. Troubleshooting
+## 4. Fast Experimental Training (Rapid Iteration on Tesla T4)
+
+For rapid experimentation, hyperparameter tuning, and swift train-evaluate cycles:
+
+| Model | Architecture | Backbone | Params | Precision | Batch | Speed / Epoch |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Fast Experimental** | Faster R-CNN FPN | ResNet-50 | 41.5M | FP16 (AMP) | 4 | **~8–10 sec** |
+| **Fast Co-DETR** | Co-DETR (300 queries) | ResNet-50 | ~54M | FP16 (AMP) | 2 | **~35–45 sec** |
+| **Baseline Production** | Co-DINO (900 queries) | Swin-Large | 234.8M | FP32 | 1 | **~550 sec (~9 min)** |
+
+### Fast Smoke Test (1 Epoch, ~10 seconds)
+```bash
+%%bash
+cd /content/Smart-Helmet-Violation-Detection
+bash run_codetr.sh training/codetr/train.py \
+  --config configs/faster_rcnn/helmet_faster_rcnn_r50_fpn.py \
+  --work-dir /content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs/helmet_faster_rcnn_smoke \
+  --data-root /content/drive/MyDrive/Smart-Helmet-Violation-Detection/data \
+  --max-epochs 1 \
+  --log-interval 10
+```
+
+### Fast Controlled Experiment (2 Epochs, ~20 seconds)
+```bash
+%%bash
+cd /content/Smart-Helmet-Violation-Detection
+bash run_codetr.sh training/codetr/train.py \
+  --config configs/faster_rcnn/helmet_faster_rcnn_r50_fpn.py \
+  --work-dir /content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs/helmet_faster_rcnn_exp1 \
+  --data-root /content/drive/MyDrive/Smart-Helmet-Violation-Detection/data \
+  --max-epochs 2 \
+  --log-interval 10
+```
+
+### Fast Validation Evaluation
+```bash
+%%bash
+cd /content/Smart-Helmet-Violation-Detection
+bash run_codetr.sh evaluation/codetr/evaluate.py \
+  --config configs/faster_rcnn/helmet_faster_rcnn_r50_fpn.py \
+  --work-dir /content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs/helmet_faster_rcnn_exp1 \
+  --data-root /content/drive/MyDrive/Smart-Helmet-Violation-Detection/data \
+  --split val
+```
+
+---
+
+## 5. Troubleshooting
 
 | Symptom | Cause | Solution |
 |:---|:---|:---|
