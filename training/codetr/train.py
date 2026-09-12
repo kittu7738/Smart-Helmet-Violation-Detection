@@ -835,9 +835,15 @@ def main():
             CLASSES=datasets[0].CLASSES
         )
 
+    try:
+        config_text = cfg.pretty_text
+    except TypeError:
+        # MMCV 1.5.0 and YAPF >= 0.40.0 compatibility fallback
+        config_text = cfg.text
+
     meta = dict()
     meta['env_info'] = env_info
-    meta['config'] = cfg.pretty_text
+    meta['config'] = config_text
     meta['seed'] = cfg.seed
     meta['exp_name'] = os.path.basename(args.config)
 
