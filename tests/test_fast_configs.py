@@ -98,3 +98,20 @@ def test_train_cli_with_fast_configs():
     args2 = _parse_args(["--config", CODETR_R50_CONFIG, "--epochs", "1"])
     assert args2.config == CODETR_R50_CONFIG
     assert args2.max_epochs == 1
+
+
+def test_all_configs_define_lifecycle_fields():
+    """Verify that all configs define standard MMDetection lifecycle fields (resume_from, load_from, auto_resume, workflow)."""
+    swin_config = os.path.join(REPO_ROOT, "configs", "codetr", "helmet_codetr_swin_large.py")
+
+    for cfg_path in [FASTER_RCNN_CONFIG, CODETR_R50_CONFIG, swin_config]:
+        cfg = runpy.run_path(cfg_path)
+        assert "resume_from" in cfg, f"{cfg_path} must define resume_from"
+        assert cfg["resume_from"] is None, f"{cfg_path} resume_from should default to None"
+        assert "load_from" in cfg, f"{cfg_path} must define load_from"
+        assert cfg["load_from"] is None, f"{cfg_path} load_from should default to None"
+        assert "auto_resume" in cfg, f"{cfg_path} must define auto_resume"
+        assert cfg["auto_resume"] is False, f"{cfg_path} auto_resume should default to False"
+        assert "workflow" in cfg, f"{cfg_path} must define workflow"
+        assert cfg["workflow"] == [("train", 1)]
+

@@ -545,6 +545,7 @@ dist_params = dict(backend='nccl')
 log_level = 'INFO'
 load_from = None   # set to a .pth path if using a pretrained checkpoint
 resume_from = None
+auto_resume = False
 workflow = [('train', 1)]
 find_unused_parameters = False
 

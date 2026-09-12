@@ -725,9 +725,21 @@ def main():
     # ── Stage 4/8: Checkpoint Resuming & Device Setup ─────────────────────────
     t_stage = time.time()
     stage_marker(4, 8, "Starting: GPU device verification & reproducibility")
+
+    # Ensure standard MMDetection 2.25.3 root attributes exist with sensible defaults
+    if not hasattr(cfg, "resume_from"):
+        cfg.resume_from = None
+    if not hasattr(cfg, "load_from"):
+        cfg.load_from = None
+    if not hasattr(cfg, "auto_resume"):
+        cfg.auto_resume = False
+    if not hasattr(cfg, "workflow") or not cfg.workflow:
+        cfg.workflow = [('train', 1)]
+
     if args.resume_from:
         cfg.resume_from = args.resume_from
     elif args.auto_resume:
+        cfg.auto_resume = True
         latest_ckpt = os.path.join(work_dir, "latest.pth")
         if os.path.isfile(latest_ckpt):
             cfg.resume_from = latest_ckpt
