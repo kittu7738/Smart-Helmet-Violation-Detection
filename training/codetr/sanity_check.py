@@ -22,18 +22,26 @@ Usage (Google Colab):
         --data-root /path/to/coco
 """
 
-import argparse
-import json
 import os
 import sys
 import time
-import traceback
+
+# Immediate visual confirmation that Python process is running
+print(f"[{time.strftime('%H:%M:%S')}] >>> Co-DETR sanity_check.py initializing (PID {os.getpid()}) <<<", flush=True)
+try:
+    sys.stdout.flush()
+except Exception:
+    pass
 
 try:
     sys.stdout.reconfigure(line_buffering=True)
     sys.stderr.reconfigure(line_buffering=True)
 except (AttributeError, Exception):
     pass
+
+import argparse
+import json
+import traceback
 
 # ---------------------------------------------------------------------------
 # Ensure repository root and Co-DETR source are on sys.path

@@ -25,18 +25,26 @@ Usage:
         --score-thr 0.3
 """
 
-import argparse
-import glob
-import json
 import os
 import sys
 import time
+
+# Immediate visual confirmation that Python process is running
+print(f"[{time.strftime('%H:%M:%S')}] >>> Co-DETR infer.py initializing (PID {os.getpid()}) <<<", flush=True)
+try:
+    sys.stdout.flush()
+except Exception:
+    pass
 
 try:
     sys.stdout.reconfigure(line_buffering=True)
     sys.stderr.reconfigure(line_buffering=True)
 except (AttributeError, Exception):
     pass
+
+import argparse
+import glob
+import json
 
 # ---------------------------------------------------------------------------
 # Ensure repository root and Co-DETR source are on sys.path

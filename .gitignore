@@ -19,9 +19,12 @@ logs/
 work_dirs/
 checkpoints/
 training/outputs/
-models/*.pt
+*.pt
 *.pth
 *.ckpt
+*.jsonl
+dataset_local/
+.ipynb_checkpoints/
 
 # Datasets & video media (AI City Challenge & others)
 datasets/

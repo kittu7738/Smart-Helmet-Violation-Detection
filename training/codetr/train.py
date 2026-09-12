@@ -34,12 +34,18 @@ Usage (Google Colab):
 See docs/colab_codetr_setup.md for full Colab setup instructions.
 """
 
-import argparse
-import copy
 import os
-import shutil
 import sys
 import time
+
+# ---------------------------------------------------------------------------
+# 1. Immediate visual confirmation (FIRST EXECUTABLE ACTION)
+# ---------------------------------------------------------------------------
+print(f"[{time.strftime('%H:%M:%S')}] >>> Co-DETR train.py initializing (PID {os.getpid()}) <<<", flush=True)
+try:
+    sys.stdout.flush()
+except Exception:
+    pass
 
 try:
     sys.stdout.reconfigure(line_buffering=True)
@@ -47,22 +53,21 @@ try:
 except (AttributeError, Exception):
     pass
 
+import argparse
+import copy
+import shutil
+
 # Ensure repository root is on sys.path
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-# Immediate visual confirmation that Python process is running
-print(f"[{time.strftime('%H:%M:%S')}] >>> Co-DETR train.py initializing (PID {os.getpid()}) <<<", flush=True)
-
-# ---------------------------------------------------------------------------
 # Ensure Co-DETR source is on sys.path before importing mmdet / Co-DETR.
-# The Co-DETR repo is expected at /content/Co-DETR in Colab, or at the
-# path given by the CODETR_REPO env var.
-# ---------------------------------------------------------------------------
 _CODETR_REPO = os.environ.get("CODETR_REPO", "/content/Co-DETR")
-if _CODETR_REPO and os.path.isdir(_CODETR_REPO) and _CODETR_REPO not in sys.path:
-    sys.path.insert(0, _CODETR_REPO)
+for cand in [_CODETR_REPO, os.path.abspath(os.path.join(_REPO_ROOT, "..", "Co-DETR")), "/content/Co-DETR"]:
+    if cand and os.path.isdir(cand) and cand not in sys.path:
+        sys.path.insert(0, cand)
+        break
 
 
 def _parse_args():
@@ -155,6 +160,11 @@ def _parse_args():
         default=None,
         help="Path to local Swin-L backbone checkpoint .pth.",
     )
+    parser.add_argument(
+        "--startup-diagnostic",
+        action="store_true",
+        help="Run through full startup sequence, configuration, data staging, and model initialization to verify readiness without launching training loop.",
+    )
     # Allow passing arbitrary MMDetection cfg-options as KEY=VALUE pairs.
     parser.add_argument(
         "--cfg-options",
@@ -201,14 +211,12 @@ def _resolve_work_dir(args):
     )
 
 
-from evaluation.codetr.evaluate import verify_dataset_paths
-
-
 def _validate_and_patch_data_root(cfg, data_root):
     """
     Verify dataset paths for train and val splits (supporting both flat and nested layouts)
     and patch the MMDetection config accordingly.
     """
+    from evaluation.codetr.evaluate import verify_dataset_paths
     ok, report = verify_dataset_paths(data_root)
     for split in ["train", "val", "test"]:
         if hasattr(cfg.data, split):
@@ -229,7 +237,8 @@ def _validate_and_patch_data_root(cfg, data_root):
             print(
                 f"[INFO] Configured '{split}' split: ann_file={split_cfg.ann_file} "
                 f"({sinfo.get('num_images', 0)} images, {sinfo.get('num_annotations', 0)} annotations), "
-                f"img_prefix={split_cfg.img_prefix}"
+                f"img_prefix={split_cfg.img_prefix}",
+                flush=True,
             )
 
 
@@ -242,17 +251,18 @@ def stage_marker(step, total, name, detail="", elapsed=None):
     print(msg, flush=True)
     try:
         sys.stdout.flush()
-        os.fsync(sys.stdout.fileno())
     except Exception:
         pass
 
 
 def _copy_tree_compat(src, dst):
-    """Recursively copy files from src to dst in a Python 3.7+ compatible manner with progress."""
+    """Recursively copy files from src to dst in a Python 3.7+ compatible manner with fast local checks."""
     os.makedirs(dst, exist_ok=True)
     count = 0
     size = 0
-    for item in os.listdir(src):
+    items = sorted(os.listdir(src))
+    total_items = len(items)
+    for idx, item in enumerate(items):
         s = os.path.join(src, item)
         d = os.path.join(dst, item)
         if os.path.isdir(s):
@@ -262,10 +272,15 @@ def _copy_tree_compat(src, dst):
             sub_mb = sub_size / (1024 * 1024)
             print(f"[{time.strftime('%H:%M:%S')}]   -> Staged '{item}/' ({sub_count} files, {sub_mb:.1f} MB)", flush=True)
         else:
-            if not os.path.exists(d) or os.path.getmtime(s) > os.path.getmtime(d):
+            if not os.path.exists(d) or os.path.getsize(d) == 0:
                 shutil.copy2(s, d)
             count += 1
-            size += os.path.getsize(d)
+            try:
+                size += os.path.getsize(d)
+            except Exception:
+                pass
+            if total_items > 50 and (idx + 1) % 100 == 0:
+                print(f"[{time.strftime('%H:%M:%S')}]     ... copied {idx + 1}/{total_items} files", flush=True)
     return count, size
 
 
@@ -392,7 +407,14 @@ def _resolve_swin_backbone(cfg, swin_arg=None):
         print(f"[{time.strftime('%H:%M:%S')}] [INFO] Using local Swin-L backbone checkpoint: {checkpoint}", flush=True)
         return
 
-    # Candidate locations on Google Drive or local cache
+    # Fast path: already cached in user's torch hub directory on local fast disk
+    hub_cache = os.path.expanduser("~/.cache/torch/hub/checkpoints/swin_large_patch4_window12_384_22k.pth")
+    if os.path.isfile(hub_cache) and os.path.getsize(hub_cache) > 500 * 1024 * 1024:
+        print(f"[{time.strftime('%H:%M:%S')}] [INFO] Using cached Swin-L weights on local SSD: {hub_cache}", flush=True)
+        init_cfg["checkpoint"] = hub_cache
+        return
+
+    print(f"[{time.strftime('%H:%M:%S')}] [INFO] Searching local directories and Google Drive for Swin-L backbone...", flush=True)
     candidates = []
     if swin_arg and os.path.isfile(swin_arg):
         candidates.append(swin_arg)
@@ -401,18 +423,17 @@ def _resolve_swin_backbone(cfg, swin_arg=None):
     if env_swin and os.path.isfile(env_swin):
         candidates.append(env_swin)
 
-    hub_cache = os.path.expanduser("~/.cache/torch/hub/checkpoints/swin_large_patch4_window12_384_22k.pth")
     drive_cache_dir = "/content/drive/MyDrive/Smart-Helmet-Violation-Detection"
     drive_ckpt = os.path.join(drive_cache_dir, "swin_large_patch4_window12_384_22k.pth")
 
-    candidates.extend([
-        hub_cache,
-        drive_ckpt,
-        "/content/drive/MyDrive/swin_large_patch4_window12_384_22k.pth",
-        "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs/helmet_codetr_swin_large/swin_large_patch4_window12_384_22k.pth",
-        "/content/drive/MyDrive/checkpoints/swin_large_patch4_window12_384_22k.pth",
-        "/content/drive/MyDrive/weights/swin_large_patch4_window12_384_22k.pth",
-    ])
+    if os.path.isdir("/content/drive"):
+        candidates.extend([
+            drive_ckpt,
+            "/content/drive/MyDrive/swin_large_patch4_window12_384_22k.pth",
+            "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs/helmet_codetr_swin_large/swin_large_patch4_window12_384_22k.pth",
+            "/content/drive/MyDrive/checkpoints/swin_large_patch4_window12_384_22k.pth",
+            "/content/drive/MyDrive/weights/swin_large_patch4_window12_384_22k.pth",
+        ])
 
     found_local = None
     for cand in candidates:
@@ -460,10 +481,11 @@ def main():
 
     # ── Stage 1/8: Configuration ──────────────────────────────────────────────
     t_stage = time.time()
-    stage_marker(1, 8, "Loading configuration", f"config={args.config}")
+    stage_marker(1, 8, "Starting: Configuration loading and parsing", f"config={args.config}")
     if not os.path.isfile(args.config):
         sys.exit(f"[ERROR] Config not found: {args.config}")
 
+    print(f"[{time.strftime('%H:%M:%S')}]   -> Importing MMDetection, MMCV, and Co-DETR plugins...", flush=True)
     # -- Late import so the script can be imported without mmdet installed. --
     try:
         import mmcv
@@ -532,14 +554,15 @@ def main():
             "PYTHONPATH includes the Co-DETR repo root."
         )
 
+    print(f"[{time.strftime('%H:%M:%S')}]   -> Parsing config file: {args.config} ...", flush=True)
     cfg = Config.fromfile(args.config)
     if args.cfg_options:
         cfg.merge_from_dict(args.cfg_options)
-    stage_marker(1, 8, "Configuration loaded successfully", elapsed=time.time() - t_stage)
+    stage_marker(1, 8, "Completed: Configuration loaded successfully", elapsed=time.time() - t_stage)
 
     # ── Stage 2/8: Dataset Staging & Validation ──────────────────────────────
     t_stage = time.time()
-    stage_marker(2, 8, "Staging & validating dataset", f"data_root={args.data_root or 'default'}")
+    stage_marker(2, 8, "Starting: Dataset staging & validation", f"data_root={args.data_root or 'default'}")
     data_root = _resolve_data_root(args)
     data_root = stage_dataset_if_needed(
         data_root,
@@ -547,10 +570,11 @@ def main():
         enabled=(not args.no_stage_data),
     )
     _validate_and_patch_data_root(cfg, data_root)
-    stage_marker(2, 8, "Dataset validated and patched into config", f"root={data_root}", elapsed=time.time() - t_stage)
+    stage_marker(2, 8, "Completed: Dataset staged and validated", f"root={data_root}", elapsed=time.time() - t_stage)
 
     # ── Stage 3/8: Work Directory & Output Logging ────────────────────────────
     t_stage = time.time()
+    stage_marker(3, 8, "Starting: Work directory & output logging setup")
     work_dir = _resolve_work_dir(args)
     cfg.work_dir = work_dir
     os.makedirs(work_dir, exist_ok=True)
@@ -560,11 +584,11 @@ def main():
     if args.workers_per_gpu is not None:
         if hasattr(cfg, "data"):
             cfg.data.workers_per_gpu = args.workers_per_gpu
-    stage_marker(3, 8, "Work directory ready", f"work_dir={work_dir}", elapsed=time.time() - t_stage)
+    stage_marker(3, 8, "Completed: Work directory ready", f"work_dir={work_dir}", elapsed=time.time() - t_stage)
 
     # ── Stage 4/8: Checkpoint Resuming & Device Setup ─────────────────────────
     t_stage = time.time()
-    stage_marker(4, 8, "Configuring runtime device & reproducibility")
+    stage_marker(4, 8, "Starting: GPU device verification & reproducibility")
     if args.resume_from:
         cfg.resume_from = args.resume_from
     elif args.auto_resume:
@@ -608,11 +632,11 @@ def main():
     cfg.seed = args.seed
     if cfg.get('cudnn_benchmark', False):
         torch.backends.cudnn.benchmark = True
-    stage_marker(4, 8, "Runtime device verified", dev_info, elapsed=time.time() - t_stage)
+    stage_marker(4, 8, "Completed: GPU & environment verified", dev_info, elapsed=time.time() - t_stage)
 
     # ── Stage 5/8: Build Dataset(s) ───────────────────────────────────────────
     t_stage = time.time()
-    stage_marker(5, 8, "Building training dataset with MMDetection pipeline")
+    stage_marker(5, 8, "Starting: Building training dataset with MMDetection pipeline")
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.get('workflow', [('train', 1)])) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
@@ -621,26 +645,26 @@ def main():
         datasets.append(build_dataset(val_dataset))
     stage_marker(
         5, 8,
-        "Training dataset ready",
+        "Completed: Training dataset ready",
         f"{len(datasets[0])} images, {len(datasets[0].CLASSES)} classes",
         elapsed=time.time() - t_stage
     )
 
     # ── Stage 6/8: Backbone Resolution & Model Initialization ─────────────────
     t_stage = time.time()
-    stage_marker(6, 8, "Resolving Swin-L backbone & building Co-DETR model")
+    stage_marker(6, 8, "Starting: Resolving Swin-L backbone & building Co-DETR model")
     _resolve_swin_backbone(cfg, args.swin_pretrained)
     model = build_detector(cfg.model, train_cfg=cfg.get("train_cfg"),
                            test_cfg=cfg.get("test_cfg"))
-    stage_marker(6, 8, "Initializing model weights (backbone & detection heads)...")
+    print(f"[{time.strftime('%H:%M:%S')}]   -> Initializing model weights (backbone & detection heads)...", flush=True)
     t_init = time.time()
     model.init_weights()
     model.CLASSES = datasets[0].CLASSES
-    stage_marker(6, 8, "Model initialized successfully", elapsed=time.time() - t_stage)
+    stage_marker(6, 8, "Completed: Model initialized successfully", elapsed=time.time() - t_stage)
 
     # ── Stage 7/8: Setup Logging & Register Hooks ─────────────────────────────
     t_stage = time.time()
-    stage_marker(7, 8, "Configuring logger, metadata, and runner hooks")
+    stage_marker(7, 8, "Starting: Configuring logger, metadata, and runner hooks")
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     log_file = os.path.join(work_dir, f"train_{timestamp}.log")
     logger = get_root_logger(log_file=log_file, log_level=cfg.log_level)
@@ -673,7 +697,7 @@ def main():
     if not hasattr(cfg, "custom_hooks") or cfg.custom_hooks is None:
         cfg.custom_hooks = []
     cfg.custom_hooks.append(dict(type='StartupLivenessHook', priority='VERY_LOW'))
-    stage_marker(7, 8, "Hooks configured", f"interval={cfg.log_config.interval}", elapsed=time.time() - t_stage)
+    stage_marker(7, 8, "Completed: Hooks and checkpoint rotation configured", f"interval={cfg.log_config.interval}", elapsed=time.time() - t_stage)
 
     # ── Stage 8/8: Launch Training Loop ───────────────────────────────────────
     log_int = cfg.log_config.get("interval", "N/A") if hasattr(cfg, "log_config") else "N/A"
@@ -681,10 +705,19 @@ def main():
     workers_gpu = cfg.data.get("workers_per_gpu", "N/A") if hasattr(cfg, "data") else "N/A"
     stage_marker(
         8, 8,
-        "Entering training loop (train_detector)",
+        "Starting: Entering training loop (train_detector)",
         f"epochs={cfg.runner.max_epochs}, iters/epoch={len(datasets[0])}, log_interval={log_int}, batch={samples_gpu}, workers={workers_gpu}",
         elapsed=time.time() - t_start
     )
+
+    if args.startup_diagnostic:
+        print("\n" + "=" * 74, flush=True)
+        print("  STARTUP DIAGNOSTIC PASSED", flush=True)
+        print(f"  All 8 stages validated successfully in {time.time() - t_start:.2f}s.", flush=True)
+        print("  System, environment, dataset, and model are fully ready for training.", flush=True)
+        print("=" * 74 + "\n", flush=True)
+        return 0
+
     train_detector(
         model,
         datasets,
@@ -694,7 +727,8 @@ def main():
         timestamp=timestamp,
         meta=meta,
     )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

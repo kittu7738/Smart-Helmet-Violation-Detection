@@ -414,3 +414,45 @@ def test_sanity_check_check_dataset(tmp_path):
     ok = check_dataset_func(cfg, str(data_root))
     assert isinstance(ok, bool)
     assert ok is True
+
+
+def test_train_py_startup_diagnostic_flag():
+    """Verify --startup-diagnostic argument is parsed cleanly by train.py."""
+    module = runpy.run_path(TRAIN_PY_PATH)
+    parse_args_func = module["_parse_args"]
+
+    orig_argv = sys.argv
+    try:
+        sys.argv = ["train.py", "--config", CONFIG_PATH, "--startup-diagnostic"]
+        args = parse_args_func()
+        assert args.startup_diagnostic is True
+    finally:
+        sys.argv = orig_argv
+
+
+def test_immediate_heartbeat_all_entrypoints_subprocess():
+    """Subprocess test verifying all 4 entry points emit flushed heartbeat on line 1."""
+    import subprocess
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    scripts = {
+        "train.py": os.path.join(REPO_ROOT, "training", "codetr", "train.py"),
+        "sanity_check.py": os.path.join(REPO_ROOT, "training", "codetr", "sanity_check.py"),
+        "evaluate.py": os.path.join(REPO_ROOT, "evaluation", "codetr", "evaluate.py"),
+        "infer.py": os.path.join(REPO_ROOT, "inference", "codetr", "infer.py"),
+    }
+    for name, path in scripts.items():
+        res = subprocess.run(
+            [sys.executable, "-u", path, "--help"],
+            cwd="/tmp",
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        assert res.returncode == 0, f"{name} exited with error: {res.stderr}"
+        lines = [ln.strip() for ln in res.stdout.splitlines() if ln.strip()]
+        assert len(lines) > 0, f"{name} produced zero stdout!"
+        first_line = lines[0]
+        assert ">>> Co-DETR" in first_line and "initializing" in first_line, (
+            f"Expected immediate heartbeat on line 1 of {name}, got: {first_line}"
+        )
+

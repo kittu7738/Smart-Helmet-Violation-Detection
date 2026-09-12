@@ -42,20 +42,29 @@ Usage (Google Colab / Local):
         --split test
 """
 
-import argparse
-import glob
-import json
-import math
 import os
-import re
 import sys
-import numpy as np
+import time
+
+# Immediate visual confirmation that Python process is running
+print(f"[{time.strftime('%H:%M:%S')}] >>> Co-DETR evaluate.py initializing (PID {os.getpid()}) <<<", flush=True)
+try:
+    sys.stdout.flush()
+except Exception:
+    pass
 
 try:
     sys.stdout.reconfigure(line_buffering=True)
     sys.stderr.reconfigure(line_buffering=True)
 except (AttributeError, Exception):
     pass
+
+import argparse
+import glob
+import json
+import math
+import re
+import numpy as np
 
 # ---------------------------------------------------------------------------
 # Ensure repository root and Co-DETR source are on sys.path
