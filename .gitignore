@@ -32,6 +32,12 @@ data/raw/
 data/processed/
 data/extracted/
 data/coco/
+data/train/
+data/vaid/
+data/val/
+data/test/
+data/*.json
+data/instances_*.json
 data/aicity*/
 aicity*/
 *.mp4

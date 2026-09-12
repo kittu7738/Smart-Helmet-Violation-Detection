@@ -892,11 +892,42 @@ def main():
         if "MultiScaleDeformAttn" not in ATTENTION:
             ATTENTION.register_module(name="MultiScaleDeformAttn", module=MultiScaleDeformableAttention)
     except ImportError as exc:
-        sys.exit(
-            f"[ERROR] Could not import mmdet/mmcv/projects: {exc}\n"
-            "Ensure the codetr conda environment is active (Python 3.7.11) and "
-            "PYTHONPATH includes the Co-DETR repo root."
-        )
+        curr_py = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        known_pythons = [
+            "/content/codetr_env/bin/python",
+            "/content/miniconda3/envs/codetr/bin/python",
+            "/content/miniconda3/bin/python",
+            os.path.abspath(os.path.join(_REPO_ROOT, ".codetr_env", "bin", "python")),
+        ]
+        found_env = [p for p in known_pythons if os.path.isfile(p) and os.access(p, os.X_OK)]
+        lines = [
+            "",
+            "=" * 78,
+            f"  [ENVIRONMENT ERROR] Co-DETR dependencies could not be imported: {exc}",
+            f"  Current Python : {curr_py} ({sys.executable})",
+            "",
+            "  Co-DETR requires Python 3.7-3.10 with PyTorch 1.11.0+cu113, MMCV-full 1.5.0,",
+            "  and MMDetection 2.25.3. Python >= 3.11 is incompatible with MMCV 1.x.",
+            "",
+        ]
+        if found_env:
+            lines.extend([
+                f"  A valid Co-DETR environment was DETECTED at: {found_env[0]}",
+                "",
+                "  Please run your command using that Python binary, for example:",
+                f"    {found_env[0]} {' '.join(sys.argv)}",
+                "  or using the runner wrapper:",
+                f"    bash run_codetr.sh {' '.join(sys.argv)}",
+            ])
+        else:
+            lines.extend([
+                "  To create the isolated Co-DETR environment in Google Colab, run:",
+                "    bash scripts/setup_codetr_colab.sh",
+                "  Then execute via:",
+                f"    bash run_codetr.sh {' '.join(sys.argv)}",
+            ])
+        lines.append("=" * 78 + "\n")
+        sys.exit("\n".join(lines))
 
     if not os.path.isfile(args.config):
         sys.exit(f"[ERROR] Config not found: {args.config}")

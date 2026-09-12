@@ -277,21 +277,50 @@ def check_gpu():
 
 
 def check_mmcv_mmdet():
-    """Check mmcv and mmdet versions."""
-    _header("5b. MMCV / MMDetection")
+    """Check mmcv, mmdet, timm, fairscale, and MultiScaleDeformableAttention."""
+    _header("5b. MMCV / MMDetection / Co-DETR dependencies")
     ok = True
     try:
         import mmcv
         _ok(f"mmcv {mmcv.__version__}")
-    except ImportError:
-        _fail("mmcv not importable")
+    except ImportError as e:
+        _fail(f"mmcv not importable ({e})")
         ok = False
+
     try:
         import mmdet
         _ok(f"mmdet {mmdet.__version__}")
-    except ImportError:
-        _fail("mmdet not importable")
+    except ImportError as e:
+        _fail(f"mmdet not importable ({e})")
         ok = False
+
+    try:
+        import timm
+        _ok(f"timm {timm.__version__}")
+    except ImportError as e:
+        _fail(f"timm not importable ({e})")
+        ok = False
+
+    try:
+        import fairscale
+        _ok("fairscale importable")
+    except ImportError as e:
+        _warn(f"fairscale not importable ({e}) — required only for distributed sharded training")
+
+    try:
+        from mmcv.ops.multi_scale_deform_attn import MultiScaleDeformableAttention
+        _ok("MultiScaleDeformableAttention CUDA operation functional")
+    except Exception as e:
+        _warn(f"MultiScaleDeformableAttention check: {e}")
+
+    if not ok:
+        curr_py = f"{sys.version_info.major}.{sys.version_info.minor}"
+        _fail(
+            f"Current Python {curr_py} is missing Co-DETR dependencies.\n"
+            "  Run 'bash scripts/setup_codetr_colab.sh' to bootstrap the isolated environment,\n"
+            "  then run using 'bash run_codetr.sh training/codetr/sanity_check.py ...'"
+        )
+
     return ok
 
 
