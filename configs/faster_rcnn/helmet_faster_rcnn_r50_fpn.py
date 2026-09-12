@@ -43,7 +43,7 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=(1000, 600), keep_ratio=True),
+    dict(type='Resize', img_scale=[(1333, 640), (1333, 800)], multiscale_mode='range', keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(
         type='PhotoMetricDistortion',
@@ -62,7 +62,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=(1000, 600),
+        img_scale=(1333, 800),
         flip=False,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -135,7 +135,7 @@ model = dict(
         feat_channels=256,
         anchor_generator=dict(
             type='AnchorGenerator',
-            scales=[8],
+            scales=[4, 8],
             ratios=[0.5, 1.0, 2.0],
             strides=[4, 8, 16, 32, 64],
         ),
@@ -168,11 +168,11 @@ model = dict(
                 target_means=[0.0, 0.0, 0.0, 0.0],
                 target_stds=[0.1, 0.1, 0.2, 0.2],
             ),
-            reg_class_agnostic=False,
+            reg_decoded_bbox=True,
             loss_cls=dict(
                 type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0,
             ),
-            loss_bbox=dict(type='L1Loss', loss_weight=1.0),
+            loss_bbox=dict(type='GIoULoss', loss_weight=10.0),
         ),
     ),
     train_cfg=dict(
@@ -251,11 +251,11 @@ optimizer_config = dict(grad_clip=None)
 lr_config = dict(
     policy='step',
     warmup='linear',
-    warmup_iters=100,
+    warmup_iters=500,
     warmup_ratio=0.001,
-    step=[8, 11],
+    step=[16, 22],
 )
-max_epochs = 12
+max_epochs = 24
 runner = dict(type='EpochBasedRunner', max_epochs=max_epochs)
 
 # ------------------------------------------------------------------
