@@ -85,7 +85,7 @@ for cand in [_CODETR_REPO, os.path.abspath(os.path.join(_REPO_ROOT, "..", "Co-DE
         break
 
 
-def _parse_args():
+def _parse_args(args_list=None):
     parser = argparse.ArgumentParser(
         description="Train Co-DETR for Smart-Helmet-Violation-Detection"
     )
@@ -149,6 +149,15 @@ def _parse_args():
     )
     # Performance & Colab optimizations
     parser.add_argument(
+        "--max-epochs",
+        "--epochs",
+        dest="max_epochs",
+        type=int,
+        default=None,
+        help="Override total number of training epochs (e.g. 2 for pilot run). "
+             "Overrides config runner.max_epochs, max_epochs, and total_epochs.",
+    )
+    parser.add_argument(
         "--log-interval",
         type=int,
         default=None,
@@ -193,7 +202,7 @@ def _parse_args():
         help="Override config key/values: e.g. --cfg-options "
              "optimizer.lr=2e-4 data.samples_per_gpu=1",
     )
-    return parser.parse_args()
+    return parser.parse_args(args_list)
 
 
 class _DictAction(argparse.Action):
@@ -666,6 +675,14 @@ def main():
     cfg = Config.fromfile(args.config)
     if args.cfg_options:
         cfg.merge_from_dict(args.cfg_options)
+    if args.max_epochs is not None:
+        if args.max_epochs <= 0:
+            sys.exit(f"[ERROR] --max-epochs must be a positive integer, got {args.max_epochs}")
+        if hasattr(cfg, "runner"):
+            cfg.runner.max_epochs = args.max_epochs
+        cfg.max_epochs = args.max_epochs
+        cfg.total_epochs = args.max_epochs
+        print(f"[{time.strftime('%H:%M:%S')}]   -> Overriding max_epochs to {args.max_epochs} (pilot/custom schedule)", flush=True)
     stage_marker(1, 8, "Completed: Configuration loaded successfully", elapsed=time.time() - t_stage)
 
     # ── Stage 2/8: Dataset Staging & Validation ──────────────────────────────
@@ -815,6 +832,8 @@ def main():
     # ── Stage 8/8: Launch Training Loop ───────────────────────────────────────
     if args.training_diagnostic:
         cfg.runner.max_epochs = 1
+        cfg.max_epochs = 1
+        cfg.total_epochs = 1
         if not hasattr(cfg, "custom_hooks") or cfg.custom_hooks is None:
             cfg.custom_hooks = []
         cfg.custom_hooks.append(dict(type='TrainingDiagnosticHook', priority='LOWEST'))

@@ -96,19 +96,49 @@ bash run_codetr.sh training/codetr/train.py \
 > - Executes iteration 1 forward pass, loss calculation, backward pass, and logs peak GPU VRAM.
 > - Terminates with `TRAINING DIAGNOSTIC PASSED`.
 
-### Cell 5 — Launch Full 12-Epoch v2 Training
+### Cell 5 — Launch Controlled 2-Epoch Pilot Run
 ```bash
 %%bash
 cd /content/Smart-Helmet-Violation-Detection
 bash run_codetr.sh training/codetr/train.py \
   --config configs/codetr/helmet_codetr_swin_large.py \
-  --work-dir /content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs/helmet_codetr_swin_large_v2 \
+  --work-dir /content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs/helmet_codetr_swin_large_pilot2 \
   --data-root /content/drive/MyDrive/Smart-Helmet-Violation-Detection/data \
+  --max-epochs 2 \
   --log-interval 10
 ```
+> - Overrides `max_epochs` to 2 via CLI without touching baseline config.
+> - Preserves `workers_per_gpu = 0` and local staging to `/content/dataset_local`.
 > - Emits liveness heartbeats for warmup iterations 1, 2, and 3 immediately upon completion.
 > - Streams regular training progress every 10 iterations.
-> - Validates at the end of each epoch and preserves top checkpoints on Google Drive.
+> - Runs validation at the end of each epoch and preserves checkpoints on Google Drive:
+>   `epoch_1.pth`, `epoch_2.pth`, and `best_bbox_mAP_*.pth`.
+
+### Cell 6 — Evaluate Pilot Checkpoint on Validation Split
+```bash
+%%bash
+cd /content/Smart-Helmet-Violation-Detection
+bash run_codetr.sh evaluation/codetr/evaluate.py \
+  --config configs/codetr/helmet_codetr_swin_large.py \
+  --work-dir /content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs/helmet_codetr_swin_large_pilot2 \
+  --data-root /content/drive/MyDrive/Smart-Helmet-Violation-Detection/data \
+  --split val
+```
+> - Computes full COCO metrics: mAP, AP50, AP75, and per-class AP for all 7 classes.
+> - Informs the decision on whether to proceed to 4, 6, or 12 epochs.
+
+### Cell 7 — (Optional) Resume / Extend Training
+```bash
+%%bash
+cd /content/Smart-Helmet-Violation-Detection
+bash run_codetr.sh training/codetr/train.py \
+  --config configs/codetr/helmet_codetr_swin_large.py \
+  --work-dir /content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs/helmet_codetr_swin_large_pilot2 \
+  --data-root /content/drive/MyDrive/Smart-Helmet-Violation-Detection/data \
+  --resume-from /content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs/helmet_codetr_swin_large_pilot2/epoch_2.pth \
+  --max-epochs 4 \
+  --log-interval 10
+```
 
 ---
 

@@ -74,3 +74,27 @@ def test_incompatible_python_diagnostic_message():
     err_out = res.stdout + res.stderr
     assert "ENVIRONMENT ERROR" in err_out or "No module named" in err_out
     assert "setup_codetr_colab.sh" in err_out or "run_codetr.sh" in err_out
+
+
+def test_train_cli_max_epochs_override():
+    """Verify training/codetr/train.py supports --max-epochs and --epochs CLI arguments."""
+    from training.codetr.train import _parse_args
+
+    args_default = _parse_args([])
+    assert args_default.max_epochs is None
+
+    args_flag = _parse_args(["--max-epochs", "2"])
+    assert args_flag.max_epochs == 2
+
+    args_alias = _parse_args(["--epochs", "4"])
+    assert args_alias.max_epochs == 4
+
+
+def test_train_cli_help_lists_max_epochs():
+    """Verify train.py --help lists --max-epochs and --epochs options."""
+    train_script = os.path.join(REPO_ROOT, "training", "codetr", "train.py")
+    res = subprocess.run([sys.executable, train_script, "--help"], capture_output=True, text=True)
+    assert res.returncode == 0
+    assert "--max-epochs" in res.stdout
+    assert "--epochs" in res.stdout
+
