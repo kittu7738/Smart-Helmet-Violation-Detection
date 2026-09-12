@@ -156,7 +156,7 @@ test_pipeline = [
 
 data = dict(
     samples_per_gpu=1,   # adjust if memory allows
-    workers_per_gpu=2,
+    workers_per_gpu=0,   # default 0 eliminates fork deadlocks; override via --workers-per-gpu
     train=dict(
         type=dataset_type,
         ann_file=data_root + 'instances_train.json',

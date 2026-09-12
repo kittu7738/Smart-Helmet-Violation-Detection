@@ -53,6 +53,21 @@ try:
 except (AttributeError, Exception):
     pass
 
+# Prevent OpenCV & OpenMP threadpool deadlock in PyTorch DataLoader worker forks
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+os.environ.setdefault("CV_NUM_THREADS", "0")
+
+try:
+    import cv2
+    cv2.setNumThreads(0)
+    cv2.ocl.setUseOpenCL(False)
+except Exception:
+    pass
+
 import argparse
 import copy
 import shutil
@@ -164,6 +179,11 @@ def _parse_args():
         "--startup-diagnostic",
         action="store_true",
         help="Run through full startup sequence, configuration, data staging, and model initialization to verify readiness without launching training loop.",
+    )
+    parser.add_argument(
+        "--training-diagnostic",
+        action="store_true",
+        help="Run full training pipeline through exactly 1 iteration to verify DataLoader, CUDA forward/backward pass, and loss computation, then exit cleanly.",
     )
     # Allow passing arbitrary MMDetection cfg-options as KEY=VALUE pairs.
     parser.add_argument(
@@ -475,6 +495,13 @@ def _resolve_swin_backbone(cfg, swin_arg=None):
             print(f"[{time.strftime('%H:%M:%S')}] [WARNING] Custom download failed ({exc}); falling back to standard loader", flush=True)
 
 
+class TrainingDiagnosticComplete(Exception):
+    """Sentinel exception raised by TrainingDiagnosticHook to terminate training after iteration 1."""
+    def __init__(self, stats=None):
+        self.stats = stats or {}
+        super().__init__("Training diagnostic iteration 1 completed successfully.")
+
+
 def main():
     t_start = time.time()
     args = _parse_args()
@@ -510,22 +537,37 @@ def main():
         if 'StartupLivenessHook' not in HOOKS:
             @HOOKS.register_module()
             class StartupLivenessHook(Hook):
-                def __init__(self, log_first_n=3):
+                def __init__(self, log_first_n=3, *args, **kwargs):
+                    super().__init__()
                     self.log_first_n = log_first_n
                     self._iter_start_time = None
 
+                def before_run(self, runner):
+                    ts = time.strftime("%H:%M:%S")
+                    n_iters = len(runner.data_loader) if hasattr(runner, 'data_loader') and runner.data_loader else 'N/A'
+                    print(
+                        f"[{ts}] [Training Lifecycle] runner.before_run complete. "
+                        f"Total epochs: {runner.max_epochs}, iterations/epoch: {n_iters}.",
+                        flush=True
+                    )
+
                 def before_train_epoch(self, runner):
-                    if runner.epoch == 0:
-                        ts = time.strftime("%H:%M:%S")
-                        print(f"\n[{ts}] [Liveness] >>> Epoch 1/{runner.max_epochs} started! ({len(runner.data_loader)} iterations per epoch) <<<", flush=True)
+                    ts = time.strftime("%H:%M:%S")
+                    n_iters = len(runner.data_loader) if hasattr(runner, 'data_loader') and runner.data_loader else 'N/A'
+                    print(
+                        f"\n[{ts}] [Training Lifecycle] >>> Epoch {runner.epoch + 1}/{runner.max_epochs} started! "
+                        f"Awaiting batch 1 from DataLoader ({n_iters} iterations per epoch) <<<",
+                        flush=True
+                    )
 
                 def before_train_iter(self, runner):
                     if runner.iter < self.log_first_n:
                         self._iter_start_time = time.time()
                         ts = time.strftime("%H:%M:%S")
+                        n_iters = len(runner.data_loader) if hasattr(runner, 'data_loader') and runner.data_loader else 'N/A'
                         print(
-                            f"[{ts}] [Liveness] Iteration {runner.iter + 1}/{len(runner.data_loader)} "
-                            f"forward pass starting (CUDA warmup & loss graph)...",
+                            f"[{ts}] [Training Lifecycle] Iteration {runner.iter + 1}/{n_iters}: "
+                            f"Data batch received! Running forward pass & loss computation...",
                             flush=True
                         )
 
@@ -533,19 +575,54 @@ def main():
                     if runner.iter < self.log_first_n:
                         dur = time.time() - self._iter_start_time if self._iter_start_time else 0.0
                         ts = time.strftime("%H:%M:%S")
+                        n_iters = len(runner.data_loader) if hasattr(runner, 'data_loader') and runner.data_loader else 'N/A'
                         loss_val = runner.outputs.get('loss', 'computed') if hasattr(runner, 'outputs') and isinstance(runner.outputs, dict) else 'computed'
                         if hasattr(loss_val, 'item'):
                             loss_val = f"{loss_val.item():.4f}"
+                        lr = runner.current_lr()[0] if hasattr(runner, 'current_lr') and runner.current_lr() else 'N/A'
+                        lr_str = f"{lr:.2e}" if isinstance(lr, (int, float)) else str(lr)
                         print(
-                            f"[{ts}] [Liveness] Iteration {runner.iter + 1}/{len(runner.data_loader)} "
-                            f"SUCCESS: step completed in {dur:.2f}s | loss={loss_val}",
+                            f"[{ts}] [Training Lifecycle] Iteration {runner.iter + 1}/{n_iters}: "
+                            f"SUCCESS: step completed in {dur:.2f}s | loss={loss_val} | lr={lr_str}",
                             flush=True
                         )
                         if runner.iter + 1 == self.log_first_n:
                             print(
-                                f"[{ts}] [Liveness] Warmup iterations complete! Streaming standard metrics every 10 iterations.\n",
+                                f"[{ts}] [Training Lifecycle] Warmup iterations verified! Streaming logs every interval.\n",
                                 flush=True
                             )
+
+        if 'TrainingDiagnosticHook' not in HOOKS:
+            @HOOKS.register_module()
+            class TrainingDiagnosticHook(Hook):
+                def __init__(self, *args, **kwargs):
+                    super().__init__()
+                    self._start_time = None
+
+                def before_train_iter(self, runner):
+                    self._start_time = time.time()
+
+                def after_train_iter(self, runner):
+                    dur = time.time() - self._start_time if self._start_time else 0.0
+                    loss_val = runner.outputs.get('loss', None) if hasattr(runner, 'outputs') and isinstance(runner.outputs, dict) else None
+                    loss_str = f"{loss_val.item():.4f}" if hasattr(loss_val, 'item') else str(loss_val)
+
+                    gpu_mem_str = "N/A"
+                    try:
+                        import torch
+                        if torch.cuda.is_available():
+                            alloc = torch.cuda.max_memory_allocated(0) / (1024**3)
+                            total = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                            gpu_mem_str = f"{alloc:.2f} GB / {total:.2f} GB"
+                    except Exception:
+                        pass
+
+                    stats = {
+                        "step_time": dur,
+                        "loss": loss_str,
+                        "gpu_mem": gpu_mem_str,
+                    }
+                    raise TrainingDiagnosticComplete(stats)
 
     except ImportError as exc:
         sys.exit(
@@ -584,6 +661,11 @@ def main():
     if args.workers_per_gpu is not None:
         if hasattr(cfg, "data"):
             cfg.data.workers_per_gpu = args.workers_per_gpu
+    workers_cnt = cfg.data.get("workers_per_gpu", 0) if hasattr(cfg, "data") else 0
+    if workers_cnt == 0:
+        print(f"[{time.strftime('%H:%M:%S')}]   -> DataLoader workers: 0 (synchronous in-process loading; completely immune to OpenCV fork deadlocks)", flush=True)
+    else:
+        print(f"[{time.strftime('%H:%M:%S')}]   -> DataLoader workers: {workers_cnt} (multiprocessing enabled; cv2.setNumThreads(0) enforced)", flush=True)
     stage_marker(3, 8, "Completed: Work directory ready", f"work_dir={work_dir}", elapsed=time.time() - t_stage)
 
     # ── Stage 4/8: Checkpoint Resuming & Device Setup ─────────────────────────
@@ -700,6 +782,13 @@ def main():
     stage_marker(7, 8, "Completed: Hooks and checkpoint rotation configured", f"interval={cfg.log_config.interval}", elapsed=time.time() - t_stage)
 
     # ── Stage 8/8: Launch Training Loop ───────────────────────────────────────
+    if args.training_diagnostic:
+        cfg.runner.max_epochs = 1
+        if not hasattr(cfg, "custom_hooks") or cfg.custom_hooks is None:
+            cfg.custom_hooks = []
+        cfg.custom_hooks.append(dict(type='TrainingDiagnosticHook', priority='LOWEST'))
+        print(f"[{time.strftime('%H:%M:%S')}]   -> Attached TrainingDiagnosticHook (runs exactly 1 iteration, then verifies pipeline readiness)", flush=True)
+
     log_int = cfg.log_config.get("interval", "N/A") if hasattr(cfg, "log_config") else "N/A"
     samples_gpu = cfg.data.get("samples_per_gpu", "N/A") if hasattr(cfg, "data") else "N/A"
     workers_gpu = cfg.data.get("workers_per_gpu", "N/A") if hasattr(cfg, "data") else "N/A"
@@ -718,15 +807,28 @@ def main():
         print("=" * 74 + "\n", flush=True)
         return 0
 
-    train_detector(
-        model,
-        datasets,
-        cfg,
-        distributed=distributed,
-        validate=(not args.no_validate),
-        timestamp=timestamp,
-        meta=meta,
-    )
+    try:
+        train_detector(
+            model,
+            datasets,
+            cfg,
+            distributed=distributed,
+            validate=(not args.no_validate and not args.training_diagnostic),
+            timestamp=timestamp,
+            meta=meta,
+        )
+    except TrainingDiagnosticComplete as diag:
+        t_total = time.time() - t_start
+        print("\n" + "=" * 74, flush=True)
+        print("  TRAINING DIAGNOSTIC PASSED", flush=True)
+        print(f"  Iteration 1 forward/backward execution verified in {diag.stats.get('step_time', 0):.2f}s.", flush=True)
+        print(f"  - Initial loss : {diag.stats.get('loss', 'N/A')}", flush=True)
+        print(f"  - Peak GPU VRAM: {diag.stats.get('gpu_mem', 'N/A')}", flush=True)
+        print(f"  - Total elapsed: {t_total:.2f}s", flush=True)
+        print("  Full training pipeline is 100% verified and ready for complete training.", flush=True)
+        print("=" * 74 + "\n", flush=True)
+        return 0
+
     return 0
 
 

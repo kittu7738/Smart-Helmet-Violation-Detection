@@ -456,3 +456,34 @@ def test_immediate_heartbeat_all_entrypoints_subprocess():
             f"Expected immediate heartbeat on line 1 of {name}, got: {first_line}"
         )
 
+
+def test_train_py_training_diagnostic_flag():
+    """Verify --training-diagnostic argument is parsed cleanly by train.py."""
+    module = runpy.run_path(TRAIN_PY_PATH)
+    parse_args_func = module["_parse_args"]
+
+    orig_argv = sys.argv
+    try:
+        sys.argv = ["train.py", "--config", CONFIG_PATH, "--training-diagnostic"]
+        args = parse_args_func()
+        assert args.training_diagnostic is True
+    finally:
+        sys.argv = orig_argv
+
+
+def test_config_workers_per_gpu_default():
+    """Verify data.workers_per_gpu is 0 by default to eliminate OpenCV fork deadlocks on Linux."""
+    cfg = runpy.run_path(CONFIG_PATH)
+    assert cfg["data"]["workers_per_gpu"] == 0
+
+
+def test_training_diagnostic_exception():
+    """Verify TrainingDiagnosticComplete stores stats and message correctly."""
+    module = runpy.run_path(TRAIN_PY_PATH)
+    exc_cls = module["TrainingDiagnosticComplete"]
+    stats = {"step_time": 1.25, "loss": "2.3456", "gpu_mem": "4.50 GB / 15.00 GB"}
+    exc = exc_cls(stats)
+    assert exc.stats == stats
+    assert "iteration 1 completed" in str(exc).lower()
+
+
