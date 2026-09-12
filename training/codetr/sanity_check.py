@@ -26,14 +26,27 @@ import argparse
 import json
 import os
 import sys
+import time
 import traceback
 
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+except (AttributeError, Exception):
+    pass
+
 # ---------------------------------------------------------------------------
-# Ensure Co-DETR source is on sys.path
+# Ensure repository root and Co-DETR source are on sys.path
 # ---------------------------------------------------------------------------
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
 _CODETR_REPO = os.environ.get("CODETR_REPO", "/content/Co-DETR")
-if _CODETR_REPO and os.path.isdir(_CODETR_REPO) and _CODETR_REPO not in sys.path:
-    sys.path.insert(0, _CODETR_REPO)
+for cand in [_CODETR_REPO, os.path.abspath(os.path.join(_REPO_ROOT, "..", "Co-DETR")), "/content/Co-DETR"]:
+    if cand and os.path.isdir(cand) and cand not in sys.path:
+        sys.path.insert(0, cand)
+        break
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Colour helpers
@@ -140,6 +153,7 @@ def check_dataset(cfg, data_root):
 
     train_info = report.get("train", {})
     val_info = report.get("val", {})
+    test_info = report.get("test", {})
 
     all_valid = True
     for sname, sinfo in [("Train", train_info), ("Val", val_info)]:
@@ -153,6 +167,13 @@ def check_dataset(cfg, data_root):
         else:
             _fail(f"{sname} images dir NOT FOUND under {data_root}")
             all_valid = False
+
+    if test_info.get("valid"):
+        _ok(f"Test split (held-out): {test_info['ann_path']} ({test_info.get('num_images', 0)} images, {test_info.get('num_annotations', 0)} annotations)")
+    elif test_info.get("ann_exists"):
+        _warn(f"Test annotations found ({test_info['ann_path']}), but image dir: {test_info.get('img_path')}")
+    else:
+        _warn(f"Held-out test split not found under {data_root} (optional for training, required for final evaluation)")
 
     if not (train_info.get("valid") and val_info.get("valid")) or not all_valid:
         return False
@@ -217,8 +238,15 @@ def check_dataset(cfg, data_root):
             _fail(f"cv2.imread returned None for {img_path}")
             return False
     except ImportError:
-        _warn("OpenCV not available — skipping pixel load test")
-        return True
+        try:
+            from PIL import Image
+            with Image.open(img_path) as im:
+                w, h = im.size
+            _ok(f"Loaded {first_img['file_name']} (via PIL): {w}x{h}")
+            return True
+        except Exception:
+            _warn("OpenCV and PIL not available — skipping pixel load test")
+            return True
 
 
 def check_gpu():

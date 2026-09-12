@@ -51,6 +51,25 @@ import re
 import sys
 import numpy as np
 
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+except (AttributeError, Exception):
+    pass
+
+# ---------------------------------------------------------------------------
+# Ensure repository root and Co-DETR source are on sys.path
+# ---------------------------------------------------------------------------
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+_CODETR_REPO = os.environ.get("CODETR_REPO", "/content/Co-DETR")
+for cand in [_CODETR_REPO, os.path.abspath(os.path.join(_REPO_ROOT, "..", "Co-DETR")), "/content/Co-DETR"]:
+    if cand and os.path.isdir(cand) and cand not in sys.path:
+        sys.path.insert(0, cand)
+        break
+
 # ---------------------------------------------------------------------------
 # Default 7 temporary helmet classes (0-indexed, exact paper order)
 # ---------------------------------------------------------------------------
@@ -103,13 +122,6 @@ def apply_minority_optimizer(outputs, classes=EXPECTED_CLASSES, thresholds=None)
                 img_filtered.append(np.zeros((0, 5), dtype=np.float32))
         filtered_outputs.append(img_filtered)
     return filtered_outputs
-
-# ---------------------------------------------------------------------------
-# Ensure Co-DETR source is on sys.path
-# ---------------------------------------------------------------------------
-_CODETR_REPO = os.environ.get("CODETR_REPO", "/content/Co-DETR")
-if _CODETR_REPO and os.path.isdir(_CODETR_REPO) and _CODETR_REPO not in sys.path:
-    sys.path.insert(0, _CODETR_REPO)
 
 
 def _parse_args():

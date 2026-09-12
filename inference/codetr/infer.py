@@ -32,6 +32,25 @@ import os
 import sys
 import time
 
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+except (AttributeError, Exception):
+    pass
+
+# ---------------------------------------------------------------------------
+# Ensure repository root and Co-DETR source are on sys.path
+# ---------------------------------------------------------------------------
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+_CODETR_REPO = os.environ.get("CODETR_REPO", "/content/Co-DETR")
+for cand in [_CODETR_REPO, os.path.abspath(os.path.join(_REPO_ROOT, "..", "Co-DETR")), "/content/Co-DETR"]:
+    if cand and os.path.isdir(cand) and cand not in sys.path:
+        sys.path.insert(0, cand)
+        break
+
 EXPECTED_CLASSES = (
     "driver_with_helmet",
     "bike",
@@ -231,6 +250,11 @@ def main():
         from mmdet.models import build_detector
         from mmdet.apis import inference_detector, init_detector
         import projects
+
+        from mmcv.cnn.bricks.registry import ATTENTION
+        from mmcv.ops.multi_scale_deform_attn import MultiScaleDeformableAttention
+        if "MultiScaleDeformAttn" not in ATTENTION:
+            ATTENTION.register_module(name="MultiScaleDeformAttn", module=MultiScaleDeformableAttention)
     except ImportError as exc:
         sys.exit(f"[ERROR] Could not import dependencies: {exc}")
 

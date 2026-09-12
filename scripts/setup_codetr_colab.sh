@@ -275,6 +275,14 @@ else
   success "Co-DETR installed (editable, no-deps)."
 fi
 
+# Link Smart-Helmet-Violation-Detection repository to conda site-packages
+SITE_PACKAGES=$("${PYTHON}" -c "import site; print(site.getsitepackages()[0])" 2>/dev/null || echo "")
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ -n "${SITE_PACKAGES}" && -d "${SITE_PACKAGES}" ]]; then
+  echo "${REPO_DIR}" > "${SITE_PACKAGES}/smart_helmet.pth"
+  success "Linked repository to Python site-packages: ${REPO_DIR} -> ${SITE_PACKAGES}/smart_helmet.pth"
+fi
+
 # ──────────────────────────────────────────────────────────────────────────────
 # 7.  Environment verification
 # ──────────────────────────────────────────────────────────────────────────────

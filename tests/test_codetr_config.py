@@ -355,5 +355,62 @@ def test_stage_dataset_fast_path_skip(tmp_path, capsys):
     assert "skipping re-copy" in captured.out
 
 
+def test_entrypoints_isolated_from_arbitrary_cwd():
+    """Verify all Co-DETR CLI entry points resolve imports without PYTHONPATH from /tmp."""
+    import subprocess
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    scripts = [
+        os.path.join(REPO_ROOT, "training", "codetr", "sanity_check.py"),
+        os.path.join(REPO_ROOT, "training", "codetr", "train.py"),
+        os.path.join(REPO_ROOT, "evaluation", "codetr", "evaluate.py"),
+        os.path.join(REPO_ROOT, "inference", "codetr", "infer.py"),
+    ]
+    for script in scripts:
+        res = subprocess.run(
+            [sys.executable, script, "--help"],
+            cwd="/tmp",
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        assert res.returncode == 0, f"Script {script} failed from /tmp:\n{res.stderr}"
 
 
+def test_sanity_check_check_dataset(tmp_path):
+    """Test check_dataset in sanity_check.py with mock dataset."""
+    module = runpy.run_path(os.path.join(REPO_ROOT, "training", "codetr", "sanity_check.py"))
+    check_dataset_func = module["check_dataset"]
+
+    # Setup mock dataset
+    data_root = tmp_path / "mock_data"
+    for split in ["train", "vaid", "test"]:
+        split_dir = data_root / split
+        img_dir = split_dir / "images"
+        os.makedirs(img_dir, exist_ok=True)
+        # 1 mock image
+        try:
+            from PIL import Image
+            im = Image.new("RGB", (32, 32), color="red")
+            im.save(img_dir / "img1.jpg")
+        except ImportError:
+            import cv2
+            import numpy as np
+            im = np.zeros((32, 32, 3), dtype=np.uint8)
+            cv2.imwrite(str(img_dir / "img1.jpg"), im)
+        coco_data = {
+            "categories": [{"id": i + 1, "name": f"c_{i}"} for i in range(7)],
+            "images": [{"id": 1, "file_name": "img1.jpg"}],
+            "annotations": [{"id": 1, "image_id": 1, "category_id": 1, "bbox": [0, 0, 10, 10]}],
+        }
+        with open(split_dir / f"instances_{'val' if split == 'vaid' else split}.json", "w") as f:
+            json.dump(coco_data, f)
+
+    cfg = {
+        "num_classes": 7,
+        "CLASSES": tuple(f"c_{i}" for i in range(7)),
+    }
+
+    # Should pass check
+    ok = check_dataset_func(cfg, str(data_root))
+    assert isinstance(ok, bool)
+    assert ok is True
