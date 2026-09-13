@@ -80,7 +80,7 @@ test_pipeline = [
 
 data = dict(
     samples_per_gpu=2,   # 4 images per batch on T4 if feasible, but user requested 2 for safety. 2 fits perfectly at 800x480.
-    workers_per_gpu=0,   # Avoid OpenCV thread deadlocks
+    workers_per_gpu=2,   # Use background processes to parallelize data loading and prevent CPU throttling
     train=dict(
         type=dataset_type,
         ann_file=data_root + 'instances_train.json',

@@ -749,17 +749,29 @@ def main():
                             
                             # Safely extract resolution from train pipeline
                             try:
-                                pipe = cfg.data.train.pipeline
-                                resize_op = next((op for op in pipe if op['type'] == 'Resize'), None)
-                                if resize_op:
-                                    input_res = str(resize_op.get('img_scale', 'N/A'))
-                                else:
-                                    input_res = str(cfg.get("image_size", "N/A"))
+                                pipe = None
+                                if isinstance(cfg, dict):
+                                    pipe = cfg.get('data', {}).get('train', {}).get('pipeline', [])
+                                    img_size = cfg.get('image_size', 'N/A')
+                                elif hasattr(cfg, 'data'):
+                                    pipe = cfg.data.train.pipeline
+                                    img_size = getattr(cfg, 'image_size', 'N/A')
+                                
+                                input_res = str(img_size)
+                                if pipe:
+                                    resize_op = next((op for op in pipe if isinstance(op, dict) and op.get('type') == 'Resize'), None)
+                                    if resize_op and 'img_scale' in resize_op:
+                                        input_res = str(resize_op['img_scale'])
                             except Exception:
                                 input_res = "Error parsing"
                                 
                             try:
-                                num_query = str(cfg.model.query_head.num_query)
+                                if isinstance(cfg, dict):
+                                    num_query = str(cfg.get('model', {}).get('query_head', {}).get('num_query', 'N/A'))
+                                elif hasattr(cfg, 'model'):
+                                    num_query = str(cfg.model.query_head.num_query)
+                                else:
+                                    num_query = "N/A"
                             except Exception:
                                 num_query = "Error parsing"
                         
