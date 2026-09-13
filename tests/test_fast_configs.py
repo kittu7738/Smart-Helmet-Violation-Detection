@@ -85,6 +85,9 @@ def test_codetr_r50_model_and_optimizations():
     assert "fp16" not in cfg, "Co-DETR R50 should have fp16 disabled for MMCV compatibility on T4"
     assert cfg["data"]["samples_per_gpu"] == 1
     assert cfg["data"]["workers_per_gpu"] == 0
+    assert cfg["checkpoint_config"]["interval"] == 4
+    assert cfg["checkpoint_config"]["max_keep_ckpts"] == 2
+    assert cfg["checkpoint_config"]["save_best"] == "bbox_mAP"
 
 
 def test_train_cli_with_fast_configs():

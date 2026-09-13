@@ -287,7 +287,7 @@ model = dict(
             octave_base_scale=4,
             scales_per_octave=3,
             ratios=[0.5, 1.0, 2.0],
-            strides=[4, 8, 16, 32, 64, 128],
+            strides=[4, 8, 16, 32, 64],
         ),
         bbox_coder=dict(
             type='DeltaXYWHBBoxCoder',
@@ -343,10 +343,10 @@ model = dict(
             anchor_generator=dict(
                 type='AnchorGenerator',
                 ratios=[1.0],
-                octave_base_scale=8,
+                octave_base_scale=4,
                 scales_per_octave=1,
                 center_offset=0.0,
-                strides=[4, 8, 16, 32, 64, 128],
+                strides=[4, 8, 16, 32, 64],
             ),
             bbox_coder=dict(
                 type='DeltaXYWHBBoxCoder',
@@ -493,7 +493,7 @@ lr_config = dict(
 max_epochs = 36
 runner = dict(type='EpochBasedRunner', max_epochs=max_epochs)
 
-checkpoint_config = dict(interval=1, max_keep_ckpts=3)
+checkpoint_config = dict(interval=4, max_keep_ckpts=2, save_best='bbox_mAP')
 log_config = dict(
     interval=10,
     hooks=[
