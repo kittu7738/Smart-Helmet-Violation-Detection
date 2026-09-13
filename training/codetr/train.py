@@ -747,30 +747,33 @@ def main():
                         else:
                             is_fp16 = "FP16 (Enabled)" if hasattr(cfg, 'fp16') or (isinstance(cfg, dict) and "fp16" in cfg) else "FP32 (Safe Baseline)"
                             
-                        # Robust regex parsing from the config file text directly
+                        # Safest parser: read the config file directly from sys.argv
                         input_res = "N/A"
                         num_query = "N/A"
                         is_fp16 = "FP32 (Safe Baseline)"
                         try:
-                            cfg_text = getattr(runner, 'meta', {}).get('cfg_text', '')
-                            if not cfg_text and hasattr(runner, 'model') and hasattr(runner.model, 'cfg'):
-                                cfg_text = runner.model.cfg.pretty_text
+                            import sys, os, re
+                            config_path = next((arg for arg in sys.argv if arg.endswith('.py') and 'configs/' in arg), None)
+                            if config_path and os.path.isfile(config_path):
+                                with open(config_path, 'r') as f:
+                                    cfg_text = f.read()
                                 
-                            import re
-                            # Match img_scale=(800, 480) or img_scale=[(800, 480)]
-                            res_match = re.search(r"img_scale\s*=\s*[\(\[]?\(?(\d+)\s*,\s*(\d+)\)?[\)\]]?", cfg_text)
-                            if res_match:
-                                input_res = f"({res_match.group(1)}, {res_match.group(2)})"
+                                res_match = re.search(r"image_size\s*=\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)", cfg_text)
+                                if not res_match:
+                                    res_match = re.search(r"img_scale\s*=\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)", cfg_text)
+                                if res_match:
+                                    input_res = f"({res_match.group(1)}, {res_match.group(2)})"
                                 
-                            q_match = re.search(r"num_query\s*=\s*(\d+)", cfg_text)
-                            if q_match:
-                                num_query = q_match.group(1)
-                                
-                            if "fp16" in cfg_text.lower():
-                                is_fp16 = "FP16 (Enabled)"
+                                q_match = re.search(r"num_query\s*=\s*(\d+)", cfg_text)
+                                if q_match:
+                                    num_query = q_match.group(1)
+                                    
+                                if "fp16" in cfg_text.lower() and "loss_scale" in cfg_text.lower():
+                                    if not re.search(r"#\s*fp16\s*=", cfg_text):
+                                        is_fp16 = "FP16 (Enabled)"
                         except Exception as e:
-                            input_res = f"Error: {str(e)}"
-                            num_query = f"Error: {str(e)}"
+                            input_res = f"File Read Error: {str(e)}"
+                            num_query = f"File Read Error: {str(e)}"
                         
                         print(f"  Input Resolution     : {input_res}")
                         print(f"  Number of Queries    : {num_query}")
