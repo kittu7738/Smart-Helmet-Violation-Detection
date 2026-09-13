@@ -347,7 +347,37 @@ def stage_dataset_if_needed(data_root, stage_dir="/content/dataset_local", enabl
     start_time = time.time()
 
     os.makedirs(stage_dir, exist_ok=True)
-    copied_files, total_bytes = _copy_tree_compat(data_root, stage_dir)
+    
+    # Safely stage ONLY required dataset components to avoid recursive copy bugs
+    copied_files = 0
+    total_bytes = 0
+    
+    # 1. Stage specific split directories (images and labels)
+    for split_dir in ["train", "vaid", "test"]:
+        for sub_dir in ["images", "labels"]:
+            src_sub = os.path.join(data_root, split_dir, sub_dir)
+            dst_sub = os.path.join(stage_dir, split_dir, sub_dir)
+            if os.path.isdir(src_sub):
+                c, s = _copy_tree_compat(src_sub, dst_sub)
+                copied_files += c
+                total_bytes += s
+                
+    # 2. Stage COCO annotation JSON files (either flat in data_root or inside split dirs)
+    for json_file in ["instances_train.json", "instances_val.json", "instances_test.json"]:
+        for base_dir in [data_root, os.path.join(data_root, "train"), os.path.join(data_root, "vaid"), os.path.join(data_root, "test")]:
+            src_json = os.path.join(base_dir, json_file)
+            if os.path.isfile(src_json):
+                # Calculate relative path to maintain structure
+                rel_path = os.path.relpath(src_json, data_root)
+                dst_json = os.path.join(stage_dir, rel_path)
+                os.makedirs(os.path.dirname(dst_json), exist_ok=True)
+                
+                if not os.path.exists(dst_json) or os.path.getsize(dst_json) == 0:
+                    shutil.copy2(src_json, dst_json)
+                copied_files += 1
+                total_bytes += os.path.getsize(dst_json)
+                print(f"[{time.strftime('%H:%M:%S')}]   -> Staged '{rel_path}'", flush=True)
+
     elapsed = time.time() - start_time
     mb = total_bytes / (1024 * 1024)
     print(
