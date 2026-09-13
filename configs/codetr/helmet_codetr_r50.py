@@ -287,7 +287,7 @@ model = dict(
             octave_base_scale=4,
             scales_per_octave=3,
             ratios=[0.5, 1.0, 2.0],
-            strides=[4, 8, 16, 32, 64],
+            strides=[4, 8, 16, 32, 64, 128],
         ),
         bbox_coder=dict(
             type='DeltaXYWHBBoxCoder',
@@ -346,7 +346,7 @@ model = dict(
                 octave_base_scale=4,
                 scales_per_octave=1,
                 center_offset=0.0,
-                strides=[4, 8, 16, 32, 64],
+                strides=[4, 8, 16, 32, 64, 128],
             ),
             bbox_coder=dict(
                 type='DeltaXYWHBBoxCoder',
