@@ -41,7 +41,7 @@ img_norm_cfg = dict(
     to_rgb=True,
 )
 
-image_size = (1000, 600)
+image_size = (800, 480)
 
 train_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -54,17 +54,15 @@ train_pipeline = [
                 dict(
                     type='Resize',
                     img_scale=[
-                        (480, 1000),
-                        (512, 1000),
-                        (544, 1000),
-                        (576, 1000),
-                        (608, 1000),
-                        (640, 1000),
-                        (672, 1000),
-                        (704, 1000),
-                        (736, 1000),
-                        (768, 1000),
-                        (800, 1000),
+                        (384, 800),
+                        (416, 800),
+                        (448, 800),
+                        (480, 800),
+                        (512, 800),
+                        (544, 800),
+                        (576, 800),
+                        (608, 800),
+                        (640, 800),
                     ],
                     multiscale_mode='value',
                     keep_ratio=True,
@@ -73,30 +71,28 @@ train_pipeline = [
             [
                 dict(
                     type='Resize',
-                    img_scale=[(400, 1000), (500, 1000), (600, 1000)],
+                    img_scale=[(320, 800), (400, 800), (480, 800)],
                     multiscale_mode='value',
                     keep_ratio=True,
                 ),
                 dict(
                     type='RandomCrop',
                     crop_type='absolute_range',
-                    crop_size=(384, 600),
+                    crop_size=(384, 480),
                     allow_negative_crop=True,
                 ),
                 dict(
                     type='Resize',
                     img_scale=[
-                        (480, 1000),
-                        (512, 1000),
-                        (544, 1000),
-                        (576, 1000),
-                        (608, 1000),
-                        (640, 1000),
-                        (672, 1000),
-                        (704, 1000),
-                        (736, 1000),
-                        (768, 1000),
-                        (800, 1000),
+                        (384, 800),
+                        (416, 800),
+                        (448, 800),
+                        (480, 800),
+                        (512, 800),
+                        (544, 800),
+                        (576, 800),
+                        (608, 800),
+                        (640, 800),
                     ],
                     multiscale_mode='value',
                     override=True,
@@ -122,7 +118,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=(1000, 600),
+        img_scale=(800, 480),
         flip=False,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -136,7 +132,7 @@ test_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=1,   # 2 images per batch on T4
+    samples_per_gpu=2,   # 4 images per batch on T4 if feasible, but user requested 2 for safety. 2 fits perfectly at 800x480.
     workers_per_gpu=0,   # Avoid OpenCV thread deadlocks
     train=dict(
         type=dataset_type,
@@ -166,6 +162,7 @@ data = dict(
 # Evaluation
 # ------------------------------------------------------------------
 evaluation = dict(interval=1, metric='bbox', save_best='bbox_mAP')
+cudnn_benchmark = True
 
 # ------------------------------------------------------------------
 # Model (Co-DETR with ResNet-50 backbone)
@@ -194,7 +191,7 @@ model = dict(
     ),
     query_head=dict(
         type='CoDINOHead',
-        num_query=300,
+        num_query=150,
         num_classes=num_classes,
         in_channels=2048,
         sync_cls_avg_factor=True,
