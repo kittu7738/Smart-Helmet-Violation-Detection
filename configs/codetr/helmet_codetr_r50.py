@@ -41,7 +41,7 @@ img_norm_cfg = dict(
     to_rgb=True,
 )
 
-image_size = (1000, 600)
+image_size = (1333, 800)
 
 train_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -54,11 +54,17 @@ train_pipeline = [
                 dict(
                     type='Resize',
                     img_scale=[
-                        (480, 1000),
-                        (512, 1000),
-                        (544, 1000),
-                        (576, 1000),
-                        (600, 1000),
+                        (480, 1333),
+                        (512, 1333),
+                        (544, 1333),
+                        (576, 1333),
+                        (608, 1333),
+                        (640, 1333),
+                        (672, 1333),
+                        (704, 1333),
+                        (736, 1333),
+                        (768, 1333),
+                        (800, 1333),
                     ],
                     multiscale_mode='value',
                     keep_ratio=True,
@@ -67,7 +73,7 @@ train_pipeline = [
             [
                 dict(
                     type='Resize',
-                    img_scale=[(400, 1000), (500, 1000), (600, 1000)],
+                    img_scale=[(400, 1333), (500, 1333), (600, 1333)],
                     multiscale_mode='value',
                     keep_ratio=True,
                 ),
@@ -79,7 +85,19 @@ train_pipeline = [
                 ),
                 dict(
                     type='Resize',
-                    img_scale=[(480, 1000), (544, 1000), (600, 1000)],
+                    img_scale=[
+                        (480, 1333),
+                        (512, 1333),
+                        (544, 1333),
+                        (576, 1333),
+                        (608, 1333),
+                        (640, 1333),
+                        (672, 1333),
+                        (704, 1333),
+                        (736, 1333),
+                        (768, 1333),
+                        (800, 1333),
+                    ],
                     multiscale_mode='value',
                     override=True,
                     keep_ratio=True,
@@ -104,7 +122,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=(1000, 600),
+        img_scale=(1333, 800),
         flip=False,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -176,7 +194,7 @@ model = dict(
     ),
     query_head=dict(
         type='CoDINOHead',
-        num_query=300,
+        num_query=900,
         num_classes=num_classes,
         in_channels=2048,
         sync_cls_avg_factor=True,
@@ -468,11 +486,11 @@ optimizer_config = dict(
 lr_config = dict(
     policy='step',
     warmup='linear',
-    warmup_iters=250,
+    warmup_iters=500,
     warmup_ratio=0.001,
-    step=[8, 11],
+    step=[27, 33],
 )
-max_epochs = 12
+max_epochs = 36
 runner = dict(type='EpochBasedRunner', max_epochs=max_epochs)
 
 checkpoint_config = dict(interval=1, max_keep_ckpts=3)
