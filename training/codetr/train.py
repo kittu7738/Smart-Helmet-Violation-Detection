@@ -1014,6 +1014,12 @@ def main():
         cfg.total_epochs = 1
         if not hasattr(cfg, "custom_hooks") or cfg.custom_hooks is None:
             cfg.custom_hooks = []
+
+        # Optional: enable detailed component profiling
+        if os.environ.get("CODETR_PROFILE_COMPONENTS") == "1":
+            from training.codetr.profiler import patch_model_for_profiling
+            model = patch_model_for_profiling(model)
+
         cfg.custom_hooks.append(dict(type='ThroughputBenchmarkHook', priority='LOWEST'))
         print(f"[{time.strftime('%H:%M:%S')}]   -> Attached ThroughputBenchmarkHook (runs exactly 10 iterations to benchmark throughput)", flush=True)
 
@@ -1056,6 +1062,16 @@ def main():
         print("  Full training pipeline is 100% verified and ready for complete training.", flush=True)
         print("=" * 74 + "\n", flush=True)
         return 0
+    except SystemExit as e:
+        if getattr(e, 'code', 1) == 0:
+            if os.environ.get("CODETR_PROFILE_COMPONENTS") == "1":
+                try:
+                    from training.codetr.profiler import global_profiler
+                    global_profiler.print_summary()
+                except Exception:
+                    pass
+            return 0
+        raise
 
     return 0
 
