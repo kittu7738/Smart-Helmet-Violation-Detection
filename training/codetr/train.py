@@ -352,10 +352,24 @@ def stage_dataset_if_needed(data_root, stage_dir="/content/dataset_local", enabl
     copied_files = 0
     total_bytes = 0
     
+    # Discover actual dataset root if data_root points to a parent/project directory
+    actual_data_root = data_root
+    for candidate in [
+        data_root,
+        os.path.join(data_root, "data"),
+        os.path.join(data_root, "data", "coco"),
+        os.path.join(data_root, "dataset")
+    ]:
+        if os.path.isdir(os.path.join(candidate, "train", "images")) or \
+           os.path.isfile(os.path.join(candidate, "instances_train.json")) or \
+           os.path.isfile(os.path.join(candidate, "train", "instances_train.json")):
+            actual_data_root = candidate
+            break
+
     # 1. Stage specific split directories (images and labels)
     for split_dir in ["train", "vaid", "test"]:
         for sub_dir in ["images", "labels"]:
-            src_sub = os.path.join(data_root, split_dir, sub_dir)
+            src_sub = os.path.join(actual_data_root, split_dir, sub_dir)
             dst_sub = os.path.join(stage_dir, split_dir, sub_dir)
             if os.path.isdir(src_sub):
                 c, s = _copy_tree_compat(src_sub, dst_sub)
@@ -364,11 +378,11 @@ def stage_dataset_if_needed(data_root, stage_dir="/content/dataset_local", enabl
                 
     # 2. Stage COCO annotation JSON files (either flat in data_root or inside split dirs)
     for json_file in ["instances_train.json", "instances_val.json", "instances_test.json"]:
-        for base_dir in [data_root, os.path.join(data_root, "train"), os.path.join(data_root, "vaid"), os.path.join(data_root, "test")]:
+        for base_dir in [actual_data_root, os.path.join(actual_data_root, "train"), os.path.join(actual_data_root, "vaid"), os.path.join(actual_data_root, "test")]:
             src_json = os.path.join(base_dir, json_file)
             if os.path.isfile(src_json):
                 # Calculate relative path to maintain structure
-                rel_path = os.path.relpath(src_json, data_root)
+                rel_path = os.path.relpath(src_json, actual_data_root)
                 dst_json = os.path.join(stage_dir, rel_path)
                 os.makedirs(os.path.dirname(dst_json), exist_ok=True)
                 
