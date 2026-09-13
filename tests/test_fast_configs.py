@@ -81,9 +81,9 @@ def test_codetr_r50_model_and_optimizations():
     assert model["type"] == "CoDETR"
     assert model["backbone"]["type"] == "ResNet"
     assert model["backbone"]["depth"] == 50
-    assert model["query_head"]["num_query"] == 900, "Query count should be 900 for dense scenes"
-    assert "fp16" in cfg, "Co-DETR R50 should have fp16 enabled"
-    assert cfg["data"]["samples_per_gpu"] == 2
+    assert model["query_head"]["num_query"] == 300, "Query count should be 300 for T4 memory safety"
+    assert "fp16" not in cfg, "Co-DETR R50 should have fp16 disabled for MMCV compatibility on T4"
+    assert cfg["data"]["samples_per_gpu"] == 1
     assert cfg["data"]["workers_per_gpu"] == 0
 
 
