@@ -111,3 +111,35 @@ if __name__ == '__main__':
             shutil.rmtree(nested_temp)
             if "CODETR_FORCE_STAGE" in os.environ:
                 del os.environ["CODETR_FORCE_STAGE"]
+
+    def test_reuse_existing_staged_dataset_without_data_root(self):
+        """Verify that if stage_dir is already valid, it reuses it even if data_root isn't a gdrive path."""
+        import tempfile
+        import shutil
+        from training.codetr.train import stage_dataset_if_needed
+        
+        temp_dir = tempfile.mkdtemp()
+        try:
+            stage_dir = os.path.join(temp_dir, "dataset_local")
+            os.makedirs(os.path.join(stage_dir, "train", "images"))
+            
+            with open(os.path.join(stage_dir, "instances_train.json"), "w") as f:
+                f.write("{}")
+                
+            # Mock 300 images to pass the fast-path check
+            for i in range(300):
+                with open(os.path.join(stage_dir, "train", "images", f"img{i}.jpg"), "w") as f:
+                    f.write("mock image data")
+                    
+            # Call stage_dataset_if_needed with data_root="data/coco" (not gdrive)
+            staged_path = stage_dataset_if_needed(
+                data_root="data/coco",
+                stage_dir=stage_dir,
+                enabled=True
+            )
+            
+            # It should return the stage_dir because it's already populated
+            self.assertEqual(os.path.abspath(staged_path), os.path.abspath(stage_dir))
+            
+        finally:
+            shutil.rmtree(temp_dir)

@@ -326,26 +326,28 @@ def stage_dataset_if_needed(data_root, stage_dir="/content/dataset_local", enabl
     if not enabled or not data_root:
         return data_root
 
+    stage_dir = os.path.abspath(stage_dir)
+    
+    # Fast-path check: Is stage_dir already staged with images and annotations?
+    if os.path.abspath(data_root) != stage_dir:
+        train_ann_flat = os.path.join(stage_dir, "instances_train.json")
+        train_ann_nested = os.path.join(stage_dir, "train", "instances_train.json")
+        train_img_flat = os.path.join(stage_dir, "train", "images")
+        train_img_direct = os.path.join(stage_dir, "images")
+        
+        has_ann = os.path.isfile(train_ann_flat) or os.path.isfile(train_ann_nested)
+        img_dir = train_img_flat if os.path.isdir(train_img_flat) else (train_img_direct if os.path.isdir(train_img_direct) else None)
+        if has_ann and img_dir and len(os.listdir(img_dir)) >= 300:
+            print(f"[{time.strftime('%H:%M:%S')}] [INFO] Dataset already staged and verified at: {stage_dir} (skipping re-copy)", flush=True)
+            return stage_dir
+
     # Only auto-stage if data_root appears to be on Google Drive (or if forced via env)
     is_gdrive = data_root.startswith("/content/drive/") or "/MyDrive" in data_root
     if not is_gdrive and not os.environ.get("CODETR_FORCE_STAGE"):
         return data_root
-
-    stage_dir = os.path.abspath(stage_dir)
+        
     if os.path.abspath(data_root) == stage_dir:
         return data_root
-
-    # Fast-path check: Is stage_dir already staged with images and annotations?
-    train_ann_flat = os.path.join(stage_dir, "instances_train.json")
-    train_ann_nested = os.path.join(stage_dir, "train", "instances_train.json")
-    train_img_flat = os.path.join(stage_dir, "train", "images")
-    train_img_direct = os.path.join(stage_dir, "images")
-
-    has_ann = os.path.isfile(train_ann_flat) or os.path.isfile(train_ann_nested)
-    img_dir = train_img_flat if os.path.isdir(train_img_flat) else (train_img_direct if os.path.isdir(train_img_direct) else None)
-    if has_ann and img_dir and len(os.listdir(img_dir)) >= 300:
-        print(f"[{time.strftime('%H:%M:%S')}] [INFO] Dataset already staged and verified at: {stage_dir} (skipping re-copy)", flush=True)
-        return stage_dir
 
     print(f"[{time.strftime('%H:%M:%S')}] [INFO] Google Drive dataset detected at: {data_root}", flush=True)
     print(f"[{time.strftime('%H:%M:%S')}] [INFO] Staging dataset to local fast disk: {stage_dir} ...", flush=True)
