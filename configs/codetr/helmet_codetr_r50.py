@@ -46,61 +46,8 @@ image_size = (800, 480)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
+    dict(type='Resize', img_scale=(800, 480), keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
-    dict(
-        type='AutoAugment',
-        policies=[
-            [
-                dict(
-                    type='Resize',
-                    img_scale=[
-                        (384, 800),
-                        (416, 800),
-                        (448, 800),
-                        (480, 800),
-                        (512, 800),
-                        (544, 800),
-                        (576, 800),
-                        (608, 800),
-                        (640, 800),
-                    ],
-                    multiscale_mode='value',
-                    keep_ratio=True,
-                )
-            ],
-            [
-                dict(
-                    type='Resize',
-                    img_scale=[(320, 800), (400, 800), (480, 800)],
-                    multiscale_mode='value',
-                    keep_ratio=True,
-                ),
-                dict(
-                    type='RandomCrop',
-                    crop_type='absolute_range',
-                    crop_size=(384, 480),
-                    allow_negative_crop=True,
-                ),
-                dict(
-                    type='Resize',
-                    img_scale=[
-                        (384, 800),
-                        (416, 800),
-                        (448, 800),
-                        (480, 800),
-                        (512, 800),
-                        (544, 800),
-                        (576, 800),
-                        (608, 800),
-                        (640, 800),
-                    ],
-                    multiscale_mode='value',
-                    override=True,
-                    keep_ratio=True,
-                ),
-            ],
-        ],
-    ),
     dict(
         type='PhotoMetricDistortion',
         brightness_delta=32,

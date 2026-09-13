@@ -736,13 +736,33 @@ def main():
                         if not cfg and hasattr(runner, 'model') and hasattr(runner.model, 'cfg'):
                             cfg = runner.model.cfg
                             
-                        # Use runner's dataset info or fallback
-                        is_fp16 = "FP32 (Safe Baseline)"
-                        input_res = "N/A"
-                        num_query = "N/A"
+                        # Parse actual config values
+                        if isinstance(cfg, str):
+                            # Fallback if config is just text
+                            is_fp16 = "FP16" if "fp16" in cfg else "FP32"
+                            input_res = "Parsed from text"
+                            num_query = "Parsed from text"
+                        else:
+                            is_fp16 = "FP16 (Enabled)" if hasattr(cfg, 'fp16') or (isinstance(cfg, dict) and "fp16" in cfg) else "FP32 (Safe Baseline)"
+                            
+                            # Safely extract resolution from train pipeline
+                            try:
+                                pipe = cfg.data.train.pipeline
+                                resize_op = next((op for op in pipe if op['type'] == 'Resize'), None)
+                                if resize_op:
+                                    input_res = str(resize_op.get('img_scale', 'N/A'))
+                                else:
+                                    input_res = str(cfg.get("image_size", "N/A"))
+                            except Exception:
+                                input_res = "Error parsing"
+                                
+                            try:
+                                num_query = str(cfg.model.query_head.num_query)
+                            except Exception:
+                                num_query = "Error parsing"
                         
-                        print(f"  Input Resolution     : (1000, 600)") # Hardcoded as safe baseline per constraints
-                        print(f"  Number of Queries    : 300")
+                        print(f"  Input Resolution     : {input_res}")
+                        print(f"  Number of Queries    : {num_query}")
                         print(f"  Precision            : {is_fp16}")
                         print(f"  Peak CUDA Allocated  : {gpu_mem_alloc}")
                         print(f"  Peak CUDA Reserved   : {gpu_mem_res}")
