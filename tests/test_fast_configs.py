@@ -101,6 +101,9 @@ def test_train_cli_with_fast_configs():
     args2 = _parse_args(["--config", CODETR_R50_CONFIG, "--epochs", "1"])
     assert args2.config == CODETR_R50_CONFIG
     assert args2.max_epochs == 1
+    
+    args3 = _parse_args(["--config", CODETR_R50_CONFIG, "--benchmark-throughput"])
+    assert args3.benchmark_throughput is True
 
 
 def test_all_configs_define_lifecycle_fields():

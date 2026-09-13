@@ -194,6 +194,11 @@ def _parse_args(args_list=None):
         action="store_true",
         help="Run full training pipeline through exactly 1 iteration to verify DataLoader, CUDA forward/backward pass, and loss computation, then exit cleanly.",
     )
+    parser.add_argument(
+        "--benchmark-throughput",
+        action="store_true",
+        help="Run full training pipeline for exactly 10 iterations to measure throughput, memory, and training speed, then exit cleanly.",
+    )
     # Allow passing arbitrary MMDetection cfg-options as KEY=VALUE pairs.
     parser.add_argument(
         "--cfg-options",
@@ -548,6 +553,13 @@ def _resolve_swin_backbone(cfg, swin_arg=None):
             print(f"[{time.strftime('%H:%M:%S')}] [WARNING] Custom download failed ({exc}); falling back to standard loader", flush=True)
 
 
+class ThroughputBenchmarkComplete(Exception):
+    """Sentinel exception raised by ThroughputBenchmarkHook to terminate training after exactly 10 iterations."""
+    def __init__(self, stats=None):
+        self.stats = stats or {}
+        super().__init__("Throughput benchmark (10 iterations) completed successfully.")
+
+
 class TrainingDiagnosticComplete(Exception):
     """Sentinel exception raised by TrainingDiagnosticHook to terminate training after iteration 1."""
     def __init__(self, stats=None):
@@ -682,6 +694,54 @@ def main():
                         "gpu_mem": gpu_mem_str,
                     }
                     raise TrainingDiagnosticComplete(stats)
+
+        if 'ThroughputBenchmarkHook' not in HOOKS:
+            @HOOKS.register_module()
+            class ThroughputBenchmarkHook(Hook):
+                def __init__(self, *args, **kwargs):
+                    super().__init__()
+                    self._start_time = None
+                    self._iter_times = []
+                    self._max_iters = 10
+
+                def before_train_iter(self, runner):
+                    self._start_time = time.time()
+
+                def after_train_iter(self, runner):
+                    dur = time.time() - self._start_time if self._start_time else 0.0
+                    if runner.iter > 0:  # Skip first iteration for warmup
+                        self._iter_times.append(dur)
+                    
+                    if runner.iter + 1 >= self._max_iters:
+                        avg_time = sum(self._iter_times) / len(self._iter_times) if self._iter_times else 0.0
+                        samples = getattr(runner.data_loader, 'batch_size', 1)
+                        img_sec = samples / avg_time if avg_time > 0 else 0.0
+                        
+                        gpu_mem_alloc = "N/A"
+                        gpu_mem_res = "N/A"
+                        gpu_name = "N/A"
+                        try:
+                            import torch
+                            if torch.cuda.is_available():
+                                gpu_name = torch.cuda.get_device_name(0)
+                                alloc = torch.cuda.max_memory_allocated(0) / (1024**3)
+                                res = torch.cuda.max_memory_reserved(0) / (1024**3)
+                                total = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                                gpu_mem_alloc = f"{alloc:.2f} GB / {total:.2f} GB"
+                                gpu_mem_res = f"{res:.2f} GB"
+                        except Exception:
+                            pass
+
+                        stats = {
+                            "iters": runner.iter + 1,
+                            "avg_time": avg_time,
+                            "img_sec": img_sec,
+                            "gpu_name": gpu_name,
+                            "gpu_mem_alloc": gpu_mem_alloc,
+                            "gpu_mem_res": gpu_mem_res,
+                            "batch_size": samples
+                        }
+                        raise ThroughputBenchmarkComplete(stats)
 
     except ImportError as exc:
         curr_py = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
@@ -907,6 +967,15 @@ def main():
         cfg.custom_hooks.append(dict(type='TrainingDiagnosticHook', priority='LOWEST'))
         print(f"[{time.strftime('%H:%M:%S')}]   -> Attached TrainingDiagnosticHook (runs exactly 1 iteration, then verifies pipeline readiness)", flush=True)
 
+    if args.benchmark_throughput:
+        cfg.runner.max_epochs = 1
+        cfg.max_epochs = 1
+        cfg.total_epochs = 1
+        if not hasattr(cfg, "custom_hooks") or cfg.custom_hooks is None:
+            cfg.custom_hooks = []
+        cfg.custom_hooks.append(dict(type='ThroughputBenchmarkHook', priority='LOWEST'))
+        print(f"[{time.strftime('%H:%M:%S')}]   -> Attached ThroughputBenchmarkHook (runs exactly 10 iterations to benchmark throughput)", flush=True)
+
     log_int = cfg.log_config.get("interval", "N/A") if hasattr(cfg, "log_config") else "N/A"
     samples_gpu = cfg.data.get("samples_per_gpu", "N/A") if hasattr(cfg, "data") else "N/A"
     workers_gpu = cfg.data.get("workers_per_gpu", "N/A") if hasattr(cfg, "data") else "N/A"
@@ -944,6 +1013,24 @@ def main():
         print(f"  - Peak GPU VRAM: {diag.stats.get('gpu_mem', 'N/A')}", flush=True)
         print(f"  - Total elapsed: {t_total:.2f}s", flush=True)
         print("  Full training pipeline is 100% verified and ready for complete training.", flush=True)
+        print("=" * 74 + "\n", flush=True)
+        return 0
+    except ThroughputBenchmarkComplete as bench:
+        print("\n" + "=" * 74, flush=True)
+        print("  THROUGHPUT BENCHMARK COMPLETED", flush=True)
+        print(f"  Iterations           : {bench.stats.get('iters', 10)}")
+        print(f"  Avg sec/iteration    : {bench.stats.get('avg_time', 0.0):.3f}s (ignoring first warmup step)")
+        print(f"  Images/sec           : {bench.stats.get('img_sec', 0.0):.2f}")
+        print(f"  Batch size           : {bench.stats.get('batch_size', 'N/A')}")
+        is_fp16 = "FP16 (Enabled)" if "fp16" in cfg else "FP32 (Safe Baseline)"
+        input_res = cfg.get("image_size", "N/A")
+        num_query = cfg.model.query_head.get("num_query", "N/A") if hasattr(cfg.model, "query_head") else "N/A"
+        print(f"  Input Resolution     : {input_res}")
+        print(f"  Number of Queries    : {num_query}")
+        print(f"  Precision            : {is_fp16}")
+        print(f"  Peak CUDA Allocated  : {bench.stats.get('gpu_mem_alloc', 'N/A')}")
+        print(f"  Peak CUDA Reserved   : {bench.stats.get('gpu_mem_res', 'N/A')}")
+        print(f"  GPU Name             : {bench.stats.get('gpu_name', 'N/A')}")
         print("=" * 74 + "\n", flush=True)
         return 0
 
