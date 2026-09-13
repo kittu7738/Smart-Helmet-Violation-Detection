@@ -747,33 +747,30 @@ def main():
                         else:
                             is_fp16 = "FP16 (Enabled)" if hasattr(cfg, 'fp16') or (isinstance(cfg, dict) and "fp16" in cfg) else "FP32 (Safe Baseline)"
                             
-                            # Safely extract resolution from train pipeline
-                            try:
-                                pipe = None
-                                if isinstance(cfg, dict):
-                                    pipe = cfg.get('data', {}).get('train', {}).get('pipeline', [])
-                                    img_size = cfg.get('image_size', 'N/A')
-                                elif hasattr(cfg, 'data'):
-                                    pipe = cfg.data.train.pipeline
-                                    img_size = getattr(cfg, 'image_size', 'N/A')
+                        # Robust regex parsing from the config file text directly
+                        input_res = "N/A"
+                        num_query = "N/A"
+                        is_fp16 = "FP32 (Safe Baseline)"
+                        try:
+                            cfg_text = getattr(runner, 'meta', {}).get('cfg_text', '')
+                            if not cfg_text and hasattr(runner, 'model') and hasattr(runner.model, 'cfg'):
+                                cfg_text = runner.model.cfg.pretty_text
                                 
-                                input_res = str(img_size)
-                                if pipe:
-                                    resize_op = next((op for op in pipe if isinstance(op, dict) and op.get('type') == 'Resize'), None)
-                                    if resize_op and 'img_scale' in resize_op:
-                                        input_res = str(resize_op['img_scale'])
-                            except Exception:
-                                input_res = "Error parsing"
+                            import re
+                            # Match img_scale=(800, 480) or img_scale=[(800, 480)]
+                            res_match = re.search(r"img_scale\s*=\s*[\(\[]?\(?(\d+)\s*,\s*(\d+)\)?[\)\]]?", cfg_text)
+                            if res_match:
+                                input_res = f"({res_match.group(1)}, {res_match.group(2)})"
                                 
-                            try:
-                                if isinstance(cfg, dict):
-                                    num_query = str(cfg.get('model', {}).get('query_head', {}).get('num_query', 'N/A'))
-                                elif hasattr(cfg, 'model'):
-                                    num_query = str(cfg.model.query_head.num_query)
-                                else:
-                                    num_query = "N/A"
-                            except Exception:
-                                num_query = "Error parsing"
+                            q_match = re.search(r"num_query\s*=\s*(\d+)", cfg_text)
+                            if q_match:
+                                num_query = q_match.group(1)
+                                
+                            if "fp16" in cfg_text.lower():
+                                is_fp16 = "FP16 (Enabled)"
+                        except Exception as e:
+                            input_res = f"Error: {str(e)}"
+                            num_query = f"Error: {str(e)}"
                         
                         print(f"  Input Resolution     : {input_res}")
                         print(f"  Number of Queries    : {num_query}")
