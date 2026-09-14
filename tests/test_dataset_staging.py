@@ -64,8 +64,6 @@ class TestDatasetStaging(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.stage_dir, "codetr_env")))
         self.assertFalse(os.path.exists(os.path.join(self.stage_dir, "work_dirs")))
 
-if __name__ == '__main__':
-    unittest.main()
 
     def test_staging_finds_nested_dataset(self):
         # Create a new structure where data_root is the project root, but dataset is inside data/coco
@@ -143,3 +141,6 @@ if __name__ == '__main__':
             
         finally:
             shutil.rmtree(temp_dir)
+
+if __name__ == '__main__':
+    unittest.main()
