@@ -734,49 +734,69 @@ def main():
                         print(f"  Images/sec           : {img_sec:.2f}")
                         print(f"  Batch size           : {samples}")
                         
-                        cfg = getattr(runner, 'meta', {}).get('cfg', None)
-                        if not cfg and hasattr(runner, 'model') and hasattr(runner.model, 'cfg'):
-                            cfg = runner.model.cfg
-                            
-                        # Parse actual config values
-                        if isinstance(cfg, str):
-                            # Fallback if config is just text
-                            is_fp16 = "FP16" if "fp16" in cfg else "FP32"
-                            input_res = "Parsed from text"
-                            num_query = "Parsed from text"
-                        else:
-                            is_fp16 = "FP16 (Enabled)" if hasattr(cfg, 'fp16') or (isinstance(cfg, dict) and "fp16" in cfg) else "FP32 (Safe Baseline)"
-                            
-                        # Safest parser: read the config file directly from sys.argv
+                        # Safest parser: read the full merged config text from runner.meta
                         input_res = "N/A"
                         num_query = "N/A"
+                        decoder_depth = "N/A"
+                        bb_frozen = "N/A"
+                        width = "N/A"
                         is_fp16 = "FP32 (Safe Baseline)"
+                        exp_name = "Baseline"
+
                         try:
                             import sys, os, re
-                            config_path = next((arg for arg in sys.argv if arg.endswith('.py') and 'configs/' in arg), None)
-                            if config_path and os.path.isfile(config_path):
-                                with open(config_path, 'r') as f:
-                                    cfg_text = f.read()
+                            config_path = next((arg for arg in sys.argv if arg.endswith('.py') and 'configs/' in arg), "")
+                            if "exp_" in config_path:
+                                exp_name = os.path.basename(config_path).replace('.py', '')
+                            
+                            cfg_text = getattr(runner, 'meta', {}).get('cfg_text', '')
+                            if not cfg_text and hasattr(runner, 'model') and hasattr(runner.model, 'cfg'):
+                                cfg_text = runner.model.cfg.pretty_text if hasattr(runner.model.cfg, 'pretty_text') else str(runner.model.cfg)
                                 
+                            if cfg_text:
                                 res_match = re.search(r"image_size\s*=\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)", cfg_text)
-                                if not res_match:
-                                    res_match = re.search(r"img_scale\s*=\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)", cfg_text)
                                 if res_match:
-                                    input_res = f"({res_match.group(1)}, {res_match.group(2)})"
+                                    input_res = f"{res_match.group(1)}x{res_match.group(2)}"
                                 
                                 q_match = re.search(r"num_query\s*=\s*(\d+)", cfg_text)
                                 if q_match:
                                     num_query = q_match.group(1)
                                     
+                                d_match = re.search(r"decoder=dict\([^)]*num_layers\s*=\s*(\d+)", cfg_text)
+                                if d_match:
+                                    decoder_depth = d_match.group(1)
+                                    
+                                f_match = re.search(r"frozen_stages\s*=\s*(\d+)", cfg_text)
+                                if f_match:
+                                    bb_frozen = f_match.group(1)
+                                    
+                                w_match = re.search(r"out_channels\s*=\s*(\d+)", cfg_text)
+                                if w_match:
+                                    width = w_match.group(1)
+                                    
                                 if "fp16" in cfg_text.lower() and "loss_scale" in cfg_text.lower():
-                                    if not re.search(r"#\s*fp16\s*=", cfg_text):
-                                        is_fp16 = "FP16 (Enabled)"
+                                    is_fp16 = "FP16 (Enabled)"
                         except Exception as e:
-                            input_res = f"File Read Error: {str(e)}"
-                            num_query = f"File Read Error: {str(e)}"
-                        
+                            exp_name = f"Parse Error: {str(e)}"
+                            
+                        # Estimate epoch time
+                        iters_per_epoch = 183 # Assuming batch size 2, (366 / 2 = 183) wait, dataset has 366. With batch 2, it is 183 iters/epoch.
+                        if samples != 2:
+                            iters_per_epoch = int(366 / samples)
+                        est_epoch_sec = avg_time * iters_per_epoch
+                        est_epoch_min = est_epoch_sec / 60.0
+
+                        print(f"  Experiment Name      : {exp_name}")
+                        print(f"  Avg sec/iteration    : {avg_time:.3f}s (ignoring first warmup step)")
+                        print(f"  Images/sec           : {img_sec:.2f}")
+                        print(f"  Iterations/epoch     : {iters_per_epoch}")
+                        print(f"  Est. epoch time      : {est_epoch_sec:.1f}s ({est_epoch_min:.2f} min)")
+                        print(f"  Batch size           : {samples}")
                         print(f"  Input Resolution     : {input_res}")
                         print(f"  Number of Queries    : {num_query}")
+                        print(f"  Decoder Depth        : {decoder_depth}")
+                        print(f"  Backbone Frozen      : {bb_frozen}")
+                        print(f"  Channel/Trans Width  : {width}")
                         print(f"  Precision            : {is_fp16}")
                         print(f"  Peak CUDA Allocated  : {gpu_mem_alloc}")
                         print(f"  Peak CUDA Reserved   : {gpu_mem_res}")
