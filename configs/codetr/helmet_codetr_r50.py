@@ -436,7 +436,7 @@ lr_config = dict(
 max_epochs = 36
 runner = dict(type='EpochBasedRunner', max_epochs=max_epochs)
 
-checkpoint_config = dict(interval=4, max_keep_ckpts=2, save_best='bbox_mAP')
+checkpoint_config = dict(interval=1, max_keep_ckpts=2)
 log_config = dict(
     interval=10,
     hooks=[
