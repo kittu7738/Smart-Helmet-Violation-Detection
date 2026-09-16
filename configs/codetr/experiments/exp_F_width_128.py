@@ -4,30 +4,30 @@ num_classes = 7
 
 model = dict(
     neck=dict(
-        out_channels=192
+        out_channels=128
     ),
     query_head=dict(
         transformer=dict(
             encoder=dict(
                 transformerlayers=dict(
-                    attn_cfgs=dict(embed_dims=192),
-                    feedforward_channels=1536
+                    attn_cfgs=dict(embed_dims=128),
+                    feedforward_channels=1024
                 )
             ),
             decoder=dict(
                 transformerlayers=dict(
                     attn_cfgs=[
-                        dict(embed_dims=192),
-                        dict(embed_dims=192)
+                        dict(embed_dims=128),
+                        dict(embed_dims=128)
                     ],
-                    feedforward_channels=1536
+                    feedforward_channels=1024
                 )
             )
         )
     ),
     rpn_head=dict(
-        in_channels=192,
-        feat_channels=192
+        in_channels=128,
+        feat_channels=128
     ),
     roi_head=[
         dict(
@@ -35,13 +35,13 @@ model = dict(
             bbox_roi_extractor=dict(
                 type='SingleRoIExtractor',
                 roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=0),
-                out_channels=192,
+                out_channels=128,
                 featmap_strides=[4, 8, 16, 32, 64],
                 finest_scale=56,
             ),
             bbox_head=dict(
                 type='Shared2FCBBoxHead',
-                in_channels=192,
+                in_channels=128,
                 fc_out_channels=1024,
                 roi_feat_size=7,
                 num_classes=num_classes,
@@ -65,9 +65,9 @@ model = dict(
         dict(
             type='CoATSSHead',
             num_classes=num_classes,
-            in_channels=192,
+            in_channels=128,
             stacked_convs=1,
-            feat_channels=192,
+            feat_channels=128,
             anchor_generator=dict(
                 type='AnchorGenerator',
                 ratios=[1.0],

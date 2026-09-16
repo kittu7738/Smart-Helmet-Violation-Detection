@@ -2,7 +2,7 @@
 set -e # Exit immediately if a command exits with a non-zero status
 
 echo "=================================================="
-echo "  CO-DETR R50 BENCHMARK MATRIX (T4)"
+echo "  CO-DETR BENCHMARK MATRIX (T4)"
 echo "=================================================="
 
 has_data_root=false
@@ -27,29 +27,41 @@ echo "  PROFILING BASELINE COMPONENT BOTTLENECKS"
 echo "--------------------------------------------------"
 CODETR_PROFILE_COMPONENTS=1 python training/codetr/train.py --config configs/codetr/helmet_codetr_r50.py --benchmark-throughput "$@"
 
-# A. 100 Queries
-echo "--------------------------------------------------"
-echo "  EXPERIMENT A: 100 QUERIES"
-echo "--------------------------------------------------"
-python training/codetr/train.py --config configs/codetr/experiments/exp_A_100_queries.py --benchmark-throughput "$@"
-
-# B. Decoder Depth = 1
-echo "--------------------------------------------------"
-echo "  EXPERIMENT B: DECODER DEPTH = 1"
-echo "--------------------------------------------------"
-python training/codetr/train.py --config configs/codetr/experiments/exp_B_decoder_1.py --benchmark-throughput "$@"
-
 # C. Freeze Backbone
 echo "--------------------------------------------------"
 echo "  EXPERIMENT C: FREEZE ALL BACKBONE STAGES"
 echo "--------------------------------------------------"
 python training/codetr/train.py --config configs/codetr/experiments/exp_C_freeze_backbone.py --benchmark-throughput "$@"
 
-# D. Width = 192
+# E. ResNet-18 Backbone
 echo "--------------------------------------------------"
-echo "  EXPERIMENT D: FEATURE WIDTH = 192"
+echo "  EXPERIMENT E: RESNET-18 BACKBONE"
 echo "--------------------------------------------------"
-python training/codetr/train.py --config configs/codetr/experiments/exp_D_width_192.py --benchmark-throughput "$@"
+python training/codetr/train.py --config configs/codetr/experiments/exp_E_r18.py --benchmark-throughput "$@"
+
+# F. Feature Width 128
+echo "--------------------------------------------------"
+echo "  EXPERIMENT F: FEATURE WIDTH = 128"
+echo "--------------------------------------------------"
+python training/codetr/train.py --config configs/codetr/experiments/exp_F_width_128.py --benchmark-throughput "$@"
+
+# G. Input Resolution 512x320
+echo "--------------------------------------------------"
+echo "  EXPERIMENT G: RESOLUTION 512x320"
+echo "--------------------------------------------------"
+python training/codetr/train.py --config configs/codetr/experiments/exp_G_res_512.py --benchmark-throughput "$@"
+
+# H. Combined (ResNet-50 Frozen)
+echo "--------------------------------------------------"
+echo "  EXPERIMENT H: COMBINED (R50 Frozen, 512x320, 100Q, Depth 1)"
+echo "--------------------------------------------------"
+python training/codetr/train.py --config configs/codetr/experiments/exp_H_combined.py --benchmark-throughput "$@"
+
+# I. Combined (ResNet-18)
+echo "--------------------------------------------------"
+echo "  EXPERIMENT I: COMBINED (R18, 512x320, 100Q, Depth 1)"
+echo "--------------------------------------------------"
+python training/codetr/train.py --config configs/codetr/experiments/exp_I_r18_combined.py --benchmark-throughput "$@"
 
 echo "=================================================="
 echo "  MATRIX COMPLETE"
