@@ -7,20 +7,54 @@ model = dict(
         out_channels=128
     ),
     query_head=dict(
+        positional_encoding=dict(
+            num_feats=64,
+        ),
         transformer=dict(
             encoder=dict(
                 transformerlayers=dict(
-                    attn_cfgs=dict(embed_dims=128),
-                    feedforward_channels=1024
+                    attn_cfgs=dict(
+                        type='MultiScaleDeformableAttention',
+                        embed_dims=128,
+                        num_levels=5,
+                        dropout=0.0,
+                    ),
+                    feedforward_channels=1024,
+                    ffn_cfgs=dict(
+                        type='FFN',
+                        embed_dims=128,
+                        feedforward_channels=1024,
+                        num_fcs=2,
+                        ffn_drop=0.0,
+                        act_cfg=dict(type='ReLU', inplace=True)
+                    )
                 )
             ),
             decoder=dict(
                 transformerlayers=dict(
                     attn_cfgs=[
-                        dict(embed_dims=128),
-                        dict(embed_dims=128)
+                        dict(
+                            type='MultiheadAttention',
+                            embed_dims=128,
+                            num_heads=8,
+                            dropout=0.0,
+                        ),
+                        dict(
+                            type='MultiScaleDeformableAttention',
+                            embed_dims=128,
+                            num_levels=5,
+                            dropout=0.0,
+                        ),
                     ],
-                    feedforward_channels=1024
+                    feedforward_channels=1024,
+                    ffn_cfgs=dict(
+                        type='FFN',
+                        embed_dims=128,
+                        feedforward_channels=1024,
+                        num_fcs=2,
+                        ffn_drop=0.0,
+                        act_cfg=dict(type='ReLU', inplace=True)
+                    )
                 )
             )
         )

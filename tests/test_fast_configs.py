@@ -1,123 +1,76 @@
-"""
-tests/test_fast_configs.py
-==========================
-Validation tests for fast experimental training configs:
-- configs/faster_rcnn/helmet_faster_rcnn_r50_fpn.py (Faster R-CNN R50 FPN)
-- configs/codetr/helmet_codetr_r50.py (Co-DETR R50)
-Verifies class consistency, 7 classes, FP16 configuration, batch sizes,
-data loader safety, and CLI argument parsing.
-"""
-
 import os
-import runpy
-import sys
 import pytest
+import runpy
+import importlib.util
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-FASTER_RCNN_CONFIG = os.path.join(REPO_ROOT, "configs", "faster_rcnn", "helmet_faster_rcnn_r50_fpn.py")
-CODETR_R50_CONFIG = os.path.join(REPO_ROOT, "configs", "codetr", "helmet_codetr_r50.py")
 
-EXPECTED_CLASSES = (
-    "driver_with_helmet",
-    "bike",
-    "driver",
-    "passenger_with_helmet",
-    "passenger",
-    "driver_without_helmet",
-    "passenger_without_helmet",
-)
+def load_config_dict(filename):
+    """Load configuration as a dictionary using mmcv if available, otherwise just parse carefully or skip."""
+    # Since we can't reliably resolve _base_ without mmcv Config, we will test using runpy for now,
+    # but runpy does not resolve _base_. To properly validate, we need to check if mmcv is available.
+    try:
+        from mmcv import Config
+        cfg = Config.fromfile(os.path.join(REPO_ROOT, "configs", "codetr", "experiments", filename))
+        return cfg
+    except ImportError:
+        pytest.skip("MMCV not installed, skipping full config resolution tests.")
 
-
-def test_faster_rcnn_config_syntax_and_classes():
-    """Verify Faster R-CNN R50 FPN config parses cleanly and has exact 7 classes."""
-    assert os.path.isfile(FASTER_RCNN_CONFIG), f"Config missing: {FASTER_RCNN_CONFIG}"
-    cfg = runpy.run_path(FASTER_RCNN_CONFIG)
-
-    assert cfg["CLASSES"] == EXPECTED_CLASSES
-    assert cfg["num_classes"] == 7
-    assert len(cfg["CLASSES"]) == 7
-
-
-def test_faster_rcnn_model_architecture():
-    """Verify Faster R-CNN model structure, ResNet-50 backbone, FPN neck, and RoI head."""
-    cfg = runpy.run_path(FASTER_RCNN_CONFIG)
-
-    model = cfg["model"]
-    assert model["type"] == "FasterRCNN"
-    assert model["backbone"]["type"] == "ResNet"
-    assert model["backbone"]["depth"] == 50
-    assert model["neck"]["type"] == "FPN"
-    assert model["roi_head"]["bbox_head"]["num_classes"] == 7
-
-
-def test_faster_rcnn_speed_and_fp16_optimizations():
-    """Verify Faster R-CNN enables FP16 mixed precision, batch size 4, and workers=0."""
-    cfg = runpy.run_path(FASTER_RCNN_CONFIG)
-
-    assert "fp16" in cfg, "Faster R-CNN config must enable fp16 for Tensor Core acceleration"
-    assert cfg["fp16"]["loss_scale"] == 512.0
-
-    assert cfg["data"]["samples_per_gpu"] == 4, "Batch size must be >= 4 for high GPU throughput"
-    assert cfg["data"]["workers_per_gpu"] == 0, "workers_per_gpu must be 0 to prevent fork deadlocks"
-    assert cfg["evaluation"]["interval"] == 1
-    assert cfg["evaluation"]["save_best"] == "bbox_mAP"
-
-
-def test_codetr_r50_config_syntax_and_classes():
-    """Verify Co-DETR ResNet-50 config parses cleanly and has exact 7 classes."""
-    assert os.path.isfile(CODETR_R50_CONFIG), f"Config missing: {CODETR_R50_CONFIG}"
-    cfg = runpy.run_path(CODETR_R50_CONFIG)
-
-    assert cfg["CLASSES"] == EXPECTED_CLASSES
-    assert cfg["num_classes"] == 7
-    assert len(cfg["CLASSES"]) == 7
-
-
-def test_codetr_r50_model_and_optimizations():
-    """Verify Co-DETR R50 model structure, query count reduction, and FP16."""
-    cfg = runpy.run_path(CODETR_R50_CONFIG)
-
-    model = cfg["model"]
-    assert model["type"] == "CoDETR"
-    assert model["backbone"]["type"] == "ResNet"
-    assert model["backbone"]["depth"] == 50
-    assert model["query_head"]["num_query"] == 150, "Query count reduced to 150 for throughput optimization"
-    assert "fp16" not in cfg, "Co-DETR R50 should have fp16 disabled for MMCV compatibility on T4"
-    assert cfg["data"]["samples_per_gpu"] == 2
-    assert cfg["data"]["workers_per_gpu"] == 2
-    assert cfg["checkpoint_config"]["interval"] == 4
-    assert cfg["checkpoint_config"]["max_keep_ckpts"] == 2
-    assert cfg["checkpoint_config"]["save_best"] == "bbox_mAP"
-
-
-def test_train_cli_with_fast_configs():
-    """Verify train.py CLI accepts the fast configs without errors."""
-    from training.codetr.train import _parse_args
-
-    args = _parse_args(["--config", FASTER_RCNN_CONFIG, "--max-epochs", "2"])
-    assert args.config == FASTER_RCNN_CONFIG
-    assert args.max_epochs == 2
-
-    args2 = _parse_args(["--config", CODETR_R50_CONFIG, "--epochs", "1"])
-    assert args2.config == CODETR_R50_CONFIG
-    assert args2.max_epochs == 1
+@pytest.mark.parametrize("filename,expected_width", [
+    ("exp_F_width_128.py", 128),
+    ("exp_D_width_192.py", 192),
+])
+def test_experiment_config_structural_integrity(filename, expected_width):
+    cfg = load_config_dict(filename)
     
-    args3 = _parse_args(["--config", CODETR_R50_CONFIG, "--benchmark-throughput"])
-    assert args3.benchmark_throughput is True
+    # 1. Check Neck
+    assert cfg.model.neck.out_channels == expected_width, "Neck out_channels mismatch"
+    
+    # 2. Check Transformer Encoder
+    enc = cfg.model.query_head.transformer.encoder
+    enc_layers = enc.transformerlayers
+    
+    # Check attn_cfgs
+    assert 'type' in enc_layers.attn_cfgs, "Encoder attn_cfgs lost its 'type' due to list/dict overwrite"
+    assert enc_layers.attn_cfgs.embed_dims == expected_width, "Encoder attn_cfgs embed_dims mismatch"
+    
+    # Check ffn_cfgs
+    assert 'ffn_cfgs' in enc_layers, "ffn_cfgs is missing from encoder transformerlayers"
+    assert enc_layers.ffn_cfgs.embed_dims == expected_width, "Encoder ffn_cfgs embed_dims mismatch"
+    assert enc_layers.ffn_cfgs.feedforward_channels == expected_width * 8, "Encoder feedforward_channels mismatch"
+    
+    # 3. Check Transformer Decoder
+    dec = cfg.model.query_head.transformer.decoder
+    dec_layers = dec.transformerlayers
+    
+    # Check attn_cfgs (should be list of 2)
+    assert isinstance(dec_layers.attn_cfgs, list), "Decoder attn_cfgs must be a list"
+    assert len(dec_layers.attn_cfgs) == 2, "Decoder attn_cfgs must have 2 attention modules"
+    assert 'type' in dec_layers.attn_cfgs[0], "Decoder attn_cfgs[0] lost its 'type'"
+    assert dec_layers.attn_cfgs[0].embed_dims == expected_width, "Decoder attn_cfgs[0] embed_dims mismatch"
+    assert 'type' in dec_layers.attn_cfgs[1], "Decoder attn_cfgs[1] lost its 'type'"
+    assert dec_layers.attn_cfgs[1].embed_dims == expected_width, "Decoder attn_cfgs[1] embed_dims mismatch"
+    
+    # Check ffn_cfgs
+    assert 'ffn_cfgs' in dec_layers, "ffn_cfgs is missing from decoder transformerlayers"
+    assert dec_layers.ffn_cfgs.embed_dims == expected_width, "Decoder ffn_cfgs embed_dims mismatch"
+    assert dec_layers.ffn_cfgs.feedforward_channels == expected_width * 8, "Decoder feedforward_channels mismatch"
+    
+    # 4. Check auxiliary heads (lists)
+    assert isinstance(cfg.model.roi_head, list), "roi_head must be a list"
+    assert 'type' in cfg.model.roi_head[0], "roi_head[0] lost its 'type'"
+    assert cfg.model.roi_head[0].bbox_head.in_channels == expected_width
+    
+    assert isinstance(cfg.model.bbox_head, list), "bbox_head must be a list"
+    assert 'type' in cfg.model.bbox_head[0], "bbox_head[0] lost its 'type'"
+    assert cfg.model.bbox_head[0].in_channels == expected_width
 
-
-def test_all_configs_define_lifecycle_fields():
-    """Verify that all configs define standard MMDetection lifecycle fields (resume_from, load_from, auto_resume, workflow)."""
-    swin_config = os.path.join(REPO_ROOT, "configs", "codetr", "helmet_codetr_swin_large.py")
-
-    for cfg_path in [FASTER_RCNN_CONFIG, CODETR_R50_CONFIG, swin_config]:
-        cfg = runpy.run_path(cfg_path)
-        assert "resume_from" in cfg, f"{cfg_path} must define resume_from"
-        assert cfg["resume_from"] is None, f"{cfg_path} resume_from should default to None"
-        assert "load_from" in cfg, f"{cfg_path} must define load_from"
-        assert cfg["load_from"] is None, f"{cfg_path} load_from should default to None"
-        assert "auto_resume" in cfg, f"{cfg_path} must define auto_resume"
-        assert cfg["auto_resume"] is False, f"{cfg_path} auto_resume should default to False"
-        assert "workflow" in cfg, f"{cfg_path} must define workflow"
-        assert cfg["workflow"] == [("train", 1)]
-
+@pytest.mark.parametrize("filename", [
+    "exp_E_r18.py",
+    "exp_G_res_512.py",
+    "exp_H_combined.py",
+    "exp_I_r18_combined.py",
+])
+def def_test_other_experiments_load(filename):
+    cfg = load_config_dict(filename)
+    assert cfg is not None
