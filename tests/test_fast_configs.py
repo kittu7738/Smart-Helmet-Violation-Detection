@@ -74,3 +74,15 @@ def test_experiment_config_structural_integrity(filename, expected_width):
 def def_test_other_experiments_load(filename):
     cfg = load_config_dict(filename)
     assert cfg is not None
+
+@pytest.mark.parametrize("filename", [
+    "exp_J1_queries_64.py",
+    "exp_J2_queries_50.py",
+    "exp_J3_res_448.py",
+    "exp_J4_res_416.py",
+    "exp_J8_combined.py",
+    "exp_J9_max_speed.py",
+])
+def test_j_experiments_load(filename):
+    cfg = load_config_dict(filename)
+    assert cfg is not None
