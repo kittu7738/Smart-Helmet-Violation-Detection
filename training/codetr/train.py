@@ -1763,121 +1763,8 @@ def patch_codetr_fp16_target_assignment():
     except Exception as e:
         print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] inverse_sigmoid patch skipped: {e}", flush=True)
 
-    # 10. Patch NMS & SoftNMS for FP16 evaluation compatibility
+    # 10a. Patch CoDeformDETRHead & CoDINOHead get_bboxes & _get_bboxes_single directly
     try:
-        import mmcv.ops.nms as nms_mod
-
-        orig_soft_nms = nms_mod.soft_nms
-        def soft_nms_fp16_safe(boxes, scores, *args, **kwargs):
-            if hasattr(boxes, 'dtype') and boxes.dtype == torch.float16:
-                boxes = boxes.float()
-            if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
-                scores = scores.float()
-            return orig_soft_nms(boxes, scores, *args, **kwargs)
-
-        orig_nms = nms_mod.nms
-        def nms_fp16_safe(boxes, scores, *args, **kwargs):
-            if hasattr(boxes, 'dtype') and boxes.dtype == torch.float16:
-                boxes = boxes.float()
-            if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
-                scores = scores.float()
-            return orig_nms(boxes, scores, *args, **kwargs)
-
-        orig_batched_nms = nms_mod.batched_nms
-        def batched_nms_fp16_safe(boxes, scores, idxs, nms_cfg, class_agnostic=False):
-            if hasattr(boxes, 'dtype') and boxes.dtype == torch.float16:
-                boxes = boxes.float()
-            if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
-                scores = scores.float()
-            return orig_batched_nms(boxes, scores, idxs, nms_cfg, class_agnostic=class_agnostic)
-
-        nms_mod.soft_nms = soft_nms_fp16_safe
-        nms_mod.nms = nms_fp16_safe
-        nms_mod.batched_nms = batched_nms_fp16_safe
-
-        # CRITICAL: Update NMS_OPS dictionary in mmcv.ops.nms used directly by batched_nms
-        if hasattr(nms_mod, 'NMS_OPS') and isinstance(nms_mod.NMS_OPS, dict):
-            nms_mod.NMS_OPS['soft_nms'] = soft_nms_fp16_safe
-            nms_mod.NMS_OPS['nms'] = nms_fp16_safe
-
-        # Patch mmcv.ops top-level package namespace
-        try:
-            import mmcv.ops as ops_mod
-            ops_mod.soft_nms = soft_nms_fp16_safe
-            ops_mod.nms = nms_fp16_safe
-            ops_mod.batched_nms = batched_nms_fp16_safe
-        except Exception:
-            pass
-
-        # Patch SoftNMSop.apply and NMSop.apply autograd entries
-        if hasattr(nms_mod, 'SoftNMSop'):
-            try:
-                orig_soft_apply = nms_mod.SoftNMSop.apply
-                def soft_nms_apply_safe(boxes, scores, *args, **kwargs):
-                    if hasattr(boxes, 'dtype') and boxes.dtype == torch.float16:
-                        boxes = boxes.float()
-                    if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
-                        scores = scores.float()
-                    return orig_soft_apply(boxes, scores, *args, **kwargs)
-                nms_mod.SoftNMSop.apply = soft_nms_apply_safe
-            except Exception:
-                pass
-
-        if hasattr(nms_mod, 'NMSop'):
-            try:
-                orig_nms_apply = nms_mod.NMSop.apply
-                def nms_apply_safe(bboxes, scores, *args, **kwargs):
-                    if hasattr(bboxes, 'dtype') and bboxes.dtype == torch.float16:
-                        bboxes = bboxes.float()
-                    if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
-                        scores = scores.float()
-                    return orig_nms_apply(bboxes, scores, *args, **kwargs)
-                nms_mod.NMSop.apply = nms_apply_safe
-            except Exception:
-                pass
-
-        # Patch C-level ext_module if accessible
-        if hasattr(nms_mod, 'ext_module'):
-            try:
-                if hasattr(nms_mod.ext_module, 'softnms'):
-                    orig_c_softnms = nms_mod.ext_module.softnms
-                    def c_softnms_safe(boxes, scores, *args, **kwargs):
-                        if hasattr(boxes, 'dtype') and boxes.dtype == torch.float16:
-                            boxes = boxes.float()
-                        if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
-                            scores = scores.float()
-                        return orig_c_softnms(boxes, scores, *args, **kwargs)
-                    nms_mod.ext_module.softnms = c_softnms_safe
-            except Exception:
-                pass
-
-        # Propagate to all already-imported modules in sys.modules
-        for m_name, mod in list(sys.modules.items()):
-            if mod is None:
-                continue
-            if hasattr(mod, 'batched_nms'):
-                try:
-                    setattr(mod, 'batched_nms', batched_nms_fp16_safe)
-                except Exception:
-                    pass
-            if hasattr(mod, 'soft_nms'):
-                try:
-                    setattr(mod, 'soft_nms', soft_nms_fp16_safe)
-                except Exception:
-                    pass
-            if hasattr(mod, 'nms') and m_name.startswith(('mmcv', 'mmdet', 'projects')):
-                try:
-                    setattr(mod, 'nms', nms_fp16_safe)
-                except Exception:
-                    pass
-            if hasattr(mod, 'NMS_OPS') and isinstance(mod.NMS_OPS, dict):
-                try:
-                    mod.NMS_OPS['soft_nms'] = soft_nms_fp16_safe
-                    mod.NMS_OPS['nms'] = nms_fp16_safe
-                except Exception:
-                    pass
-
-        # Patch CoDeformDETRHead & CoDINOHead get_bboxes and _get_bboxes_single directly
         from projects.models.co_deformable_detr_head import CoDeformDETRHead
         from projects.models.co_dino_head import CoDINOHead
 
@@ -1916,7 +1803,140 @@ def patch_codetr_fp16_target_assignment():
         if hasattr(CoDINOHead, '_get_bboxes_single') and CoDINOHead._get_bboxes_single is not CoDeformDETRHead._get_bboxes_single:
             CoDINOHead._get_bboxes_single = _make_fp16_safe_get_bboxes_single(CoDINOHead._get_bboxes_single)
 
-        print(f"[{time.strftime('%H:%M:%S')}] [FP16] NMS, SoftNMS, get_bboxes & _get_bboxes_single float32 evaluation patch applied", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16] CoDeformDETRHead & CoDINOHead get_bboxes float32 evaluation patch applied", flush=True)
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16 ERROR] CoDeformDETRHead get_bboxes patch failed: {e}", flush=True)
+
+    # 10b. Patch NMS & SoftNMS for FP16 evaluation compatibility
+    try:
+        import sys, types
+        # Note: In mmcv.ops, ops.nms is a function that shadows the submodule mmcv.ops.nms.
+        # Retrieve the actual module object from sys.modules:
+        nms_mod = sys.modules.get('mmcv.ops.nms')
+        if nms_mod is None or not isinstance(nms_mod, types.ModuleType):
+            import importlib
+            importlib.import_module('mmcv.ops.nms')
+            nms_mod = sys.modules.get('mmcv.ops.nms')
+
+        orig_soft_nms = getattr(nms_mod, 'soft_nms', None) if nms_mod is not None else None
+        def soft_nms_fp16_safe(boxes, scores, *args, **kwargs):
+            if hasattr(boxes, 'dtype') and boxes.dtype == torch.float16:
+                boxes = boxes.float()
+            if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
+                scores = scores.float()
+            return orig_soft_nms(boxes, scores, *args, **kwargs)
+
+        orig_nms = getattr(nms_mod, 'nms', None) if nms_mod is not None else None
+        def nms_fp16_safe(boxes, scores, *args, **kwargs):
+            if hasattr(boxes, 'dtype') and boxes.dtype == torch.float16:
+                boxes = boxes.float()
+            if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
+                scores = scores.float()
+            return orig_nms(boxes, scores, *args, **kwargs)
+
+        orig_batched_nms = getattr(nms_mod, 'batched_nms', None) if nms_mod is not None else None
+        def batched_nms_fp16_safe(boxes, scores, idxs, nms_cfg, class_agnostic=False):
+            if hasattr(boxes, 'dtype') and boxes.dtype == torch.float16:
+                boxes = boxes.float()
+            if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
+                scores = scores.float()
+            return orig_batched_nms(boxes, scores, idxs, nms_cfg, class_agnostic=class_agnostic)
+
+        if nms_mod is not None:
+            if orig_soft_nms is not None:
+                nms_mod.soft_nms = soft_nms_fp16_safe
+            if orig_nms is not None:
+                nms_mod.nms = nms_fp16_safe
+            if orig_batched_nms is not None:
+                nms_mod.batched_nms = batched_nms_fp16_safe
+
+            # Update NMS_OPS dictionary in mmcv.ops.nms used directly by batched_nms
+            if hasattr(nms_mod, 'NMS_OPS') and isinstance(nms_mod.NMS_OPS, dict):
+                nms_mod.NMS_OPS['soft_nms'] = soft_nms_fp16_safe
+                nms_mod.NMS_OPS['nms'] = nms_fp16_safe
+
+            # Patch SoftNMSop.apply and NMSop.apply autograd entries
+            if hasattr(nms_mod, 'SoftNMSop'):
+                try:
+                    orig_soft_apply = nms_mod.SoftNMSop.apply
+                    def soft_nms_apply_safe(boxes, scores, *args, **kwargs):
+                        if hasattr(boxes, 'dtype') and boxes.dtype == torch.float16:
+                            boxes = boxes.float()
+                        if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
+                            scores = scores.float()
+                        return orig_soft_apply(boxes, scores, *args, **kwargs)
+                    nms_mod.SoftNMSop.apply = soft_nms_apply_safe
+                except Exception:
+                    pass
+
+            if hasattr(nms_mod, 'NMSop'):
+                try:
+                    orig_nms_apply = nms_mod.NMSop.apply
+                    def nms_apply_safe(bboxes, scores, *args, **kwargs):
+                        if hasattr(bboxes, 'dtype') and bboxes.dtype == torch.float16:
+                            bboxes = bboxes.float()
+                        if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
+                            scores = scores.float()
+                        return orig_nms_apply(bboxes, scores, *args, **kwargs)
+                    nms_mod.NMSop.apply = nms_apply_safe
+                except Exception:
+                    pass
+
+            # Patch C-level ext_module if accessible
+            if hasattr(nms_mod, 'ext_module'):
+                try:
+                    if hasattr(nms_mod.ext_module, 'softnms'):
+                        orig_c_softnms = nms_mod.ext_module.softnms
+                        def c_softnms_safe(boxes, scores, *args, **kwargs):
+                            if hasattr(boxes, 'dtype') and boxes.dtype == torch.float16:
+                                boxes = boxes.float()
+                            if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
+                                scores = scores.float()
+                            return orig_c_softnms(boxes, scores, *args, **kwargs)
+                        nms_mod.ext_module.softnms = c_softnms_safe
+                except Exception:
+                    pass
+
+        # Patch mmcv.ops top-level package namespace
+        try:
+            ops_mod = sys.modules.get('mmcv.ops')
+            if ops_mod is not None and isinstance(ops_mod, types.ModuleType):
+                if orig_soft_nms is not None:
+                    ops_mod.soft_nms = soft_nms_fp16_safe
+                if orig_nms is not None:
+                    ops_mod.nms = nms_fp16_safe
+                if orig_batched_nms is not None:
+                    ops_mod.batched_nms = batched_nms_fp16_safe
+        except Exception:
+            pass
+
+        # Propagate to all already-imported modules in sys.modules
+        for m_name, mod in list(sys.modules.items()):
+            if mod is None or not isinstance(mod, types.ModuleType):
+                continue
+            if hasattr(mod, 'batched_nms') and orig_batched_nms is not None:
+                try:
+                    setattr(mod, 'batched_nms', batched_nms_fp16_safe)
+                except Exception:
+                    pass
+            if hasattr(mod, 'soft_nms') and orig_soft_nms is not None:
+                try:
+                    setattr(mod, 'soft_nms', soft_nms_fp16_safe)
+                except Exception:
+                    pass
+            if hasattr(mod, 'nms') and m_name.startswith(('mmcv', 'mmdet', 'projects')) and orig_nms is not None:
+                try:
+                    setattr(mod, 'nms', nms_fp16_safe)
+                except Exception:
+                    pass
+            if hasattr(mod, 'NMS_OPS') and isinstance(mod.NMS_OPS, dict):
+                try:
+                    mod.NMS_OPS['soft_nms'] = soft_nms_fp16_safe
+                    mod.NMS_OPS['nms'] = nms_fp16_safe
+                except Exception:
+                    pass
+
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16] NMS & SoftNMS float32 evaluation patch applied", flush=True)
     except Exception as e:
         print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] NMS patch skipped: {e}", flush=True)
 
