@@ -176,6 +176,14 @@ def _parse_args(args_list=None):
         help="DataLoader workers per GPU (overrides config data.workers_per_gpu).",
     )
     parser.add_argument(
+        "--batch-size",
+        "--samples-per-gpu",
+        dest="batch_size",
+        type=int,
+        default=None,
+        help="Batch size (samples per GPU) for training (overrides config data.samples_per_gpu).",
+    )
+    parser.add_argument(
         "--no-stage-data",
         action="store_true",
         help="Do not automatically stage Google Drive dataset to local disk.",
@@ -929,9 +937,21 @@ def main():
                     self._max_iters = 10
 
                 def before_train_iter(self, runner):
+                    try:
+                        import torch
+                        if torch.cuda.is_available():
+                            torch.cuda.synchronize()
+                    except Exception:
+                        pass
                     self._start_time = time.time()
 
                 def after_train_iter(self, runner):
+                    try:
+                        import torch
+                        if torch.cuda.is_available():
+                            torch.cuda.synchronize()
+                    except Exception:
+                        pass
                     dur = time.time() - self._start_time if self._start_time else 0.0
                     if runner.iter > 0:  # Skip first iteration for warmup
                         self._iter_times.append(dur)
@@ -1008,16 +1028,17 @@ def main():
                         except Exception as e:
                             exp_name = f"Parse Error: {str(e)}"
                             
-                        # Estimate epoch time
-                        iters_per_epoch = 183 # Assuming batch size 2, (366 / 2 = 183) wait, dataset has 366. With batch 2, it is 183 iters/epoch.
-                        if samples != 2:
-                            iters_per_epoch = int(366 / samples)
+                        # Estimate epoch time dynamically from actual dataloader
+                        total_dataset_imgs = len(getattr(runner.data_loader, 'dataset', []))
+                        if total_dataset_imgs > 0:
+                            iters_per_epoch = len(runner.data_loader)
+                        else:
+                            iters_per_epoch = 1890 if samples == 2 else int(3780 / samples)
                         est_epoch_sec = avg_time * iters_per_epoch
                         est_epoch_min = est_epoch_sec / 60.0
 
                         print(f"  Experiment Name      : {exp_name}")
-                        print(f"  Avg sec/iteration    : {avg_time:.3f}s (ignoring first warmup step)")
-                        print(f"  Images/sec           : {img_sec:.2f}")
+                        print(f"  Total Dataset Images : {total_dataset_imgs if total_dataset_imgs > 0 else '3780 (est)'}")
                         print(f"  Iterations/epoch     : {iters_per_epoch}")
                         print(f"  Est. epoch time      : {est_epoch_sec:.1f}s ({est_epoch_min:.2f} min)")
                         print(f"  Batch size           : {samples}")
@@ -1115,6 +1136,9 @@ def main():
     if args.workers_per_gpu is not None:
         if hasattr(cfg, "data"):
             cfg.data.workers_per_gpu = args.workers_per_gpu
+    if getattr(args, "batch_size", None) is not None:
+        if hasattr(cfg, "data"):
+            cfg.data.samples_per_gpu = args.batch_size
     workers_cnt = cfg.data.get("workers_per_gpu", 0) if hasattr(cfg, "data") else 0
     if workers_cnt == 0:
         print(f"[{time.strftime('%H:%M:%S')}]   -> DataLoader workers: 0 (synchronous in-process loading; completely immune to OpenCV fork deadlocks)", flush=True)
