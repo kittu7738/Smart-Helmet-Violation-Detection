@@ -1342,8 +1342,18 @@ def patch_codetr_fp16_target_assignment():
                     self, flat_anchors.float(), valid_flags, num_level_anchors,
                     gt_bboxes.float(), gt_bboxes_ignore, gt_labels, img_meta,
                     label_channels=label_channels, unmap_outputs=unmap_outputs)
-                labels, label_weights, bbox_targets, bbox_weights, pos_inds, neg_inds = res
-                return (labels, label_weights, bbox_targets.to(orig_dtype), bbox_weights.to(orig_dtype), pos_inds, neg_inds)
+                # CoATSSHead._get_target_single returns 7 items:
+                # (anchors, labels, label_weights, bbox_targets, bbox_weights, pos_inds, neg_inds)
+                # Or (None,) * 7 when no inside flags.
+                # Dynamically convert only floating point tensor returns that match float32 back to orig_dtype
+                # while preserving all return values, count, types, and exact order.
+                if isinstance(res, tuple):
+                    res_list = list(res)
+                    for idx, item in enumerate(res_list):
+                        if isinstance(item, torch.Tensor) and torch.is_floating_point(item) and item.dtype == torch.float32:
+                            res_list[idx] = item.to(orig_dtype)
+                    return tuple(res_list)
+                return res
 
             CoATSSHead._get_target_single = atss_get_target_single_fp16_safe
             CoATSSHead._fp16_target_patched = True
@@ -1355,20 +1365,30 @@ def patch_codetr_fp16_target_assignment():
     try:
         from mmdet.models.dense_heads.anchor_head import AnchorHead
         if not getattr(AnchorHead, '_fp16_target_patched', False):
-            orig_anchor_get_target_single = AnchorHead._get_target_single
-            def anchor_get_target_single_fp16_safe(self, flat_anchors, valid_flags,
-                                                   gt_bboxes, gt_bboxes_ignore,
-                                                   gt_labels, img_meta,
-                                                   label_channels=1, unmap_outputs=True):
-                orig_dtype = flat_anchors.dtype
-                res = orig_anchor_get_target_single(
-                    self, flat_anchors.float(), valid_flags, gt_bboxes.float(),
-                    gt_bboxes_ignore, gt_labels, img_meta,
-                    label_channels=label_channels, unmap_outputs=unmap_outputs)
-                labels, label_weights, bbox_targets, bbox_weights, pos_inds, neg_inds = res
-                return (labels, label_weights, bbox_targets.to(orig_dtype), bbox_weights.to(orig_dtype), pos_inds, neg_inds)
+            # Patch both _get_target_single (if exists) and _get_targets_single (mmdet standard)
+            target_fn_names = [name for name in ('_get_target_single', '_get_targets_single') if hasattr(AnchorHead, name)]
+            for fn_name in target_fn_names:
+                orig_anchor_fn = getattr(AnchorHead, fn_name)
+                def make_anchor_wrapper(orig_fn):
+                    def anchor_get_targets_single_fp16_safe(self, flat_anchors, valid_flags,
+                                                            gt_bboxes, gt_bboxes_ignore,
+                                                            gt_labels, img_meta,
+                                                            label_channels=1, unmap_outputs=True):
+                        orig_dtype = flat_anchors.dtype
+                        res = orig_fn(
+                            self, flat_anchors.float(), valid_flags, gt_bboxes.float(),
+                            gt_bboxes_ignore, gt_labels, img_meta,
+                            label_channels=label_channels, unmap_outputs=unmap_outputs)
+                        if isinstance(res, tuple):
+                            res_list = list(res)
+                            for idx, item in enumerate(res_list):
+                                if isinstance(item, torch.Tensor) and torch.is_floating_point(item) and item.dtype == torch.float32:
+                                    res_list[idx] = item.to(orig_dtype)
+                            return tuple(res_list)
+                        return res
+                    return anchor_get_targets_single_fp16_safe
 
-            AnchorHead._get_target_single = anchor_get_target_single_fp16_safe
+                setattr(AnchorHead, fn_name, make_anchor_wrapper(orig_anchor_fn))
             AnchorHead._fp16_target_patched = True
             print(f"[{time.strftime('%H:%M:%S')}] [FP16] AnchorHead (RPN) target assignment patch applied", flush=True)
     except Exception as e:
@@ -1381,9 +1401,15 @@ def patch_codetr_fp16_target_assignment():
             def bbox_get_target_single_fp16_safe(self, pos_bboxes, neg_bboxes,
                                                  pos_gt_bboxes, pos_gt_labels, cfg):
                 orig_dtype = pos_bboxes.dtype
-                labels, label_weights, bbox_targets, bbox_weights = orig_bbox_get_target_single(
+                res = orig_bbox_get_target_single(
                     self, pos_bboxes.float(), neg_bboxes.float(), pos_gt_bboxes.float(), pos_gt_labels, cfg)
-                return labels, label_weights, bbox_targets.to(orig_dtype), bbox_weights.to(orig_dtype)
+                if isinstance(res, tuple):
+                    res_list = list(res)
+                    for idx, item in enumerate(res_list):
+                        if isinstance(item, torch.Tensor) and torch.is_floating_point(item) and item.dtype == torch.float32:
+                            res_list[idx] = item.to(orig_dtype)
+                    return tuple(res_list)
+                return res
 
             BBoxHead._get_target_single = bbox_get_target_single_fp16_safe
             BBoxHead._fp16_target_patched = True
@@ -1395,9 +1421,11 @@ def patch_codetr_fp16_target_assignment():
     try:
         from projects.models.co_deformable_detr_head import CoDeformDETRHead
         from projects.models.co_dino_head import CoDINOHead
+        from projects.models.co_atss_head import CoATSSHead
         assert getattr(CoDeformDETRHead, '_fp16_target_patched', False), "CoDeformDETRHead not patched!"
         assert getattr(CoDINOHead, '_fp16_target_patched', False), "CoDINOHead _get_target_single not patched!"
         assert getattr(CoDINOHead, '_fp16_dn_target_patched', False), "CoDINOHead _get_dn_target_single not patched!"
+        assert getattr(CoATSSHead, '_fp16_target_patched', False), "CoATSSHead _get_target_single not patched!"
         print(f"[{time.strftime('%H:%M:%S')}] [FP16 VERIFIED] All active Co-DETR target and loss patches confirmed active!", flush=True)
     except Exception as e:
         print(f"[{time.strftime('%H:%M:%S')}] [FP16 VERIFICATION ERROR] Active head verification failed: {e}", flush=True)

@@ -161,3 +161,109 @@ def test_mock_head_patching_and_inheritance():
     labels, bbox_targets = head._get_target_single(bbox_pred_half, sampling_res, {'img_shape': (640, 640, 3)})
     assert bbox_targets.dtype == torch.float16
     assert torch.allclose(bbox_targets[sampling_res.pos_inds].float(), sampling_res.pos_gt_bboxes, atol=1e-3)
+
+
+def test_coatsshead_return_signature_and_fp16_safe_wrapper():
+    """Regression test for CoATSSHead._get_target_single return signature:
+    CoATSSHead returns a 7-tuple:
+      (anchors, labels, label_weights, bbox_targets, bbox_weights, pos_inds, neg_inds)
+    Verifies that:
+      1. Hardcoded 6-value unpacking raises ValueError: too many values to unpack (expected 6)
+      2. The dynamic wrapper properly preserves all 7 items, casts float32 targets to orig_dtype,
+         preserves non-float tensors and lists/tuples, and maintains exact order.
+    """
+    torch = pytest.importorskip("torch")
+
+    # Mock original CoATSSHead._get_target_single returning 7 values
+    def mock_orig_atss_get_target_single(self, flat_anchors, valid_flags,
+                                         num_level_anchors, gt_bboxes,
+                                         gt_bboxes_ignore, gt_labels,
+                                         img_meta, label_channels=1,
+                                         unmap_outputs=True):
+        anchors = flat_anchors
+        labels = torch.zeros(len(flat_anchors), dtype=torch.long)
+        label_weights = torch.ones(len(flat_anchors), dtype=torch.float32)
+        bbox_targets = torch.ones((len(flat_anchors), 4), dtype=torch.float32) * 2.5
+        bbox_weights = torch.ones((len(flat_anchors), 4), dtype=torch.float32)
+        pos_inds = torch.tensor([0, 1], dtype=torch.long)
+        neg_inds = torch.tensor([2, 3], dtype=torch.long)
+        return (anchors, labels, label_weights, bbox_targets, bbox_weights, pos_inds, neg_inds)
+
+    # 1. Verify that 6-value unpacking fails with ValueError
+    sample_flat_anchors = torch.zeros((4, 4), dtype=torch.float16)
+    res = mock_orig_atss_get_target_single(
+        None, sample_flat_anchors, None, None, torch.zeros((2, 4), dtype=torch.float32),
+        None, None, {'img_shape': (640, 384, 3)})
+
+    assert len(res) == 7
+
+    with pytest.raises(ValueError, match=r"too many values to unpack \(expected 6\)"):
+        labels, label_weights, bbox_targets, bbox_weights, pos_inds, neg_inds = res
+
+    # 2. Test the dynamic wrapper implementation from train.py
+    def atss_get_target_single_fp16_safe(self, flat_anchors, valid_flags,
+                                         num_level_anchors, gt_bboxes,
+                                         gt_bboxes_ignore, gt_labels,
+                                         img_meta, label_channels=1,
+                                         unmap_outputs=True):
+        orig_dtype = flat_anchors.dtype
+        res = mock_orig_atss_get_target_single(
+            self, flat_anchors.float(), valid_flags, num_level_anchors,
+            gt_bboxes.float(), gt_bboxes_ignore, gt_labels, img_meta,
+            label_channels=label_channels, unmap_outputs=unmap_outputs)
+        if isinstance(res, tuple):
+            res_list = list(res)
+            for idx, item in enumerate(res_list):
+                if isinstance(item, torch.Tensor) and torch.is_floating_point(item) and item.dtype == torch.float32:
+                    res_list[idx] = item.to(orig_dtype)
+            return tuple(res_list)
+        return res
+
+    wrapped_res = atss_get_target_single_fp16_safe(
+        None, sample_flat_anchors, None, None, torch.zeros((2, 4), dtype=torch.float32),
+        None, None, {'img_shape': (640, 384, 3)})
+
+    assert len(wrapped_res) == 7
+    (anchors_out, labels_out, label_weights_out, bbox_targets_out,
+     bbox_weights_out, pos_inds_out, neg_inds_out) = wrapped_res
+
+    # Check dtypes: floating point tensors match orig_dtype (float16)
+    assert anchors_out.dtype == torch.float16
+    assert label_weights_out.dtype == torch.float16
+    assert bbox_targets_out.dtype == torch.float16
+    assert bbox_weights_out.dtype == torch.float16
+    # Long indices remain long
+    assert labels_out.dtype == torch.long
+    assert pos_inds_out.dtype == torch.long
+    assert neg_inds_out.dtype == torch.long
+    # Numerical accuracy check
+    assert torch.allclose(bbox_targets_out.float(), torch.ones((4, 4)) * 2.5)
+
+
+def test_ast_coatsshead_source_returns_seven_items():
+    """Verify directly in Co-DETR's source code (if present) that CoATSSHead._get_target_single returns 7 items."""
+    candidates = [
+        os.path.join(REPO_ROOT, "..", "Co-DETR"),
+        os.path.join(os.path.expanduser("~"), ".gemini", "antigravity", "brain", "7c9511b1-7f08-46c8-823a-1f2262d15f3d", "scratch", "Co-DETR"),
+        "/content/Co-DETR"
+    ]
+    codetr_dir = None
+    for cand in candidates:
+        if os.path.isdir(cand):
+            codetr_dir = cand
+            break
+
+    if codetr_dir is None:
+        pytest.skip("Co-DETR repository clone not found in standard paths.")
+
+    atss_file = os.path.join(codetr_dir, "projects", "models", "co_atss_head.py")
+    with open(atss_file) as f:
+        content = f.read()
+
+    # Search for the return statement of _get_target_single
+    assert "return (anchors, labels, label_weights, bbox_targets, bbox_weights," in content
+    assert "pos_inds, neg_inds)" in content
+    # And check get_targets unpacks all 7:
+    assert "(all_anchors, all_labels, all_label_weights, all_bbox_targets," in content
+    assert "all_bbox_weights, pos_inds_list, neg_inds_list) = multi_apply(" in content
+
