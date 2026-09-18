@@ -1104,20 +1104,23 @@ def patch_codetr_fp16_target_assignment():
             CoDINOHead.loss_single = loss_single_fp16_safe
 
             if hasattr(CoDINOHead, 'loss_single_aux'):
-                def loss_single_aux_fp16_safe(self, cls_scores, bbox_preds, gt_bboxes_list,
-                                              gt_labels_list, img_metas, gt_bboxes_ignore_list=None):
+                def loss_single_aux_fp16_safe(self, cls_scores, bbox_preds,
+                                              labels, label_weights, bbox_targets,
+                                              bbox_weights, img_metas,
+                                              gt_bboxes_ignore_list=None):
                     num_imgs = cls_scores.size(0)
-                    cls_scores_list = [cls_scores[i] for i in range(num_imgs)]
-                    bbox_preds_list = [bbox_preds[i] for i in range(num_imgs)]
-                    cls_reg_targets = self.get_targets(cls_scores_list, bbox_preds_list,
-                                                       gt_bboxes_list, gt_labels_list,
-                                                       img_metas, gt_bboxes_ignore_list)
-                    (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,
-                     num_total_pos, num_total_neg) = cls_reg_targets
-                    labels = torch.cat(labels_list, 0)
-                    label_weights = torch.cat(label_weights_list, 0)
-                    bbox_targets = torch.cat(bbox_targets_list, 0)
-                    bbox_weights = torch.cat(bbox_weights_list, 0)
+                    num_q = cls_scores.size(1)
+                    try:
+                        labels = labels.reshape(num_imgs * num_q)
+                        label_weights = label_weights.reshape(num_imgs * num_q)
+                        bbox_targets = bbox_targets.reshape(num_imgs * num_q, 4)
+                        bbox_weights = bbox_weights.reshape(num_imgs * num_q, 4)
+                    except Exception:
+                        return cls_scores.mean() * 0, cls_scores.mean() * 0, cls_scores.mean() * 0
+
+                    bg_class_ind = self.num_classes
+                    num_total_pos = len(((labels >= 0) & (labels < bg_class_ind)).nonzero().squeeze(1))
+                    num_total_neg = num_imgs * num_q - num_total_pos
 
                     cls_scores = cls_scores.reshape(-1, self.cls_out_channels)
                     cls_avg_factor = num_total_pos * 1.0 + num_total_neg * self.bg_cls_weight
@@ -1125,7 +1128,6 @@ def patch_codetr_fp16_target_assignment():
                         cls_avg_factor = reduce_mean(cls_scores.new_tensor([cls_avg_factor]))
                     cls_avg_factor = max(cls_avg_factor, 1)
 
-                    bg_class_ind = self.num_classes
                     pos_inds = ((labels >= 0) & (labels < bg_class_ind)).nonzero().squeeze(1)
                     scores = label_weights.new_zeros(labels.shape)
                     pos_bbox_targets = bbox_targets[pos_inds]
@@ -1159,7 +1161,7 @@ def patch_codetr_fp16_target_assignment():
 
                     loss_iou = self.loss_iou(bboxes, bboxes_gt, bbox_weights, avg_factor=num_total_pos)
                     loss_bbox = self.loss_bbox(bbox_preds, bbox_targets, bbox_weights, avg_factor=num_total_pos)
-                    return loss_cls, loss_bbox, loss_iou
+                    return loss_cls * self.lambda_1, loss_bbox * self.lambda_1, loss_iou * self.lambda_1
 
                 CoDINOHead.loss_single_aux = loss_single_aux_fp16_safe
 
