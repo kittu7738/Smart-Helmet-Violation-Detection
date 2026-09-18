@@ -247,26 +247,68 @@ def build_combined_train_dataset(
             "height": item.get("height", 0),
         })
 
+    # ── Normalize Original Category IDs into Project 0-6 Taxonomy ───────────
+    orig_categories = orig_coco.get("categories", [])
+    print(f"  Original categories defined in JSON: {orig_categories}")
+
+    NAME_TO_TARGET_ID = {name: i for i, name in enumerate(EXPECTED_CLASSES)}
+    NORM_NAME_TO_TARGET_ID = {
+        name.lower().replace(" ", "_").replace("-", "_"): i
+        for i, name in enumerate(EXPECTED_CLASSES)
+    }
+
+    orig_cid_to_target_cid: Dict[int, int] = {}
+
+    for c in orig_categories:
+        c_id = c.get("id")
+        c_name = str(c.get("name", "")).strip()
+        norm_name = c_name.lower().replace(" ", "_").replace("-", "_")
+
+        if c_name in NAME_TO_TARGET_ID:
+            orig_cid_to_target_cid[c_id] = NAME_TO_TARGET_ID[c_name]
+        elif norm_name in NORM_NAME_TO_TARGET_ID:
+            orig_cid_to_target_cid[c_id] = NORM_NAME_TO_TARGET_ID[norm_name]
+        else:
+            print(f"  [WARNING] Category '{c_name}' (ID {c_id}) did not match expected class name.")
+
+    # Fallbacks for standard 1-7 or 0-6 category IDs if categories list is missing or incomplete
+    for cid in range(1, 8):
+        if cid not in orig_cid_to_target_cid:
+            orig_cid_to_target_cid[cid] = cid - 1
+    for cid in range(0, 7):
+        if cid not in orig_cid_to_target_cid:
+            orig_cid_to_target_cid[cid] = cid
+
+    print("  Resolved category ID mapping (original -> 0-6 target):")
+    for src_id, dst_id in sorted(orig_cid_to_target_cid.items()):
+        print(f"    Original ID {src_id} -> Target ID {dst_id} ({EXPECTED_CLASSES[dst_id]})")
+
     orig_ann_count = 0
+    orig_skipped_count = 0
     for ann in orig_anns:
         old_img_id = ann.get("image_id")
         if old_img_id not in orig_id_remap:
+            orig_skipped_count += 1
             continue
 
-        cat_id = ann.get("category_id")
-        if cat_id < 0 or cat_id >= len(EXPECTED_CLASSES):
-            print(f"  [WARNING] Category ID {cat_id} out of bounds, skipping.")
+        raw_cat_id = ann.get("category_id")
+        if raw_cat_id not in orig_cid_to_target_cid:
+            print(f"  [WARNING] Category ID {raw_cat_id} has no mapping, skipping.")
+            orig_skipped_count += 1
             continue
+
+        target_cat_id = orig_cid_to_target_cid[raw_cat_id]
 
         bbox = ann.get("bbox", [0, 0, 0, 0])
         x, y, w, h = bbox
         if w <= 0 or h <= 0:
+            orig_skipped_count += 1
             continue
 
         new_ann = {
             "id": next_ann_id,
             "image_id": orig_id_remap[old_img_id],
-            "category_id": int(cat_id),
+            "category_id": int(target_cat_id),
             "bbox": [float(round(x, 2)), float(round(y, 2)), float(round(w, 2)), float(round(h, 2))],
             "area": float(round(w * h, 2)),
             "iscrowd": ann.get("iscrowd", 0),
@@ -276,7 +318,7 @@ def build_combined_train_dataset(
         combined_annotations.append(new_ann)
         orig_ann_count += 1
 
-    print(f"  -> Added {len(orig_id_remap)} original images, {orig_ann_count} annotations", flush=True)
+    print(f"  -> Converted {orig_ann_count}/{len(orig_anns)} original annotations ({orig_skipped_count} skipped)", flush=True)
 
     # ── Process Roboflow YOLO Train ──────────────────────────────────────────
     print(f"\n[4/4] Converting and adding Roboflow training set...", flush=True)
@@ -414,7 +456,7 @@ def build_combined_train_dataset(
     print(f"  - Original Train: {len(orig_id_remap)}")
     print(f"  - Roboflow Train: {rf_img_count}")
     print(f"Total Annotations : {len(combined_annotations)}")
-    print(f"  - Original Train: {orig_ann_count}")
+    print(f"  - Original Train: {orig_ann_count} converted, {orig_skipped_count} skipped")
     print(f"  - Roboflow Train: {rf_ann_count}")
     print("\nClass Distribution:")
     for cname, count in class_dist.items():
@@ -427,6 +469,9 @@ def build_combined_train_dataset(
         "num_annotations": len(combined_annotations),
         "original_images": len(orig_id_remap),
         "roboflow_images": rf_img_count,
+        "original_annotations_converted": orig_ann_count,
+        "original_annotations_skipped": orig_skipped_count,
+        "roboflow_annotations": rf_ann_count,
         "class_distribution": class_dist,
         "json_path": out_json_path,
         "img_dir": out_img_dir,

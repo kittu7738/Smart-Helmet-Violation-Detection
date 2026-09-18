@@ -122,3 +122,59 @@ def test_build_combined_train_end_to_end(tmp_path):
     )
     assert success_reuse is True
     assert report_reuse.get("reused") is True
+
+
+def test_build_combined_train_1_based_categories(tmp_path):
+    orig_root = tmp_path / "orig_1_based"
+    rf_root = tmp_path / "rf_empty"
+    out_root = tmp_path / "combined_1_based"
+
+    # Setup 1-based original COCO dataset (category IDs 1 to 7)
+    orig_img_dir = orig_root / "train" / "images"
+    os.makedirs(orig_img_dir, exist_ok=True)
+    im = Image.new("RGB", (640, 480), color=(100, 150, 200))
+    im.save(orig_img_dir / "sample_0.jpg")
+
+    # Categories 1 to 7
+    orig_categories = [{"id": i + 1, "name": name} for i, name in enumerate(EXPECTED_CLASSES)]
+    # Annotations for each of the 7 classes (category IDs 1 to 7)
+    orig_annotations = [
+        {"id": 100 + i, "image_id": 1, "category_id": i + 1, "bbox": [10 + i * 10, 10, 50, 50], "area": 2500, "iscrowd": 0}
+        for i in range(7)
+    ]
+    orig_coco = {
+        "images": [{"id": 1, "file_name": "sample_0.jpg", "width": 640, "height": 480}],
+        "annotations": orig_annotations,
+        "categories": orig_categories,
+    }
+    with open(orig_root / "instances_train.json", "w") as f:
+        json.dump(orig_coco, f)
+
+    # Empty Roboflow dir
+    os.makedirs(rf_root / "images", exist_ok=True)
+    os.makedirs(rf_root / "labels", exist_ok=True)
+
+    success, report = build_combined_train_dataset(
+        original_root=str(orig_root),
+        roboflow_root=str(rf_root),
+        output_root=str(out_root),
+        copy_images=True,
+        force_rebuild=True,
+    )
+
+    assert success is True
+    assert report["original_annotations_converted"] == 7
+    assert report["original_annotations_skipped"] == 0
+
+    # Load output JSON and verify exact category mapping:
+    with open(out_root / "annotations" / "instances_train.json", "r") as f:
+        result_coco = json.load(f)
+
+    # Target category IDs must be exactly 0 to 6
+    result_cat_ids = sorted([a["category_id"] for a in result_coco["annotations"]])
+    assert result_cat_ids == [0, 1, 2, 3, 4, 5, 6]
+
+    # Target category 6 corresponds to original category 7 (passenger_without_helmet)
+    ann_7 = next(a for a in result_coco["annotations"] if a["category_id"] == 6)
+    assert ann_7["category_id"] == 6
+
