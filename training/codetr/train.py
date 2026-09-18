@@ -1870,18 +1870,24 @@ def main():
             class ThroughputBenchmarkHook(Hook):
                 def __init__(self, *args, **kwargs):
                     super().__init__()
-                    self._start_time = None
-                    self._iter_times = []
+                    self._start_compute_time = None
+                    self._last_iter_end_time = None
+                    self._compute_times = []
+                    self._data_times = []
+                    self._total_step_times = []
                     self._max_iters = 10
 
                 def before_train_iter(self, runner):
+                    now = time.time()
+                    if self._last_iter_end_time is not None and runner.iter > 0:
+                        self._data_times.append(now - self._last_iter_end_time)
                     try:
                         import torch
                         if torch.cuda.is_available():
                             torch.cuda.synchronize()
                     except Exception:
                         pass
-                    self._start_time = time.time()
+                    self._start_compute_time = time.time()
 
                 def after_train_iter(self, runner):
                     try:
@@ -1890,15 +1896,21 @@ def main():
                             torch.cuda.synchronize()
                     except Exception:
                         pass
-                    dur = time.time() - self._start_time if self._start_time else 0.0
+                    now = time.time()
+                    compute_dur = now - self._start_compute_time if self._start_compute_time else 0.0
+                    self._last_iter_end_time = now
                     if runner.iter > 0:  # Skip first iteration for warmup
-                        self._iter_times.append(dur)
-                    
+                        self._compute_times.append(compute_dur)
+                        data_dur = self._data_times[-1] if self._data_times else 0.0
+                        self._total_step_times.append(compute_dur + data_dur)
+
                     if runner.iter + 1 >= self._max_iters:
-                        avg_time = sum(self._iter_times) / len(self._iter_times) if self._iter_times else 0.0
+                        avg_compute = sum(self._compute_times) / len(self._compute_times) if self._compute_times else 0.0
+                        avg_data = sum(self._data_times) / len(self._data_times) if self._data_times else 0.0
+                        avg_total = sum(self._total_step_times) / len(self._total_step_times) if self._total_step_times else avg_compute
                         samples = getattr(runner.data_loader, 'batch_size', 1)
-                        img_sec = samples / avg_time if avg_time > 0 else 0.0
-                        
+                        img_sec = samples / avg_total if avg_total > 0 else 0.0
+
                         gpu_mem_alloc = "N/A"
                         gpu_mem_res = "N/A"
                         gpu_name = "N/A"
@@ -1917,7 +1929,9 @@ def main():
                         print("\n" + "=" * 74, flush=True)
                         print("  THROUGHPUT BENCHMARK COMPLETED", flush=True)
                         print(f"  Iterations           : {runner.iter + 1}")
-                        print(f"  Avg sec/iteration    : {avg_time:.3f}s (ignoring first warmup step)")
+                        print(f"  Avg Total Step Time  : {avg_total:.3f}s (ignoring first warmup step)")
+                        print(f"    - Compute Time     : {avg_compute:.3f}s ({avg_compute/avg_total*100:.1f}%)")
+                        print(f"    - Data Wait Time   : {avg_data:.3f}s ({avg_data/avg_total*100:.1f}%)")
                         print(f"  Images/sec           : {img_sec:.2f}")
                         print(f"  Batch size           : {samples}")
                         
