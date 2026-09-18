@@ -1017,8 +1017,8 @@ def patch_codetr_fp16_target_assignment():
                         is_aligned=True)
                     scores[pos_inds] = overlaps.to(scores.dtype)
                     loss_cls = self.loss_cls(
-                        cls_scores, (labels, scores),
-                        weight=label_weights,
+                        cls_scores.float(), (labels, scores.float()),
+                        weight=label_weights.float() if label_weights is not None else None,
                         avg_factor=cls_avg_factor)
                 else:
                     loss_cls = torch.zeros(1, dtype=cls_scores.dtype, device=cls_scores.device)
@@ -1078,8 +1078,8 @@ def patch_codetr_fp16_target_assignment():
                     is_aligned=True)
                 scores[pos_inds] = overlaps.to(scores.dtype)
                 loss_cls = self.loss_cls(
-                    cls_scores, (labels, scores),
-                    weight=label_weights,
+                    cls_scores.float(), (labels, scores.float()),
+                    weight=label_weights.float() if label_weights is not None else None,
                     avg_factor=cls_avg_factor)
 
                 num_total_pos = loss_cls.new_tensor([num_total_pos])
@@ -1140,8 +1140,8 @@ def patch_codetr_fp16_target_assignment():
                         is_aligned=True)
                     scores[pos_inds] = overlaps.to(scores.dtype)
                     loss_cls = self.loss_cls(
-                        cls_scores, (labels, scores),
-                        weight=label_weights,
+                        cls_scores.float(), (labels, scores.float()),
+                        weight=label_weights.float() if label_weights is not None else None,
                         avg_factor=cls_avg_factor)
 
                     num_total_pos = loss_cls.new_tensor([num_total_pos])
@@ -1419,15 +1419,61 @@ def patch_codetr_fp16_target_assignment():
     except Exception as e:
         print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] BBoxHead patch skipped: {e}", flush=True)
 
-    # 7. Explicit Verification of Active Methods on Active Classes
+    # 7. Patch QualityFocalLoss for FP16 numerical stability & dtype consistency
+    try:
+        from mmdet.models.losses.gfocal_loss import QualityFocalLoss
+        if not getattr(QualityFocalLoss, '_fp16_safe_patched', False):
+            orig_qfl_forward = QualityFocalLoss.forward
+            def qfl_forward_fp16_safe(self, pred, target, weight=None, avg_factor=None, reduction_override=None):
+                if pred.dtype == torch.float16:
+                    pred = pred.float()
+                if isinstance(target, (tuple, list)) and len(target) == 2:
+                    label, score = target
+                    if isinstance(score, torch.Tensor) and score.dtype == torch.float16:
+                        score = score.float()
+                    target = (label, score)
+                if weight is not None and weight.dtype == torch.float16:
+                    weight = weight.float()
+                return orig_qfl_forward(
+                    self, pred, target, weight=weight,
+                    avg_factor=avg_factor, reduction_override=reduction_override)
+
+            QualityFocalLoss.forward = qfl_forward_fp16_safe
+            QualityFocalLoss._fp16_safe_patched = True
+
+            try:
+                import mmdet.models.losses.gfocal_loss as gfocal_loss_mod
+                if hasattr(gfocal_loss_mod, 'quality_focal_loss'):
+                    orig_qfl_func = gfocal_loss_mod.quality_focal_loss
+                    if not getattr(orig_qfl_func, '_fp16_safe_patched', False):
+                        def quality_focal_loss_fp16_safe(pred, target, *args, **kwargs):
+                            if pred.dtype == torch.float16:
+                                pred = pred.float()
+                            if isinstance(target, (tuple, list)) and len(target) == 2:
+                                label, score = target
+                                if isinstance(score, torch.Tensor) and score.dtype == torch.float16:
+                                    score = score.float()
+                                target = (label, score)
+                            return orig_qfl_func(pred, target, *args, **kwargs)
+                        quality_focal_loss_fp16_safe._fp16_safe_patched = True
+                        gfocal_loss_mod.quality_focal_loss = quality_focal_loss_fp16_safe
+            except Exception:
+                pass
+            print(f"[{time.strftime('%H:%M:%S')}] [FP16] QualityFocalLoss float32 numerical stability patch applied", flush=True)
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] QualityFocalLoss patch skipped: {e}", flush=True)
+
+    # 8. Explicit Verification of Active Methods on Active Classes
     try:
         from projects.models.co_deformable_detr_head import CoDeformDETRHead
         from projects.models.co_dino_head import CoDINOHead
         from projects.models.co_atss_head import CoATSSHead
+        from mmdet.models.losses.gfocal_loss import QualityFocalLoss
         assert getattr(CoDeformDETRHead, '_fp16_target_patched', False), "CoDeformDETRHead not patched!"
         assert getattr(CoDINOHead, '_fp16_target_patched', False), "CoDINOHead _get_target_single not patched!"
         assert getattr(CoDINOHead, '_fp16_dn_target_patched', False), "CoDINOHead _get_dn_target_single not patched!"
         assert getattr(CoATSSHead, '_fp16_target_patched', False), "CoATSSHead _get_target_single not patched!"
+        assert getattr(QualityFocalLoss, '_fp16_safe_patched', False), "QualityFocalLoss not patched!"
         print(f"[{time.strftime('%H:%M:%S')}] [FP16 VERIFIED] All active Co-DETR target and loss patches confirmed active!", flush=True)
     except Exception as e:
         print(f"[{time.strftime('%H:%M:%S')}] [FP16 VERIFICATION ERROR] Active head verification failed: {e}", flush=True)

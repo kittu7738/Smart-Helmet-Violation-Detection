@@ -414,3 +414,108 @@ def test_codino_loss_single_aux_signature_and_fp16_safe():
     assert out_iou == 3.0
 
 
+def test_regression_quality_focal_loss_half_float_indexed_assignment():
+    """Regression test for QualityFocalLoss FP16 indexed assignment failure:
+    In PyTorch 1.11, when pred is Half (FP16) and quality score is Float (FP32),
+    unpatched quality_focal_loss has:
+        loss = F.binary_cross_entropy_with_logits(pred, zerolabel) * scale_factor.pow(beta)  # Half
+        pos_bce = F.binary_cross_entropy_with_logits(pred[pos, pos_label], score[pos]) * scale_factor.abs().pow(beta)  # Float
+        loss[pos, pos_label] = pos_bce  # RuntimeError: Index put requires source and destination dtypes match
+
+    Verifies:
+      1. Unpatched logic fails with RuntimeError: Index put requires the source and destination dtypes match
+      2. The safe wrapper / FP32 promotion executes cleanly, produces finite loss and finite gradients,
+         and avoids the index put error.
+    """
+    torch = pytest.importorskip("torch")
+    import torch.nn.functional as F
+
+    def unpatched_quality_focal_loss(pred, target, beta=2.0):
+        label, score = target
+        pred_sigmoid = pred.sigmoid()
+        scale_factor = pred_sigmoid
+        zerolabel = scale_factor.new_zeros(pred.shape)
+        loss = F.binary_cross_entropy_with_logits(
+            pred, zerolabel, reduction='none') * scale_factor.pow(beta)
+
+        bg_class_ind = pred.size(1)
+        pos = ((label >= 0) & (label < bg_class_ind)).nonzero().squeeze(1)
+        pos_label = label[pos].long()
+        scale_factor_pos = score[pos] - pred_sigmoid[pos, pos_label]
+        # When score is Float32, F.binary_cross_entropy_with_logits returns Float32
+        pos_bce = F.binary_cross_entropy_with_logits(
+            pred[pos, pos_label], score[pos],
+            reduction='none') * scale_factor_pos.abs().pow(beta)
+        # Assignment into Half loss tensor raises RuntimeError
+        loss[pos, pos_label] = pos_bce
+        return loss.sum(dim=1)
+
+    pred_half = torch.randn(4, 7, dtype=torch.float16, requires_grad=True)
+    label = torch.tensor([0, 1, 7, 2], dtype=torch.long)
+    score_float = torch.tensor([0.85, 0.92, 0.0, 0.74], dtype=torch.float32)
+
+    # 1. Verify unpatched raises RuntimeError
+    with pytest.raises(RuntimeError, match=r"Index put requires the source and destination dtypes match"):
+        unpatched_quality_focal_loss(pred_half, (label, score_float))
+
+    # 2. Verify patched FP16 safe execution
+    def patched_quality_focal_loss(pred, target, beta=2.0):
+        if pred.dtype == torch.float16:
+            pred = pred.float()
+        label, score = target
+        if isinstance(score, torch.Tensor) and score.dtype == torch.float16:
+            score = score.float()
+
+        pred_sigmoid = pred.sigmoid()
+        scale_factor = pred_sigmoid
+        zerolabel = scale_factor.new_zeros(pred.shape)
+        loss = F.binary_cross_entropy_with_logits(
+            pred, zerolabel, reduction='none') * scale_factor.pow(beta)
+
+        bg_class_ind = pred.size(1)
+        pos = ((label >= 0) & (label < bg_class_ind)).nonzero().squeeze(1)
+        pos_label = label[pos].long()
+        scale_factor_pos = score[pos] - pred_sigmoid[pos, pos_label]
+        pos_bce = F.binary_cross_entropy_with_logits(
+            pred[pos, pos_label], score[pos],
+            reduction='none') * scale_factor_pos.abs().pow(beta)
+        loss[pos, pos_label] = pos_bce.to(loss.dtype)
+        return loss.sum(dim=1)
+
+    loss = patched_quality_focal_loss(pred_half, (label, score_float))
+    assert loss.dtype == torch.float32
+    assert torch.isfinite(loss).all()
+
+    total_loss = loss.sum()
+    total_loss.backward()
+    assert pred_half.grad is not None
+    assert pred_half.grad.dtype == torch.float16
+    assert torch.isfinite(pred_half.grad).all()
+
+
+def test_ast_quality_focal_loss_indexed_assignment():
+    """Verify that mmdet/models/losses/gfocal_loss.py exists in Co-DETR and defines quality_focal_loss."""
+    candidates = [
+        os.path.join(REPO_ROOT, "..", "Co-DETR"),
+        os.path.join(os.path.expanduser("~"), ".gemini", "antigravity", "brain", "7c9511b1-7f08-46c8-823a-1f2262d15f3d", "scratch", "Co-DETR"),
+        "/content/Co-DETR"
+    ]
+    codetr_dir = None
+    for cand in candidates:
+        if os.path.isdir(cand):
+            codetr_dir = cand
+            break
+
+    if codetr_dir is None:
+        pytest.skip("Co-DETR repository clone not found in standard paths.")
+
+    gfocal_file = os.path.join(codetr_dir, "mmdet", "models", "losses", "gfocal_loss.py")
+    with open(gfocal_file) as f:
+        content = f.read()
+
+    assert "def quality_focal_loss(pred, target, beta=2.0):" in content
+    assert "class QualityFocalLoss(nn.Module):" in content
+    assert "loss[pos, pos_label] = F.binary_cross_entropy_with_logits(" in content
+
+
+
