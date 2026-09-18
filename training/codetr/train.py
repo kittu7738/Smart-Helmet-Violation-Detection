@@ -1763,7 +1763,66 @@ def patch_codetr_fp16_target_assignment():
     except Exception as e:
         print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] inverse_sigmoid patch skipped: {e}", flush=True)
 
-    # 10. Explicit Verification of Active Methods on Active Classes
+    # 10. Patch NMS & SoftNMS for FP16 evaluation compatibility
+    try:
+        import mmcv.ops.nms as nms_mod
+        if hasattr(nms_mod, 'soft_nms'):
+            orig_soft_nms = nms_mod.soft_nms
+            def soft_nms_fp16_safe(boxes, scores, *args, **kwargs):
+                if hasattr(boxes, 'dtype') and boxes.dtype == torch.float16:
+                    boxes = boxes.float()
+                if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
+                    scores = scores.float()
+                return orig_soft_nms(boxes, scores, *args, **kwargs)
+            nms_mod.soft_nms = soft_nms_fp16_safe
+
+        if hasattr(nms_mod, 'nms'):
+            orig_nms = nms_mod.nms
+            def nms_fp16_safe(boxes, scores, *args, **kwargs):
+                if hasattr(boxes, 'dtype') and boxes.dtype == torch.float16:
+                    boxes = boxes.float()
+                if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
+                    scores = scores.float()
+                return orig_nms(boxes, scores, *args, **kwargs)
+            nms_mod.nms = nms_fp16_safe
+
+        if hasattr(nms_mod, 'batched_nms'):
+            orig_batched_nms = nms_mod.batched_nms
+            def batched_nms_fp16_safe(boxes, scores, idxs, nms_cfg, class_agnostic=False):
+                if hasattr(boxes, 'dtype') and boxes.dtype == torch.float16:
+                    boxes = boxes.float()
+                if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
+                    scores = scores.float()
+                return orig_batched_nms(boxes, scores, idxs, nms_cfg, class_agnostic=class_agnostic)
+            nms_mod.batched_nms = batched_nms_fp16_safe
+
+        if hasattr(nms_mod, 'SoftNMSop'):
+            orig_soft_nms_op_fwd = nms_mod.SoftNMSop.forward
+            @staticmethod
+            def soft_nms_op_fwd_safe(ctx, boxes, scores, *args, **kwargs):
+                if hasattr(boxes, 'dtype') and boxes.dtype == torch.float16:
+                    boxes = boxes.float()
+                if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
+                    scores = scores.float()
+                return orig_soft_nms_op_fwd(ctx, boxes, scores, *args, **kwargs)
+            nms_mod.SoftNMSop.forward = soft_nms_op_fwd_safe
+
+        if hasattr(nms_mod, 'NMSop'):
+            orig_nms_op_fwd = nms_mod.NMSop.forward
+            @staticmethod
+            def nms_op_fwd_safe(ctx, bboxes, scores, *args, **kwargs):
+                if hasattr(bboxes, 'dtype') and bboxes.dtype == torch.float16:
+                    bboxes = bboxes.float()
+                if hasattr(scores, 'dtype') and scores.dtype == torch.float16:
+                    scores = scores.float()
+                return orig_nms_op_fwd(ctx, bboxes, scores, *args, **kwargs)
+            nms_mod.NMSop.forward = nms_op_fwd_safe
+
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16] NMS & SoftNMS float32 evaluation patch applied", flush=True)
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] NMS patch skipped: {e}", flush=True)
+
+    # 11. Explicit Verification of Active Methods on Active Classes
     try:
         from projects.models.co_deformable_detr_head import CoDeformDETRHead
         from projects.models.co_dino_head import CoDINOHead
