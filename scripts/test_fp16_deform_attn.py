@@ -100,47 +100,10 @@ def test_deformable_attention_fp16():
 
     # 3. Apply and test the robust patch
     print("\n[Step 3] Applying FP16 auto-cast wrapper for MultiScaleDeformableAttention...")
-    from mmcv.ops.multi_scale_deform_attn import MultiScaleDeformAttnFunction
-
-    orig_forward = MultiScaleDeformAttnFunction.forward
-    orig_backward = MultiScaleDeformAttnFunction.backward
-
-    @staticmethod
-    def patched_forward(ctx, value, spatial_shapes, level_start_index,
-                        sampling_locations, attention_weights, im2col_step):
-        ctx.spatial_shapes = spatial_shapes
-        ctx.level_start_index = level_start_index
-        ctx.im2col_step = im2col_step
-        is_half = (value.dtype == torch.float16)
-        ctx.is_half = is_half
-
-        if is_half:
-            value = value.float()
-            sampling_locations = sampling_locations.float()
-            attention_weights = attention_weights.float()
-
-        # Call original forward using float32
-        out = orig_forward(ctx, value, spatial_shapes, level_start_index,
-                           sampling_locations, attention_weights, im2col_step)
-        if is_half:
-            out = out.half()
-        return out
-
-    @staticmethod
-    def patched_backward(ctx, grad_output):
-        is_half = getattr(ctx, 'is_half', False)
-        if is_half and grad_output.dtype == torch.float16:
-            grad_output = grad_output.float()
-
-        grads = orig_backward(ctx, grad_output)
-        if is_half:
-            grads = tuple(g.half() if (g is not None and torch.is_tensor(g) and g.is_floating_point()) else g for g in grads)
-        return grads
-
-    MultiScaleDeformAttnFunction.forward = patched_forward
-    MultiScaleDeformAttnFunction.backward = patched_backward
-
-    print("  -> Patch applied to MultiScaleDeformAttnFunction.")
+    from training.codetr.train import install_deformable_attention_fp16_bridge
+    bridge_ok = install_deformable_attention_fp16_bridge()
+    assert bridge_ok, "Failed to install deformable attention FP16 bridge!"
+    print("  -> Patch applied to MultiScaleDeformableAttnFunction via training.codetr.train.")
 
     # 4. Verify patched FP16 forward and backward
     print("\n[Step 4] Verifying patched FP16 forward and backward pass...")

@@ -799,6 +799,82 @@ class TrainingDiagnosticComplete(Exception):
         super().__init__("Training diagnostic iteration 1 completed successfully.")
 
 
+def install_deformable_attention_fp16_bridge():
+    """Install FP16 compatibility bridge for MMCV's MultiScaleDeformableAttnFunction.
+
+    Allows the surrounding Co-DETR model to train in mixed precision (FP16/AMP)
+    while the custom CUDA deformable attention kernel (which only supports float32/float64)
+    executes safely in float32.
+    """
+    try:
+        import torch
+        import mmcv.ops.multi_scale_deform_attn as msda_mod
+        from mmcv.cnn.bricks.registry import ATTENTION
+
+        # Use the exact MMCV 1.5.0 symbol: MultiScaleDeformableAttnFunction
+        func_cls = getattr(msda_mod, 'MultiScaleDeformableAttnFunction', None)
+        if func_cls is None:
+            func_cls = getattr(msda_mod, 'MultiScaleDeformAttnFunction', None)
+
+        if func_cls is None:
+            print(f"[{time.strftime('%H:%M:%S')}] [FP16 WARNING] Could not locate MultiScaleDeformableAttnFunction in mmcv.ops.multi_scale_deform_attn", flush=True)
+            return False
+
+        if getattr(func_cls, '_fp16_patched', False):
+            return True
+
+        orig_forward = func_cls.forward
+        orig_backward = func_cls.backward
+
+        @staticmethod
+        def _fp16_safe_forward(ctx, value, spatial_shapes, level_start_index,
+                               sampling_locations, attention_weights, im2col_step):
+            ctx.spatial_shapes = spatial_shapes
+            ctx.level_start_index = level_start_index
+            ctx.im2col_step = im2col_step
+            is_half = (value.dtype == torch.float16)
+            ctx.is_half = is_half
+
+            if is_half:
+                value = value.float()
+                sampling_locations = sampling_locations.float()
+                attention_weights = attention_weights.float()
+
+            out = orig_forward(ctx, value, spatial_shapes, level_start_index,
+                               sampling_locations, attention_weights, im2col_step)
+            if is_half:
+                out = out.half()
+            return out
+
+        @staticmethod
+        def _fp16_safe_backward(ctx, grad_output):
+            is_half = getattr(ctx, 'is_half', False)
+            if is_half and grad_output.dtype == torch.float16:
+                grad_output = grad_output.float()
+
+            grads = orig_backward(ctx, grad_output)
+            if is_half:
+                grads = tuple(
+                    g.half() if (g is not None and torch.is_tensor(g) and g.is_floating_point()) else g
+                    for g in grads
+                )
+            return grads
+
+        func_cls.forward = _fp16_safe_forward
+        func_cls.backward = _fp16_safe_backward
+        func_cls._fp16_patched = True
+
+        attn_cls = getattr(msda_mod, 'MultiScaleDeformableAttention', None)
+        if attn_cls is not None and 'MultiScaleDeformAttn' not in ATTENTION:
+            ATTENTION.register_module(name='MultiScaleDeformAttn', module=attn_cls)
+
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16] MultiScaleDeformableAttnFunction FP32 kernel bridge installed", flush=True)
+        return True
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16 WARNING] Failed to install MultiScaleDeformableAttnFunction bridge: {e}", flush=True)
+        return False
+
+
 def main():
     t_start = time.time()
     args = _parse_args()
@@ -826,51 +902,8 @@ def main():
         except ImportError:
             pass
 
-        # Patch: Register mmcv's MultiScaleDeformableAttention as MultiScaleDeformAttn
-        # and ensure MultiScaleDeformAttnFunction safely executes under FP16 (Half) precision.
-        try:
-            import torch
-            from mmcv.cnn.bricks.registry import ATTENTION
-            from mmcv.ops.multi_scale_deform_attn import MultiScaleDeformableAttention, MultiScaleDeformAttnFunction
-
-            orig_forward = MultiScaleDeformAttnFunction.forward
-            orig_backward = MultiScaleDeformAttnFunction.backward
-
-            @staticmethod
-            def _fp16_safe_forward(ctx, value, spatial_shapes, level_start_index,
-                                   sampling_locations, attention_weights, im2col_step):
-                ctx.spatial_shapes = spatial_shapes
-                ctx.level_start_index = level_start_index
-                ctx.im2col_step = im2col_step
-                is_half = (value.dtype == torch.float16)
-                ctx.is_half = is_half
-                if is_half:
-                    value = value.float()
-                    sampling_locations = sampling_locations.float()
-                    attention_weights = attention_weights.float()
-                out = orig_forward(ctx, value, spatial_shapes, level_start_index,
-                                   sampling_locations, attention_weights, im2col_step)
-                if is_half:
-                    out = out.half()
-                return out
-
-            @staticmethod
-            def _fp16_safe_backward(ctx, grad_output):
-                is_half = getattr(ctx, 'is_half', False)
-                if is_half and grad_output.dtype == torch.float16:
-                    grad_output = grad_output.float()
-                grads = orig_backward(ctx, grad_output)
-                if is_half:
-                    grads = tuple(g.half() if (g is not None and torch.is_tensor(g) and g.is_floating_point()) else g for g in grads)
-                return grads
-
-            MultiScaleDeformAttnFunction.forward = _fp16_safe_forward
-            MultiScaleDeformAttnFunction.backward = _fp16_safe_backward
-
-            if 'MultiScaleDeformAttn' not in ATTENTION:
-                ATTENTION.register_module(name='MultiScaleDeformAttn', module=MultiScaleDeformableAttention)
-        except Exception:
-            pass
+        # Install FP16 compatibility bridge and register MultiScaleDeformAttn
+        install_deformable_attention_fp16_bridge()
 
         from mmcv.runner.hooks import HOOKS, Hook
         if 'StartupLivenessHook' not in HOOKS:
