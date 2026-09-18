@@ -8,11 +8,9 @@ fp16 = dict(loss_scale=dict(init_scale=512.0))
 # 1. cuDNN autotuning for fixed 640x384 resolution (optimal Tensor Core convolution kernels)
 cudnn_benchmark = True
 
-# 2. TF32 mode: T4 (Turing) supports TF32 for both matmul and cuDNN convolutions.
-#    Gives ~3-4x speedup on GEMM with 10-bit mantissa (vs 23-bit FP32), safe with FP16 AMP.
-#    Enabled by train.py at startup when this flag is set True.
-enable_tf32 = True
-
+# 2. TF32: handled in train.py via compute-capability check.
+#    TF32 requires Ampere (cc≥8.0). Tesla T4 is Turing (cc7.5) — flag is a no-op on T4.
+#    Left here as a comment so the log message in train.py is self-documenting.
 # 3. High-throughput DataLoader: 4 worker processes, persistent workers, pinned memory, prefetching
 data = dict(
     samples_per_gpu=4,

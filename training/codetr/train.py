@@ -2120,7 +2120,7 @@ def main():
                         print(f"  Images/sec           : {img_sec:.2f}")
                         print(f"  Batch size           : {samples}")
                         
-                        # Safest parser: read the full merged config text from runner.meta
+                        # Parse config text for architecture metadata
                         input_res = "N/A"
                         num_query = "N/A"
                         decoder_depth = "N/A"
@@ -2134,36 +2134,62 @@ def main():
                             config_path = next((arg for arg in sys.argv if arg.endswith('.py') and 'configs/' in arg), "")
                             if "exp_" in config_path:
                                 exp_name = os.path.basename(config_path).replace('.py', '')
-                            
+
                             cfg_text = getattr(runner, 'meta', {}).get('cfg_text', '')
                             if not cfg_text and hasattr(runner, 'model') and hasattr(runner.model, 'cfg'):
                                 cfg_text = runner.model.cfg.pretty_text if hasattr(runner.model.cfg, 'pretty_text') else str(runner.model.cfg)
-                                
+
                             if cfg_text:
                                 res_match = re.search(r"image_size\s*=\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)", cfg_text)
                                 if res_match:
                                     input_res = f"{res_match.group(1)}x{res_match.group(2)}"
-                                
+
                                 q_match = re.search(r"num_query\s*=\s*(\d+)", cfg_text)
                                 if q_match:
                                     num_query = q_match.group(1)
-                                    
+
                                 d_match = re.search(r"decoder=dict\([^)]*num_layers\s*=\s*(\d+)", cfg_text)
                                 if d_match:
                                     decoder_depth = d_match.group(1)
-                                    
+
                                 f_match = re.search(r"frozen_stages\s*=\s*(\d+)", cfg_text)
                                 if f_match:
                                     bb_frozen = f_match.group(1)
-                                    
+
                                 w_match = re.search(r"out_channels\s*=\s*(\d+)", cfg_text)
                                 if w_match:
                                     width = w_match.group(1)
-                                    
-                                if "fp16" in cfg_text.lower() and "loss_scale" in cfg_text.lower():
-                                    is_fp16 = "FP16 (Enabled)"
+
                         except Exception as e:
                             exp_name = f"Parse Error: {str(e)}"
+
+                        # Detect actual precision from runner state (authoritative).
+                        # Priority: (1) Fp16OptimizerHook present on runner, (2) cfg.fp16 key set,
+                        # (3) model parameter dtype. NOT from cfg_text which may be empty.
+                        try:
+                            _fp16_hook_present = any(
+                                h.__class__.__name__ in ('Fp16OptimizerHook', 'GradScaler')
+                                for h in getattr(runner, 'hooks', [])
+                            )
+                            _cfg_fp16 = bool(getattr(getattr(runner, 'model', None), 'cfg', None) and
+                                             runner.model.cfg.get('fp16', None))
+                            _model_half = False
+                            if hasattr(runner, 'model'):
+                                for _p in runner.model.parameters():
+                                    if _p.dtype == torch.float16:
+                                        _model_half = True
+                                    break  # only check first param
+
+                            if _fp16_hook_present:
+                                is_fp16 = "FP16/AMP (Fp16OptimizerHook active)"
+                            elif _cfg_fp16:
+                                is_fp16 = "FP16/AMP (cfg.fp16 set)"
+                            elif _model_half:
+                                is_fp16 = "FP16 (model params are float16)"
+                            else:
+                                is_fp16 = "FP32 (no FP16 hook or half params detected)"
+                        except Exception:
+                            pass  # keep existing is_fp16 value
                             
                         # Estimate epoch time dynamically from actual dataloader.
                         # avg_total is the correctly-computed per-step average (compute + data);
@@ -2345,16 +2371,21 @@ def main():
     cfg.seed = args.seed
     if cfg.get('cudnn_benchmark', False):
         torch.backends.cudnn.benchmark = True
-    # Enable TF32 on Turing/Ampere GPUs (T4 is Turing): matmul uses 10-bit mantissa instead of
-    # 23-bit, giving ~3-4x speedup on GEMM operations with negligible precision impact alongside FP16.
-    # cuDNN TF32 covers convolutions; matmul TF32 covers linear/attention projections.
-    # Both are safe with FP16 AMP and do NOT change the training objective.
+    # TF32: only effective on Ampere (cc≥8.0) and newer. Turing (T4 = cc 7.5) silently ignores
+    # the flags, so we gate on compute capability to avoid false log messages.
     try:
-        torch.backends.cuda.matmul.allow_tf32 = True
-        torch.backends.cudnn.allow_tf32 = True
-        print(f"[{time.strftime('%H:%M:%S')}] [OPT] TF32 enabled: matmul.allow_tf32=True, cudnn.allow_tf32=True", flush=True)
+        if torch.cuda.is_available():
+            _cc = torch.cuda.get_device_capability(0)  # (major, minor)
+            if _cc[0] >= 8:
+                torch.backends.cuda.matmul.allow_tf32 = True
+                torch.backends.cudnn.allow_tf32 = True
+                print(f"[{time.strftime('%H:%M:%S')}] [OPT] TF32 enabled (GPU cc={_cc[0]}.{_cc[1]} >= 8.0): "
+                      f"matmul.allow_tf32=True, cudnn.allow_tf32=True", flush=True)
+            else:
+                print(f"[{time.strftime('%H:%M:%S')}] [OPT] TF32 skipped: GPU cc={_cc[0]}.{_cc[1]} < 8.0 "
+                      f"(TF32 requires Ampere/cc≥8.0, e.g. A100; T4 is Turing/cc7.5)", flush=True)
     except AttributeError:
-        pass  # PyTorch < 1.7 or no CUDA: silently skip
+        pass  # PyTorch < 1.7: no TF32 flags at all
     stage_marker(4, 8, "Completed: GPU & environment verified", dev_info, elapsed=time.time() - t_stage)
 
     # ── Stage 5/8: Build Dataset(s) ───────────────────────────────────────────
