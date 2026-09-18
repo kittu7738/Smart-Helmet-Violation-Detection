@@ -284,26 +284,33 @@ def verify_dataset_paths(data_root, target_split="test"):
         folder = "vaid" if name == "val" else name
         alt_folder = "val" if name == "val" else name
 
-        # Candidate annotation paths
+        # Candidate annotation paths (prioritize standard COCO annotations/ and flat)
         ann_candidates = [
+            os.path.join(data_root, "annotations", f"instances_{name}.json"),
+            os.path.join(data_root, f"instances_{name}.json"),
             os.path.join(data_root, folder, f"instances_{name}.json"),
             os.path.join(data_root, alt_folder, f"instances_{name}.json"),
-            os.path.join(data_root, f"instances_{name}.json"),
-            os.path.join(data_root, "annotations", f"instances_{name}.json"),
+            os.path.join(data_root, "annotations", f"{name}.json"),
+            os.path.join(data_root, f"{name}.json"),
         ]
 
         # Candidate image directories
         img_candidates = [
-            os.path.join(data_root, folder, "images"),
+            os.path.join(data_root, "images") if name == "train" else os.path.join(data_root, folder, "images"),
+            os.path.join(data_root, folder, "images") if name == "train" else os.path.join(data_root, "images"),
             os.path.join(data_root, alt_folder, "images"),
             os.path.join(data_root, folder),
             os.path.join(data_root, alt_folder),
-            os.path.join(data_root, "images"),
+            os.path.join(data_root, "images", folder),
         ]
+
+        # Deduplicate while preserving order
+        ann_candidates = list(dict.fromkeys(ann_candidates))
+        img_candidates = list(dict.fromkeys(img_candidates))
 
         resolved_ann = None
         for ac in ann_candidates:
-            if os.path.isfile(ac):
+            if os.path.exists(ac) and not os.path.isdir(ac):
                 resolved_ann = ac
                 break
 

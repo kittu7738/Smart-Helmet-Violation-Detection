@@ -116,3 +116,58 @@ def test_validate_and_patch_auto_discover_val(tmp_path):
 
     assert cfg.data.train.ann_file == str(combined_root / "annotations" / "instances_train.json")
     assert cfg.data.val.ann_file == str(cand_root / "instances_val.json")
+
+
+def test_discover_split_paths_all_layouts(tmp_path):
+    module = runpy.run_path(TRAIN_PY_PATH)
+    discover_func = module["_discover_split_paths"]
+
+    # Layout 1: COCO layout (annotations/instances_train.json + images/)
+    coco_root = tmp_path / "coco_layout"
+    os.makedirs(coco_root / "annotations", exist_ok=True)
+    os.makedirs(coco_root / "images", exist_ok=True)
+    with open(coco_root / "annotations" / "instances_train.json", "w") as f:
+        json.dump({"images": [{"id": 1}], "annotations": [{"id": 1}]}, f)
+
+    res1 = discover_func(str(coco_root), "train")
+    assert res1["valid"] is True
+    assert res1["ann_path"] == str(coco_root / "annotations" / "instances_train.json")
+    assert res1["img_path"] == str(coco_root / "images")
+
+    # Layout 2: Flat layout (instances_train.json + images/)
+    flat_root = tmp_path / "flat_layout"
+    os.makedirs(flat_root / "images", exist_ok=True)
+    with open(flat_root / "instances_train.json", "w") as f:
+        json.dump({"images": [{"id": 1}], "annotations": [{"id": 1}]}, f)
+
+    res2 = discover_func(str(flat_root), "train")
+    assert res2["valid"] is True
+    assert res2["ann_path"] == str(flat_root / "instances_train.json")
+    assert res2["img_path"] == str(flat_root / "images")
+
+    # Layout 3: Nested layout (train/instances_train.json + train/images/)
+    nested_root = tmp_path / "nested_layout"
+    os.makedirs(nested_root / "train" / "images", exist_ok=True)
+    with open(nested_root / "train" / "instances_train.json", "w") as f:
+        json.dump({"images": [{"id": 1}], "annotations": [{"id": 1}]}, f)
+
+    res3 = discover_func(str(nested_root), "train")
+    assert res3["valid"] is True
+    assert res3["ann_path"] == str(nested_root / "train" / "instances_train.json")
+    assert res3["img_path"] == str(nested_root / "train" / "images")
+
+
+def test_discover_split_paths_val_vaid_images(tmp_path):
+    module = runpy.run_path(TRAIN_PY_PATH)
+    discover_func = module["_discover_split_paths"]
+
+    # Original val format: instances_val.json + vaid/images/
+    val_root = tmp_path / "val_orig"
+    os.makedirs(val_root / "vaid" / "images", exist_ok=True)
+    with open(val_root / "instances_val.json", "w") as f:
+        json.dump({"images": [{"id": 1}], "annotations": [{"id": 1}]}, f)
+
+    res = discover_func(str(val_root), "val")
+    assert res["valid"] is True
+    assert res["ann_path"] == str(val_root / "instances_val.json")
+    assert res["img_path"] == str(val_root / "vaid" / "images")

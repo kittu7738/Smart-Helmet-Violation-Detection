@@ -54,24 +54,30 @@ def find_split_files(data_root, split_name):
     alt_folder = "val" if split_name == "val" else split_name
 
     ann_candidates = [
+        os.path.join(data_root, "annotations", f"instances_{split_name}.json"),
+        os.path.join(data_root, f"instances_{split_name}.json"),
         os.path.join(data_root, folder, f"instances_{split_name}.json"),
         os.path.join(data_root, alt_folder, f"instances_{split_name}.json"),
-        os.path.join(data_root, f"instances_{split_name}.json"),
-        os.path.join(data_root, "annotations", f"instances_{split_name}.json"),
+        os.path.join(data_root, "annotations", f"{split_name}.json"),
+        os.path.join(data_root, f"{split_name}.json"),
     ]
 
     img_candidates = [
-        os.path.join(data_root, folder, "images"),
+        os.path.join(data_root, "images") if split_name == "train" else os.path.join(data_root, folder, "images"),
+        os.path.join(data_root, folder, "images") if split_name == "train" else os.path.join(data_root, "images"),
         os.path.join(data_root, alt_folder, "images"),
         os.path.join(data_root, folder),
         os.path.join(data_root, alt_folder),
         os.path.join(data_root, "images", folder),
-        os.path.join(data_root, "images"),
     ]
+
+    # Deduplicate while preserving order
+    ann_candidates = list(dict.fromkeys(ann_candidates))
+    img_candidates = list(dict.fromkeys(img_candidates))
 
     resolved_ann = None
     for ac in ann_candidates:
-        if os.path.isfile(ac):
+        if os.path.exists(ac) and not os.path.isdir(ac):
             resolved_ann = ac
             break
 

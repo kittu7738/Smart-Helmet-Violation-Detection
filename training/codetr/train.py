@@ -251,6 +251,98 @@ def _resolve_work_dir(args):
     )
 
 
+def _discover_split_paths(data_dir: str, split_name: str) -> dict:
+    """
+    Discover annotation file and image directory for a split under data_dir.
+    Robustly supports:
+      1. COCO layout: annotations/instances_{split}.json + images/
+      2. Flat layout: instances_{split}.json + images/ or {split}/images/
+      3. Nested layout: {split}/instances_{split}.json + {split}/images/ (or vaid/ for val)
+    """
+    if not data_dir:
+        return {
+            "valid": False,
+            "ann_path": "",
+            "img_path": "",
+            "ann_exists": False,
+            "img_exists": False,
+            "num_images": 0,
+            "num_annotations": 0,
+            "ann_candidates": [],
+            "img_candidates": [],
+        }
+
+    data_dir = os.path.abspath(os.path.expanduser(str(data_dir).strip()))
+    primary_folder = "vaid" if split_name == "val" else split_name
+    alt_folder = "val" if split_name == "val" else split_name
+
+    ann_candidates = [
+        # 1. Standard COCO layout: annotations/instances_{split}.json
+        os.path.join(data_dir, "annotations", f"instances_{split_name}.json"),
+        # 2. Flat layout: instances_{split}.json
+        os.path.join(data_dir, f"instances_{split_name}.json"),
+        # 3. Nested layout: {folder}/instances_{split}.json (e.g. vaid/instances_val.json)
+        os.path.join(data_dir, primary_folder, f"instances_{split_name}.json"),
+        os.path.join(data_dir, alt_folder, f"instances_{split_name}.json"),
+        # 4. Fallbacks: annotations/{split}.json, {split}.json
+        os.path.join(data_dir, "annotations", f"{split_name}.json"),
+        os.path.join(data_dir, f"{split_name}.json"),
+        os.path.join(data_dir, primary_folder, f"{split_name}.json"),
+    ]
+
+    img_candidates = [
+        # For val, prioritize primary_folder (vaid/images/); for train, prioritize top-level images/
+        os.path.join(data_dir, "images") if split_name == "train" else os.path.join(data_dir, primary_folder, "images"),
+        os.path.join(data_dir, primary_folder, "images") if split_name == "train" else os.path.join(data_dir, "images"),
+        os.path.join(data_dir, alt_folder, "images"),
+        os.path.join(data_dir, primary_folder),
+        os.path.join(data_dir, alt_folder),
+        os.path.join(data_dir, "images", primary_folder),
+        os.path.join(data_dir, "images", alt_folder),
+    ]
+
+    # Deduplicate while preserving order
+    ann_candidates = list(dict.fromkeys(ann_candidates))
+    img_candidates = list(dict.fromkeys(img_candidates))
+
+    resolved_ann = None
+    for ac in ann_candidates:
+        if os.path.exists(ac) and not os.path.isdir(ac):
+            resolved_ann = ac
+            break
+
+    resolved_img = None
+    for ic in img_candidates:
+        if os.path.isdir(ic):
+            resolved_img = ic
+            break
+
+    num_imgs = 0
+    num_anns = 0
+    if resolved_ann:
+        try:
+            import json
+            with open(resolved_ann, "r") as f:
+                meta = json.load(f)
+                num_imgs = len(meta.get("images", []))
+                num_anns = len(meta.get("annotations", []))
+        except Exception:
+            pass
+
+    valid = (resolved_ann is not None) and (resolved_img is not None)
+    return {
+        "valid": valid,
+        "ann_path": resolved_ann or ann_candidates[0],
+        "img_path": resolved_img or img_candidates[0],
+        "ann_exists": resolved_ann is not None,
+        "img_exists": resolved_img is not None,
+        "num_images": num_imgs,
+        "num_annotations": num_anns,
+        "ann_candidates": ann_candidates,
+        "img_candidates": img_candidates,
+    }
+
+
 def _validate_and_patch_data_root(cfg, data_root, val_data_root=None, no_validate=False):
     """
     Verify dataset paths for train and val splits (supporting flat, nested, and COCO layouts)
@@ -260,19 +352,20 @@ def _validate_and_patch_data_root(cfg, data_root, val_data_root=None, no_validat
     from --val-data-root, existing config paths, or standard candidate locations to keep the
     original validation set intact and separate.
     """
-    from evaluation.codetr.evaluate import verify_dataset_paths
-    ok, report = verify_dataset_paths(data_root)
-
     # 1. Train split
     if hasattr(cfg.data, "train"):
-        sinfo = report.get("train", {})
+        sinfo = _discover_split_paths(data_root, "train")
         if not sinfo.get("valid", False):
+            checked_anns = "\n    ".join(sinfo.get("ann_candidates", [])[:4])
+            checked_imgs = "\n    ".join(sinfo.get("img_candidates", [])[:4])
             raise FileNotFoundError(
                 f"Required dataset split 'train' is invalid or missing under {data_root}.\n"
                 f"Annotation exists: {sinfo.get('ann_exists')} ({sinfo.get('ann_path')})\n"
                 f"Image dir exists: {sinfo.get('img_exists')} ({sinfo.get('img_path')})\n"
-                "Ensure data_root contains instances_train.json, train/instances_train.json, "
-                "or annotations/instances_train.json with an images/ or train/images/ directory."
+                f"Checked annotation locations:\n    {checked_anns}\n"
+                f"Checked image locations:\n    {checked_imgs}\n"
+                "Ensure data_root contains instances_train.json, annotations/instances_train.json, "
+                "or train/instances_train.json with an images/ or train/images/ directory."
             )
         split_cfg = cfg.data.train
         if sinfo.get("ann_exists"):
@@ -290,7 +383,7 @@ def _validate_and_patch_data_root(cfg, data_root, val_data_root=None, no_validat
     # 2. Val split
     if hasattr(cfg.data, "val"):
         val_configured = False
-        val_sinfo = report.get("val", {})
+        val_sinfo = _discover_split_paths(data_root, "val")
 
         # (a) Check if val exists under data_root
         if val_sinfo.get("valid", False):
@@ -307,8 +400,7 @@ def _validate_and_patch_data_root(cfg, data_root, val_data_root=None, no_validat
 
         # (b) Check if explicitly passed val_data_root has val
         elif val_data_root:
-            _, v_report = verify_dataset_paths(val_data_root, target_split="val")
-            v_sinfo = v_report.get("val", {})
+            v_sinfo = _discover_split_paths(val_data_root, "val")
             if v_sinfo.get("valid", False):
                 cfg.data.val.ann_file = v_sinfo["ann_path"]
                 img_p = v_sinfo["img_path"]
@@ -343,17 +435,16 @@ def _validate_and_patch_data_root(cfg, data_root, val_data_root=None, no_validat
         # (d) Auto-discover original validation dataset from standard locations
         if not val_configured:
             candidate_val_roots = [
-                "/content/dataset_local",
                 "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/data",
                 "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/data/coco",
                 "/content/drive/MyDrive/helmet_dataset/coco",
+                "/content/dataset_local",
                 "data/coco",
                 "data",
             ]
             for cand in candidate_val_roots:
                 if os.path.isdir(cand):
-                    _, cand_report = verify_dataset_paths(cand, target_split="val")
-                    c_sinfo = cand_report.get("val", {})
+                    c_sinfo = _discover_split_paths(cand, "val")
                     if c_sinfo.get("valid", False):
                         cfg.data.val.ann_file = c_sinfo["ann_path"]
                         img_p = c_sinfo["img_path"]
@@ -387,7 +478,7 @@ def _validate_and_patch_data_root(cfg, data_root, val_data_root=None, no_validat
 
     # 3. Test split (only patch if test is found under data_root, otherwise preserve untouched)
     if hasattr(cfg.data, "test"):
-        test_sinfo = report.get("test", {})
+        test_sinfo = _discover_split_paths(data_root, "test")
         if test_sinfo.get("valid", False):
             cfg.data.test.ann_file = test_sinfo["ann_path"]
             img_p = test_sinfo["img_path"]
@@ -459,12 +550,13 @@ def stage_dataset_if_needed(data_root, stage_dir="/content/dataset_local", enabl
     
     # Fast-path check: Is stage_dir already staged with images and annotations?
     if os.path.abspath(data_root) != stage_dir:
+        train_ann_coco = os.path.join(stage_dir, "annotations", "instances_train.json")
         train_ann_flat = os.path.join(stage_dir, "instances_train.json")
         train_ann_nested = os.path.join(stage_dir, "train", "instances_train.json")
         train_img_flat = os.path.join(stage_dir, "train", "images")
         train_img_direct = os.path.join(stage_dir, "images")
         
-        has_ann = os.path.isfile(train_ann_flat) or os.path.isfile(train_ann_nested)
+        has_ann = os.path.isfile(train_ann_flat) or os.path.isfile(train_ann_coco) or os.path.isfile(train_ann_nested)
         img_dir = train_img_flat if os.path.isdir(train_img_flat) else (train_img_direct if os.path.isdir(train_img_direct) else None)
         if has_ann and img_dir and len(os.listdir(img_dir)) >= 300:
             print(f"[{time.strftime('%H:%M:%S')}] [INFO] Dataset already staged and verified at: {stage_dir} (skipping re-copy)", flush=True)
@@ -497,7 +589,9 @@ def stage_dataset_if_needed(data_root, stage_dir="/content/dataset_local", enabl
         os.path.join(data_root, "dataset")
     ]:
         if os.path.isdir(os.path.join(candidate, "train", "images")) or \
+           os.path.isdir(os.path.join(candidate, "images")) or \
            os.path.isfile(os.path.join(candidate, "instances_train.json")) or \
+           os.path.isfile(os.path.join(candidate, "annotations", "instances_train.json")) or \
            os.path.isfile(os.path.join(candidate, "train", "instances_train.json")):
             actual_data_root = candidate
             break
@@ -511,10 +605,16 @@ def stage_dataset_if_needed(data_root, stage_dir="/content/dataset_local", enabl
                 c, s = _copy_tree_compat(src_sub, dst_sub)
                 copied_files += c
                 total_bytes += s
+
+    # 1b. Stage top-level images/ directory if present
+    if os.path.isdir(os.path.join(actual_data_root, "images")):
+        c, s = _copy_tree_compat(os.path.join(actual_data_root, "images"), os.path.join(stage_dir, "images"))
+        copied_files += c
+        total_bytes += s
                 
-    # 2. Stage COCO annotation JSON files (either flat in data_root or inside split dirs)
+    # 2. Stage COCO annotation JSON files (either flat in data_root or inside split/annotations dirs)
     for json_file in ["instances_train.json", "instances_val.json", "instances_test.json"]:
-        for base_dir in [actual_data_root, os.path.join(actual_data_root, "train"), os.path.join(actual_data_root, "vaid"), os.path.join(actual_data_root, "test")]:
+        for base_dir in [actual_data_root, os.path.join(actual_data_root, "annotations"), os.path.join(actual_data_root, "train"), os.path.join(actual_data_root, "vaid"), os.path.join(actual_data_root, "test")]:
             src_json = os.path.join(base_dir, json_file)
             if os.path.isfile(src_json):
                 # Calculate relative path to maintain structure
