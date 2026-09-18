@@ -827,10 +827,46 @@ def main():
             pass
 
         # Patch: Register mmcv's MultiScaleDeformableAttention as MultiScaleDeformAttn
-        # to match the config's expectations without duplicating code.
+        # and ensure MultiScaleDeformAttnFunction safely executes under FP16 (Half) precision.
         try:
+            import torch
             from mmcv.cnn.bricks.registry import ATTENTION
-            from mmcv.ops.multi_scale_deform_attn import MultiScaleDeformableAttention
+            from mmcv.ops.multi_scale_deform_attn import MultiScaleDeformableAttention, MultiScaleDeformAttnFunction
+
+            orig_forward = MultiScaleDeformAttnFunction.forward
+            orig_backward = MultiScaleDeformAttnFunction.backward
+
+            @staticmethod
+            def _fp16_safe_forward(ctx, value, spatial_shapes, level_start_index,
+                                   sampling_locations, attention_weights, im2col_step):
+                ctx.spatial_shapes = spatial_shapes
+                ctx.level_start_index = level_start_index
+                ctx.im2col_step = im2col_step
+                is_half = (value.dtype == torch.float16)
+                ctx.is_half = is_half
+                if is_half:
+                    value = value.float()
+                    sampling_locations = sampling_locations.float()
+                    attention_weights = attention_weights.float()
+                out = orig_forward(ctx, value, spatial_shapes, level_start_index,
+                                   sampling_locations, attention_weights, im2col_step)
+                if is_half:
+                    out = out.half()
+                return out
+
+            @staticmethod
+            def _fp16_safe_backward(ctx, grad_output):
+                is_half = getattr(ctx, 'is_half', False)
+                if is_half and grad_output.dtype == torch.float16:
+                    grad_output = grad_output.float()
+                grads = orig_backward(ctx, grad_output)
+                if is_half:
+                    grads = tuple(g.half() if (g is not None and torch.is_tensor(g) and g.is_floating_point()) else g for g in grads)
+                return grads
+
+            MultiScaleDeformAttnFunction.forward = _fp16_safe_forward
+            MultiScaleDeformAttnFunction.backward = _fp16_safe_backward
+
             if 'MultiScaleDeformAttn' not in ATTENTION:
                 ATTENTION.register_module(name='MultiScaleDeformAttn', module=MultiScaleDeformableAttention)
         except Exception:

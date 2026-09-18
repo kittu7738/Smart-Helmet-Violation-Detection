@@ -57,6 +57,3 @@ model = dict(
         )
     )
 )
-
-# Enable Dynamic FP16 mixed precision for Tesla T4 Turing Tensor Cores
-fp16 = dict(loss_scale='dynamic')
