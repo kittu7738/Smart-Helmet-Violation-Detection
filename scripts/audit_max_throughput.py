@@ -18,6 +18,13 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 if "/content/Co-DETR" not in sys.path:
     sys.path.insert(0, "/content/Co-DETR")
+if "/content/Co-DETR/projects" not in sys.path:
+    sys.path.insert(0, "/content/Co-DETR/projects")
+
+try:
+    import projects
+except ImportError:
+    pass
 
 from mmcv import Config
 from mmdet.datasets import build_dataset, build_dataloader
@@ -256,4 +263,9 @@ def main():
     print()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
