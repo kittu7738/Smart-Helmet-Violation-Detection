@@ -90,6 +90,30 @@ def test_dataset_paths_verification_nested(tmp_path):
     assert report["test"]["valid"] is True
 
 
+def test_dataset_paths_verification_coco_combined_train(tmp_path):
+    """Test verification on standard COCO layout with annotations/instances_train.json and images/."""
+    data_root = str(tmp_path / "combined_train")
+    os.makedirs(os.path.join(data_root, "images"), exist_ok=True)
+    os.makedirs(os.path.join(data_root, "annotations"), exist_ok=True)
+
+    dummy_combined_train = {
+        "images": [{"id": i} for i in range(3780)],
+        "annotations": [{"id": i, "category_id": i % 7} for i in range(16396)],
+        "categories": [{"id": i, "name": f"cat_{i}"} for i in range(7)]
+    }
+
+    with open(os.path.join(data_root, "annotations", "instances_train.json"), "w") as f:
+        json.dump(dummy_combined_train, f)
+
+    ok, report = verify_dataset_paths(data_root, target_split="train")
+    assert ok is True
+    assert report["train"]["num_images"] == 3780
+    assert report["train"]["num_annotations"] == 16396
+    assert report["train"]["valid"] is True
+    assert report["train"]["ann_path"] == os.path.join(data_root, "annotations", "instances_train.json")
+    assert report["train"]["img_path"] == os.path.join(data_root, "images")
+
+
 def test_parse_training_logs_text(tmp_path):
     log_file = tmp_path / "train_20260910.log"
     content = """

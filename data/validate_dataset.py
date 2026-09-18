@@ -66,6 +66,7 @@ def find_split_files(data_root, split_name):
         os.path.join(data_root, folder),
         os.path.join(data_root, alt_folder),
         os.path.join(data_root, "images", folder),
+        os.path.join(data_root, "images"),
     ]
 
     resolved_ann = None

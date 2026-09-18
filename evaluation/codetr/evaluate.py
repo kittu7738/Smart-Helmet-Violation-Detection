@@ -289,6 +289,7 @@ def verify_dataset_paths(data_root, target_split="test"):
             os.path.join(data_root, folder, f"instances_{name}.json"),
             os.path.join(data_root, alt_folder, f"instances_{name}.json"),
             os.path.join(data_root, f"instances_{name}.json"),
+            os.path.join(data_root, "annotations", f"instances_{name}.json"),
         ]
 
         # Candidate image directories
@@ -297,6 +298,7 @@ def verify_dataset_paths(data_root, target_split="test"):
             os.path.join(data_root, alt_folder, "images"),
             os.path.join(data_root, folder),
             os.path.join(data_root, alt_folder),
+            os.path.join(data_root, "images"),
         ]
 
         resolved_ann = None

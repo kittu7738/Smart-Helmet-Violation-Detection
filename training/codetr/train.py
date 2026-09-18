@@ -107,7 +107,13 @@ def _parse_args(args_list=None):
         help="Root of the COCO-format dataset. "
              "Overrides CODETR_DATA_ROOT env var. "
              "Must contain instances_train.json, instances_val.json, "
-             "train/images/ and vaid/images/ subdirectories.",
+             "train/images/ and vaid/images/ subdirectories, or annotations/ and images/.",
+    )
+    parser.add_argument(
+        "--val-data-root",
+        default=None,
+        help="Separate root directory for original validation dataset if not located under --data-root. "
+             "Overrides CODETR_VAL_DATA_ROOT env var. Useful when --data-root points to a training-only directory.",
     )
     parser.add_argument(
         "--resume-from",
@@ -245,33 +251,156 @@ def _resolve_work_dir(args):
     )
 
 
-def _validate_and_patch_data_root(cfg, data_root):
+def _validate_and_patch_data_root(cfg, data_root, val_data_root=None, no_validate=False):
     """
-    Verify dataset paths for train and val splits (supporting both flat and nested layouts)
+    Verify dataset paths for train and val splits (supporting flat, nested, and COCO layouts)
     and patch the MMDetection config accordingly.
+
+    If data_root only contains the training split (e.g. combined_train), val split is resolved
+    from --val-data-root, existing config paths, or standard candidate locations to keep the
+    original validation set intact and separate.
     """
     from evaluation.codetr.evaluate import verify_dataset_paths
     ok, report = verify_dataset_paths(data_root)
-    for split in ["train", "val", "test"]:
-        if hasattr(cfg.data, split):
-            sinfo = report.get(split, {})
-            if split in ["train", "val"] and not sinfo.get("valid", False):
-                raise FileNotFoundError(
-                    f"Required dataset split '{split}' is invalid or missing under {data_root}.\n"
-                    f"Annotation exists: {sinfo.get('ann_exists')} ({sinfo.get('ann_path')})\n"
-                    f"Image dir exists: {sinfo.get('img_exists')} ({sinfo.get('img_path')})\n"
-                    "Ensure data_root contains instances_{split}.json or {split}/instances_{split}.json."
-                )
-            split_cfg = getattr(cfg.data, split)
-            if sinfo.get("ann_exists"):
-                split_cfg.ann_file = sinfo["ann_path"]
-            if sinfo.get("img_exists"):
-                img_p = sinfo["img_path"]
-                split_cfg.img_prefix = img_p + ("" if img_p.endswith("/") else "/")
+
+    # 1. Train split
+    if hasattr(cfg.data, "train"):
+        sinfo = report.get("train", {})
+        if not sinfo.get("valid", False):
+            raise FileNotFoundError(
+                f"Required dataset split 'train' is invalid or missing under {data_root}.\n"
+                f"Annotation exists: {sinfo.get('ann_exists')} ({sinfo.get('ann_path')})\n"
+                f"Image dir exists: {sinfo.get('img_exists')} ({sinfo.get('img_path')})\n"
+                "Ensure data_root contains instances_train.json, train/instances_train.json, "
+                "or annotations/instances_train.json with an images/ or train/images/ directory."
+            )
+        split_cfg = cfg.data.train
+        if sinfo.get("ann_exists"):
+            split_cfg.ann_file = sinfo["ann_path"]
+        if sinfo.get("img_exists"):
+            img_p = sinfo["img_path"]
+            split_cfg.img_prefix = img_p + ("" if img_p.endswith("/") else "/")
+        print(
+            f"[INFO] Configured 'train' split: ann_file={split_cfg.ann_file} "
+            f"({sinfo.get('num_images', 0)} images, {sinfo.get('num_annotations', 0)} annotations), "
+            f"img_prefix={split_cfg.img_prefix}",
+            flush=True,
+        )
+
+    # 2. Val split
+    if hasattr(cfg.data, "val"):
+        val_configured = False
+        val_sinfo = report.get("val", {})
+
+        # (a) Check if val exists under data_root
+        if val_sinfo.get("valid", False):
+            cfg.data.val.ann_file = val_sinfo["ann_path"]
+            img_p = val_sinfo["img_path"]
+            cfg.data.val.img_prefix = img_p + ("" if img_p.endswith("/") else "/")
             print(
-                f"[INFO] Configured '{split}' split: ann_file={split_cfg.ann_file} "
-                f"({sinfo.get('num_images', 0)} images, {sinfo.get('num_annotations', 0)} annotations), "
-                f"img_prefix={split_cfg.img_prefix}",
+                f"[INFO] Configured 'val' split from data_root: ann_file={cfg.data.val.ann_file} "
+                f"({val_sinfo.get('num_images', 0)} images, {val_sinfo.get('num_annotations', 0)} annotations), "
+                f"img_prefix={cfg.data.val.img_prefix}",
+                flush=True,
+            )
+            val_configured = True
+
+        # (b) Check if explicitly passed val_data_root has val
+        elif val_data_root:
+            _, v_report = verify_dataset_paths(val_data_root, target_split="val")
+            v_sinfo = v_report.get("val", {})
+            if v_sinfo.get("valid", False):
+                cfg.data.val.ann_file = v_sinfo["ann_path"]
+                img_p = v_sinfo["img_path"]
+                cfg.data.val.img_prefix = img_p + ("" if img_p.endswith("/") else "/")
+                print(
+                    f"[INFO] Configured 'val' split from val_data_root ({val_data_root}): "
+                    f"ann_file={cfg.data.val.ann_file} ({v_sinfo.get('num_images', 0)} images, "
+                    f"{v_sinfo.get('num_annotations', 0)} annotations), "
+                    f"img_prefix={cfg.data.val.img_prefix}",
+                    flush=True,
+                )
+                val_configured = True
+            else:
+                raise FileNotFoundError(
+                    f"Validation split not found under --val-data-root={val_data_root}.\n"
+                    f"Annotation exists: {v_sinfo.get('ann_exists')} ({v_sinfo.get('ann_path')})\n"
+                    f"Image dir exists: {v_sinfo.get('img_exists')} ({v_sinfo.get('img_path')})"
+                )
+
+        # (c) Check if config's existing val paths are already valid on disk
+        if not val_configured:
+            curr_ann = getattr(cfg.data.val, "ann_file", "")
+            curr_img = getattr(cfg.data.val, "img_prefix", "")
+            if curr_ann and os.path.isfile(curr_ann) and curr_img and os.path.isdir(curr_img):
+                print(
+                    f"[INFO] Preserving existing config 'val' split: ann_file={curr_ann}, "
+                    f"img_prefix={curr_img}",
+                    flush=True,
+                )
+                val_configured = True
+
+        # (d) Auto-discover original validation dataset from standard locations
+        if not val_configured:
+            candidate_val_roots = [
+                "/content/dataset_local",
+                "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/data",
+                "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/data/coco",
+                "/content/drive/MyDrive/helmet_dataset/coco",
+                "data/coco",
+                "data",
+            ]
+            for cand in candidate_val_roots:
+                if os.path.isdir(cand):
+                    _, cand_report = verify_dataset_paths(cand, target_split="val")
+                    c_sinfo = cand_report.get("val", {})
+                    if c_sinfo.get("valid", False):
+                        cfg.data.val.ann_file = c_sinfo["ann_path"]
+                        img_p = c_sinfo["img_path"]
+                        cfg.data.val.img_prefix = img_p + ("" if img_p.endswith("/") else "/")
+                        print(
+                            f"[INFO] Discovered original 'val' split at {cand}: "
+                            f"ann_file={cfg.data.val.ann_file} ({c_sinfo.get('num_images', 0)} images, "
+                            f"{c_sinfo.get('num_annotations', 0)} annotations), "
+                            f"img_prefix={cfg.data.val.img_prefix}",
+                            flush=True,
+                        )
+                        val_configured = True
+                        break
+
+        # (e) If still not configured:
+        if not val_configured:
+            if no_validate:
+                print(
+                    f"[WARNING] 'val' split not found under {data_root} and no original validation set found. "
+                    "Proceeding because validation is disabled.",
+                    flush=True,
+                )
+            else:
+                raise FileNotFoundError(
+                    f"Required dataset split 'val' was not found under {data_root} (training-only root), "
+                    "and no separate validation set was located at standard candidate locations.\n"
+                    "Please specify the path to your original validation set using --val-data-root "
+                    "(e.g. --val-data-root /content/drive/MyDrive/Smart-Helmet-Violation-Detection/data) "
+                    "or pass --no-validate."
+                )
+
+    # 3. Test split (only patch if test is found under data_root, otherwise preserve untouched)
+    if hasattr(cfg.data, "test"):
+        test_sinfo = report.get("test", {})
+        if test_sinfo.get("valid", False):
+            cfg.data.test.ann_file = test_sinfo["ann_path"]
+            img_p = test_sinfo["img_path"]
+            cfg.data.test.img_prefix = img_p + ("" if img_p.endswith("/") else "/")
+            print(
+                f"[INFO] Configured 'test' split: ann_file={cfg.data.test.ann_file} "
+                f"({test_sinfo.get('num_images', 0)} images), img_prefix={cfg.data.test.img_prefix}",
+                flush=True,
+            )
+        else:
+            curr_test_ann = getattr(cfg.data.test, "ann_file", "N/A")
+            print(
+                f"[INFO] Preserving original 'test' split untouched (not in data_root): ann_file={curr_test_ann}",
                 flush=True,
             )
 
@@ -865,7 +994,13 @@ def main():
         stage_dir=args.stage_dir,
         enabled=(not args.no_stage_data),
     )
-    _validate_and_patch_data_root(cfg, data_root)
+    val_data_root = getattr(args, "val_data_root", None) or os.environ.get("CODETR_VAL_DATA_ROOT")
+    _validate_and_patch_data_root(
+        cfg,
+        data_root,
+        val_data_root=val_data_root,
+        no_validate=args.no_validate,
+    )
     stage_marker(2, 8, "Completed: Dataset staged and validated", f"root={data_root}", elapsed=time.time() - t_stage)
 
     # ── Stage 3/8: Work Directory & Output Logging ────────────────────────────
