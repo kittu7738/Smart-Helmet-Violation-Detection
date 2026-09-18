@@ -96,26 +96,26 @@ if [ ! -d "${DATA_ROOT}" ]; then
   DATA_ROOT="${DRIVE_TRAIN}"
 fi
 
+BATCH_SIZE="${1:-4}"
+
 bash "${RUNNER}" training/codetr/train.py \
   --config configs/codetr/experiments/exp_K5_speed_fp16.py \
   --data-root "${DATA_ROOT}" \
   --val-data-root /content/drive/MyDrive/Smart-Helmet-Violation-Detection/data \
   --work-dir /content/codetr_work/k5_smoke \
-  --batch-size 4 \
-  --workers-per-gpu 2 \
+  --batch-size "${BATCH_SIZE}" \
   --training-diagnostic
 
 echo "[INFO] Smoke test completed successfully. Gradients finite, loss calculated, no Half runtime error."
 
 # ── 5. Throughput Benchmark (10 Iterations) ──────────────────────────────────
-echo -e "\n[STEP 5/6] Executing Full-K5 FP16 throughput benchmark (10 iterations)..."
+echo -e "\n[STEP 5/6] Executing Full-K5 FP16 throughput benchmark (10 iterations, batch size ${BATCH_SIZE})..."
 bash "${RUNNER}" training/codetr/train.py \
   --config configs/codetr/experiments/exp_K5_speed_fp16.py \
   --data-root "${DATA_ROOT}" \
   --val-data-root /content/drive/MyDrive/Smart-Helmet-Violation-Detection/data \
   --work-dir /content/codetr_work/k5_speed_benchmark \
-  --batch-size 4 \
-  --workers-per-gpu 2 \
+  --batch-size "${BATCH_SIZE}" \
   --benchmark-throughput
 
 # ── 6. Completion & Stop Instruction ─────────────────────────────────────────
