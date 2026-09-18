@@ -68,9 +68,33 @@ if [ -d "${DRIVE_TRAIN}" ]; then
     echo "[INFO] Local SSD dataset already staged at ${LOCAL_TRAIN}."
   fi
 
+  # Also stage original validation split (65 images) to local SSD
+  DRIVE_VAL="/content/drive/MyDrive/Smart-Helmet-Violation-Detection/data"
+  if [ -d "${DRIVE_VAL}" ]; then
+    if [ ! -d "${LOCAL_TRAIN}/vaid/images" ] && [ -d "${DRIVE_VAL}/vaid/images" ]; then
+      echo "[INFO] Staging validation set ${DRIVE_VAL}/vaid/images -> ${LOCAL_TRAIN}/vaid/images ..."
+      mkdir -p "${LOCAL_TRAIN}/vaid"
+      rsync -a "${DRIVE_VAL}/vaid/images" "${LOCAL_TRAIN}/vaid/"
+    fi
+    if [ ! -f "${LOCAL_TRAIN}/instances_val.json" ] && [ -f "${DRIVE_VAL}/instances_val.json" ]; then
+      cp "${DRIVE_VAL}/instances_val.json" "${LOCAL_TRAIN}/"
+    fi
+  fi
+
+  # Ensure layout compatibility aliases on LOCAL_TRAIN
+  if [ -f "${LOCAL_TRAIN}/annotations/instances_train.json" ] && [ ! -f "${LOCAL_TRAIN}/instances_train.json" ]; then
+    ln -s annotations/instances_train.json "${LOCAL_TRAIN}/instances_train.json" 2>/dev/null || cp "${LOCAL_TRAIN}/annotations/instances_train.json" "${LOCAL_TRAIN}/instances_train.json"
+  fi
+  if [ -d "${LOCAL_TRAIN}/images" ] && [ ! -d "${LOCAL_TRAIN}/train/images" ]; then
+    mkdir -p "${LOCAL_TRAIN}/train"
+    ln -s ../images "${LOCAL_TRAIN}/train/images" 2>/dev/null || true
+  fi
+
   bash "${RUNNER}" -c "
 import os, json
 ann_file = '${LOCAL_TRAIN}/annotations/instances_train.json'
+if not os.path.isfile(ann_file):
+    ann_file = '${LOCAL_TRAIN}/instances_train.json'
 img_dir = '${LOCAL_TRAIN}/images'
 if os.path.isfile(ann_file) and os.path.isdir(img_dir):
     with open(ann_file, 'r') as f:
@@ -92,8 +116,10 @@ fi
 # ── 4. Full-K5 FP16 Training Smoke Test (1 Iteration) ───────────────────────
 echo -e "\n[STEP 4/6] Executing Full-K5 FP16 training smoke test (1 iteration)..."
 DATA_ROOT="${LOCAL_TRAIN}"
-if [ ! -d "${DATA_ROOT}" ]; then
-  DATA_ROOT="${DRIVE_TRAIN}"
+if [ ! -d "${DATA_ROOT}/images" ]; then
+  if [ -d "${DRIVE_TRAIN}" ]; then
+    DATA_ROOT="${DRIVE_TRAIN}"
+  fi
 fi
 
 BATCH_SIZE="${1:-4}"
@@ -124,4 +150,13 @@ echo "  OPTIMIZATION BENCHMARK COMPLETE — STOPPED BEFORE FULL TRAINING"
 echo "======================================================================"
 echo "[INFO] All verification steps completed successfully."
 echo "[INFO] Review the printed throughput table above for final epoch duration."
+echo -e "\nTo launch the 10-epoch training run upon verification (<10 min/epoch):"
+echo "  bash ${RUNNER} training/codetr/train.py \\"
+echo "    --config configs/codetr/experiments/exp_K5_speed_fp16.py \\"
+echo "    --data-root \"${DATA_ROOT}\" \\"
+echo "    --val-data-root /content/drive/MyDrive/Smart-Helmet-Violation-Detection/data \\"
+echo "    --work-dir /content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs/k5_speed_fp16_10epochs \\"
+echo "    --batch-size \"${BATCH_SIZE}\" \\"
+echo "    --max-epochs 10 \\"
+echo "    --auto-resume"
 echo "======================================================================"

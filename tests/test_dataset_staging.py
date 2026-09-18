@@ -142,5 +142,80 @@ class TestDatasetStaging(unittest.TestCase):
         finally:
             shutil.rmtree(temp_dir)
 
+    def test_ensure_dataset_stage_layout_creates_aliases(self):
+        """Verify that _ensure_dataset_stage_layout creates flat and nested aliases."""
+        from training.codetr.train import _ensure_dataset_stage_layout
+        temp_dir = tempfile.mkdtemp()
+        try:
+            stage_dir = os.path.join(temp_dir, "dataset_local")
+            os.makedirs(os.path.join(stage_dir, "annotations"), exist_ok=True)
+            os.makedirs(os.path.join(stage_dir, "images"), exist_ok=True)
+
+            with open(os.path.join(stage_dir, "annotations", "instances_train.json"), "w") as f:
+                f.write("{}")
+
+            _ensure_dataset_stage_layout(stage_dir)
+
+            # Flat instances_train.json should now exist
+            self.assertTrue(os.path.isfile(os.path.join(stage_dir, "instances_train.json")))
+            # Nested train/images should now exist
+            self.assertTrue(os.path.exists(os.path.join(stage_dir, "train", "images")))
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_resolve_data_root_auto_discovers_subfolder(self):
+        """Verify _resolve_data_root discovers combined_train inside parent data_root."""
+        from types import SimpleNamespace
+        from training.codetr.train import _resolve_data_root
+        temp_dir = tempfile.mkdtemp()
+        try:
+            parent = os.path.join(temp_dir, "project")
+            combined = os.path.join(parent, "combined_train")
+            os.makedirs(os.path.join(combined, "images"), exist_ok=True)
+            os.makedirs(os.path.join(combined, "annotations"), exist_ok=True)
+            with open(os.path.join(combined, "annotations", "instances_train.json"), "w") as f:
+                f.write('{"images": [{"id": 1}], "annotations": []}')
+
+            args = SimpleNamespace(data_root=parent)
+            resolved = _resolve_data_root(args)
+            self.assertEqual(os.path.abspath(resolved), os.path.abspath(combined))
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_stage_dataset_stages_validation_split(self):
+        """Verify stage_dataset_if_needed stages val_data_root if provided."""
+        temp_dir = tempfile.mkdtemp()
+        try:
+            train_root = os.path.join(temp_dir, "combined_train")
+            os.makedirs(os.path.join(train_root, "images"), exist_ok=True)
+            os.makedirs(os.path.join(train_root, "annotations"), exist_ok=True)
+            with open(os.path.join(train_root, "annotations", "instances_train.json"), "w") as f:
+                f.write('{"images": [{"id": 1}], "annotations": []}')
+
+            val_root = os.path.join(temp_dir, "data")
+            os.makedirs(os.path.join(val_root, "vaid", "images"), exist_ok=True)
+            with open(os.path.join(val_root, "instances_val.json"), "w") as f:
+                f.write('{"images": [{"id": 2}], "annotations": []}')
+            with open(os.path.join(val_root, "vaid", "images", "val1.jpg"), "w") as f:
+                f.write("val image data")
+
+            stage_dir = os.path.join(temp_dir, "dataset_local")
+            os.environ["CODETR_FORCE_STAGE"] = "1"
+
+            staged = stage_dataset_if_needed(
+                data_root=train_root,
+                stage_dir=stage_dir,
+                enabled=True,
+                val_data_root=val_root
+            )
+            self.assertEqual(os.path.abspath(staged), os.path.abspath(stage_dir))
+            # Validation images and annotations are now in stage_dir
+            self.assertTrue(os.path.isfile(os.path.join(stage_dir, "instances_val.json")))
+            self.assertTrue(os.path.isfile(os.path.join(stage_dir, "vaid", "images", "val1.jpg")))
+        finally:
+            shutil.rmtree(temp_dir)
+            if "CODETR_FORCE_STAGE" in os.environ:
+                del os.environ["CODETR_FORCE_STAGE"]
+
 if __name__ == '__main__':
     unittest.main()

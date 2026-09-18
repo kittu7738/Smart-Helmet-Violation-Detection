@@ -245,11 +245,6 @@ class _DictAction(argparse.Action):
         setattr(namespace, self.dest, result)
 
 
-def _resolve_data_root(args):
-    """Return data_root from CLI arg or environment variable."""
-    root = args.data_root or os.environ.get("CODETR_DATA_ROOT", "data/coco")
-    # Normalise: remove trailing slash
-    return root.rstrip("/").rstrip(os.sep)
 
 
 def _resolve_work_dir(args):
@@ -350,6 +345,117 @@ def _discover_split_paths(data_dir: str, split_name: str) -> dict:
         "ann_candidates": ann_candidates,
         "img_candidates": img_candidates,
     }
+
+
+def _resolve_data_root(args, stage_dir=None):
+    """
+    Return normalized data_root from CLI arg, environment variable, or auto-discovery.
+    If the requested or default path does not exist on disk, auto-discovers from standard
+    candidate locations (e.g. staged SSD, combined_train, or Google Drive locations).
+    """
+    raw_root = getattr(args, "data_root", None) or os.environ.get("CODETR_DATA_ROOT")
+    if raw_root:
+        candidate = os.path.abspath(os.path.expanduser(str(raw_root).strip().rstrip("/").rstrip(os.sep)))
+        # 1. If explicit path exists and has valid train split, use it
+        if os.path.isdir(candidate):
+            sinfo = _discover_split_paths(candidate, "train")
+            if sinfo.get("valid", False):
+                return candidate
+            # 2. If explicit path is a parent directory containing combined_train or data
+            for sub in ["combined_train", "data", "data/coco", "dataset"]:
+                sub_cand = os.path.join(candidate, sub)
+                if os.path.isdir(sub_cand) and _discover_split_paths(sub_cand, "train").get("valid", False):
+                    print(f"[INFO] Auto-resolved sub-directory under specified data-root: {sub_cand}", flush=True)
+                    return sub_cand
+
+    # 3. If stage_dir is already staged and valid, use it
+    target_stage = stage_dir or getattr(args, "stage_dir", "/content/dataset_local")
+    if target_stage and os.path.isdir(target_stage):
+        sinfo = _discover_split_paths(target_stage, "train")
+        if sinfo.get("valid", False) and sinfo.get("num_images", 0) >= 300:
+            print(f"[INFO] Using existing staged dataset at: {target_stage} ({sinfo.get('num_images', 0)} images)", flush=True)
+            return target_stage
+
+    # 4. Search standard candidate training roots
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    search_candidates = [
+        "/content/dataset_local",
+        "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/combined_train",
+        "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/data",
+        "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/data/coco",
+        "/content/drive/MyDrive/helmet_dataset/coco",
+        os.path.join(repo_root, "combined_train"),
+        os.path.join(repo_root, "data"),
+        os.path.join(repo_root, "data", "coco"),
+        "combined_train",
+        "data",
+        "data/coco",
+    ]
+
+    for cand in search_candidates:
+        if cand and os.path.isdir(cand):
+            sinfo = _discover_split_paths(cand, "train")
+            if sinfo.get("valid", False):
+                print(
+                    f"[INFO] Auto-discovered valid training data_root at: {cand} "
+                    f"({sinfo.get('num_images', 0)} images, {sinfo.get('num_annotations', 0)} annotations)",
+                    flush=True,
+                )
+                return os.path.abspath(cand)
+
+    # 5. Fallback to passed raw_root or default
+    fallback = raw_root or "data/coco"
+    return fallback.rstrip("/").rstrip(os.sep)
+
+
+def _resolve_val_data_root(args, data_root=None):
+    """
+    Return normalized val_data_root from CLI arg, environment variable, or auto-discovery.
+    Discovers the original validation dataset (65 images in vaid/images/) to ensure
+    validation is evaluated strictly against the original benchmark set.
+    """
+    raw_val = getattr(args, "val_data_root", None) or os.environ.get("CODETR_VAL_DATA_ROOT")
+    if raw_val:
+        candidate = os.path.abspath(os.path.expanduser(str(raw_val).strip().rstrip("/").rstrip(os.sep)))
+        if os.path.isdir(candidate):
+            sinfo = _discover_split_paths(candidate, "val")
+            if sinfo.get("valid", False):
+                return candidate
+            for sub in ["data", "data/coco"]:
+                sub_cand = os.path.join(candidate, sub)
+                if os.path.isdir(sub_cand) and _discover_split_paths(sub_cand, "val").get("valid", False):
+                    return sub_cand
+
+    # Check if data_root already has val
+    if data_root and os.path.isdir(data_root):
+        sinfo = _discover_split_paths(data_root, "val")
+        if sinfo.get("valid", False):
+            return data_root
+
+    # Search standard candidate validation roots
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    search_candidates = [
+        "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/data",
+        "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/data/coco",
+        "/content/drive/MyDrive/helmet_dataset/coco",
+        os.path.join(repo_root, "data"),
+        os.path.join(repo_root, "data", "coco"),
+        "data",
+        "data/coco",
+    ]
+
+    for cand in search_candidates:
+        if cand and os.path.isdir(cand):
+            sinfo = _discover_split_paths(cand, "val")
+            if sinfo.get("valid", False):
+                print(
+                    f"[INFO] Auto-discovered original validation val_data_root at: {cand} "
+                    f"({sinfo.get('num_images', 0)} images)",
+                    flush=True,
+                )
+                return os.path.abspath(cand)
+
+    return raw_val
 
 
 def _validate_and_patch_data_root(cfg, data_root, val_data_root=None, no_validate=False):
@@ -547,10 +653,48 @@ def _copy_tree_compat(src, dst):
     return count, size
 
 
-def stage_dataset_if_needed(data_root, stage_dir="/content/dataset_local", enabled=True):
+def _ensure_dataset_stage_layout(stage_dir):
+    """Ensure flat, nested, and COCO layouts all work seamlessly on stage_dir."""
+    coco_ann = os.path.join(stage_dir, "annotations", "instances_train.json")
+    flat_ann = os.path.join(stage_dir, "instances_train.json")
+    if os.path.isfile(coco_ann) and not os.path.exists(flat_ann):
+        try:
+            os.symlink(os.path.relpath(coco_ann, stage_dir), flat_ann)
+        except Exception:
+            try:
+                shutil.copy2(coco_ann, flat_ann)
+            except Exception:
+                pass
+    elif os.path.isfile(flat_ann) and not os.path.exists(coco_ann):
+        try:
+            os.makedirs(os.path.join(stage_dir, "annotations"), exist_ok=True)
+            os.symlink(os.path.relpath(flat_ann, os.path.join(stage_dir, "annotations")), coco_ann)
+        except Exception:
+            try:
+                shutil.copy2(flat_ann, coco_ann)
+            except Exception:
+                pass
+
+    top_img = os.path.join(stage_dir, "images")
+    train_img = os.path.join(stage_dir, "train", "images")
+    if os.path.isdir(top_img) and not os.path.exists(train_img):
+        try:
+            os.makedirs(os.path.join(stage_dir, "train"), exist_ok=True)
+            os.symlink(os.path.relpath(top_img, os.path.join(stage_dir, "train")), train_img)
+        except Exception:
+            pass
+    elif os.path.isdir(train_img) and not os.path.exists(top_img):
+        try:
+            os.symlink(os.path.relpath(train_img, stage_dir), top_img)
+        except Exception:
+            pass
+
+
+def stage_dataset_if_needed(data_root, stage_dir="/content/dataset_local", enabled=True, val_data_root=None):
     """
     Stage dataset from slow Google Drive FUSE storage to fast local NVMe storage.
     Prevents DataLoader multi-process deadlocks and massive I/O delays.
+    Supports both training dataset (combined_train) and validation dataset.
     """
     if not enabled or not data_root:
         return data_root
@@ -569,6 +713,7 @@ def stage_dataset_if_needed(data_root, stage_dir="/content/dataset_local", enabl
         img_dir = train_img_flat if os.path.isdir(train_img_flat) else (train_img_direct if os.path.isdir(train_img_direct) else None)
         if has_ann and img_dir and len(os.listdir(img_dir)) >= 300:
             print(f"[{time.strftime('%H:%M:%S')}] [INFO] Dataset already staged and verified at: {stage_dir} (skipping re-copy)", flush=True)
+            _ensure_dataset_stage_layout(stage_dir)
             return stage_dir
 
     # Only auto-stage if data_root appears to be on Google Drive (or if forced via env)
@@ -593,6 +738,7 @@ def stage_dataset_if_needed(data_root, stage_dir="/content/dataset_local", enabl
     actual_data_root = data_root
     for candidate in [
         data_root,
+        os.path.join(data_root, "combined_train"),
         os.path.join(data_root, "data"),
         os.path.join(data_root, "data", "coco"),
         os.path.join(data_root, "dataset")
@@ -615,7 +761,7 @@ def stage_dataset_if_needed(data_root, stage_dir="/content/dataset_local", enabl
                 copied_files += c
                 total_bytes += s
 
-    # 1b. Stage top-level images/ directory if present
+    # 1b. Stage top-level images/ directory if present (e.g. combined_train/images)
     if os.path.isdir(os.path.join(actual_data_root, "images")):
         c, s = _copy_tree_compat(os.path.join(actual_data_root, "images"), os.path.join(stage_dir, "images"))
         copied_files += c
@@ -636,6 +782,43 @@ def stage_dataset_if_needed(data_root, stage_dir="/content/dataset_local", enabl
                 copied_files += 1
                 total_bytes += os.path.getsize(dst_json)
                 print(f"[{time.strftime('%H:%M:%S')}]   -> Staged '{rel_path}'", flush=True)
+
+    # 3. If separate val_data_root exists on Google Drive, stage original validation split (65 images) as well
+    if val_data_root and os.path.isdir(val_data_root):
+        val_is_gdrive = val_data_root.startswith("/content/drive/") or "/MyDrive" in val_data_root
+        if val_is_gdrive or os.environ.get("CODETR_FORCE_STAGE"):
+            # Stage validation images
+            for val_img_cand in [
+                os.path.join(val_data_root, "vaid", "images"),
+                os.path.join(val_data_root, "val", "images"),
+                os.path.join(val_data_root, "images"),
+            ]:
+                if os.path.isdir(val_img_cand):
+                    dst_val_img = os.path.join(stage_dir, "vaid", "images")
+                    if not os.path.isdir(dst_val_img):
+                        c, s = _copy_tree_compat(val_img_cand, dst_val_img)
+                        copied_files += c
+                        total_bytes += s
+                        print(f"[{time.strftime('%H:%M:%S')}]   -> Staged validation images ({c} files)", flush=True)
+                    break
+
+            # Stage validation annotation
+            for val_ann_cand in [
+                os.path.join(val_data_root, "instances_val.json"),
+                os.path.join(val_data_root, "annotations", "instances_val.json"),
+                os.path.join(val_data_root, "vaid", "instances_val.json"),
+            ]:
+                if os.path.isfile(val_ann_cand):
+                    dst_val_ann = os.path.join(stage_dir, "instances_val.json")
+                    if not os.path.exists(dst_val_ann):
+                        shutil.copy2(val_ann_cand, dst_val_ann)
+                        copied_files += 1
+                        total_bytes += os.path.getsize(dst_val_ann)
+                        print(f"[{time.strftime('%H:%M:%S')}]   -> Staged 'instances_val.json'", flush=True)
+                    break
+
+    # 4. Ensure layout aliases exist on stage_dir (flat instances_train.json and train/images)
+    _ensure_dataset_stage_layout(stage_dir)
 
     elapsed = time.time() - start_time
     mb = total_bytes / (1024 * 1024)
@@ -2061,13 +2244,14 @@ def main():
     # ── Stage 2/8: Dataset Staging & Validation ──────────────────────────────
     t_stage = time.time()
     stage_marker(2, 8, "Starting: Dataset staging & validation", f"data_root={args.data_root or 'default'}")
-    data_root = _resolve_data_root(args)
+    val_data_root = _resolve_val_data_root(args)
+    data_root = _resolve_data_root(args, stage_dir=args.stage_dir)
     data_root = stage_dataset_if_needed(
         data_root,
         stage_dir=args.stage_dir,
         enabled=(not args.no_stage_data),
+        val_data_root=val_data_root,
     )
-    val_data_root = getattr(args, "val_data_root", None) or os.environ.get("CODETR_VAL_DATA_ROOT")
     _validate_and_patch_data_root(
         cfg,
         data_root,
