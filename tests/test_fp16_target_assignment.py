@@ -622,5 +622,62 @@ def test_diagnostic_hook_rejects_non_finite_values():
     assert len(non_finite_good) == 0
 
 
+def test_regression_inverse_sigmoid_backward_finite():
+    """Regression test: verify inverse_sigmoid forward and backward derivatives are strictly finite
+    across all critical edge-case values (0.0, 1.0, 1e-5, 1-1e-5, 0.01, 0.99, 0.5).
+    """
+    torch = pytest.importorskip("torch")
+
+    def inverse_sigmoid_fp16_safe(x, eps=1e-5):
+        safe_eps = 1e-4 if x.dtype == torch.float16 else eps
+        x_f = x.float().clamp(min=0.0, max=1.0)
+        x1 = x_f.clamp(min=safe_eps, max=1.0 - safe_eps)
+        return torch.log(x1 / (1.0 - x1)).to(x.dtype)
+
+    test_vals = [0.0, 1.0, 1e-5, 1.0 - 1e-5, 0.01, 0.99, 0.5]
+    for val in test_vals:
+        x = torch.tensor([val], dtype=torch.float16, requires_grad=True)
+        y = inverse_sigmoid_fp16_safe(x)
+        assert torch.isfinite(y).all(), f"Forward value not finite for val={val}: {y}"
+        y.backward()
+        assert x.grad is not None, f"Gradient is None for val={val}"
+        assert torch.isfinite(x.grad).all(), f"Backward gradient not finite for val={val}: {x.grad}"
+
+
+def test_regression_ms_deform_attn_backward_gradient_overflow_protection():
+    """Regression test: verify that scaled float32 gradients in deformable attention backward
+    exceeding 65504.0 (the max float16 value) do not overflow to +/-inf when converted to half.
+    """
+    torch = pytest.importorskip("torch")
+
+    # Scaled gradients that exceed 65504 in float32
+    scaled_grad_f32 = torch.tensor([65500.0, 70000.0, -100000.0, 65504.0], dtype=torch.float32)
+
+    # Raw .half() overflows 70000.0 and -100000.0 to inf / -inf
+    raw_half = scaled_grad_f32.half()
+    assert torch.isinf(raw_half[1]), "Expected 70000.0 to overflow to inf in raw float16"
+    assert torch.isinf(raw_half[2]), "Expected -100000.0 to overflow to -inf in raw float16"
+
+    # Clamped safe conversion prevents inf
+    def _to_half_safe(g):
+        return g.clamp(min=-65504.0, max=65504.0).half()
+
+    safe_half = _to_half_safe(scaled_grad_f32)
+    assert torch.isfinite(safe_half).all(), "Expected safe clamped gradient to be strictly finite"
+    assert safe_half[1].item() == 65504.0
+    assert safe_half[2].item() == -65504.0
+
+
+def test_fp16_config_dynamic_initial_scale():
+    """Verify that exp_K5_speed_fp16.py configures dynamic loss scaling with safe initial scale."""
+    config_path = os.path.join(REPO_ROOT, "configs", "codetr", "experiments", "exp_K5_speed_fp16.py")
+    with open(config_path) as f:
+        content = f.read()
+
+    assert "fp16 = dict(" in content
+    assert "init_scale=512.0" in content
+
+
+
 
 

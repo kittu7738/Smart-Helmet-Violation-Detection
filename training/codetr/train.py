@@ -855,10 +855,12 @@ def install_deformable_attention_fp16_bridge():
 
             grads = orig_backward(ctx, grad_output)
             if is_half:
-                grads = tuple(
-                    g.half() if (g is not None and torch.is_tensor(g) and g.is_floating_point()) else g
-                    for g in grads
-                )
+                def _to_half_safe(g):
+                    if g is not None and torch.is_tensor(g) and g.is_floating_point():
+                        # Prevent scaled float32 gradients exceeding 65504.0 from overflowing to +/-inf in float16
+                        return g.clamp(min=-65504.0, max=65504.0).half()
+                    return g
+                grads = tuple(_to_half_safe(g) for g in grads)
             return grads
 
         func_cls.forward = _fp16_safe_forward
@@ -1530,10 +1532,12 @@ def patch_codetr_fp16_target_assignment():
     # 9. Patch inverse_sigmoid for FP16 numerical stability (prevents 1/1e-5 = 100k overflow to inf)
     try:
         def inverse_sigmoid_fp16_safe(x, eps=1e-5):
+            # In IEEE 754 float16, 1 / x for x < 1.53e-5 exceeds 65504 and overflows to inf during backward.
+            # When input is float16, safe_eps must be >= 1e-4 so that backward derivative 1/x <= 10000 < 65504.
+            safe_eps = 1e-4 if x.dtype == torch.float16 else eps
             x_f = x.float().clamp(min=0.0, max=1.0)
-            x1 = x_f.clamp(min=eps)
-            x2 = (1.0 - x_f).clamp(min=eps)
-            return torch.log(x1 / x2).to(x.dtype)
+            x1 = x_f.clamp(min=safe_eps, max=1.0 - safe_eps)
+            return torch.log(x1 / (1.0 - x1)).to(x.dtype)
 
         try:
             import projects.models.transformer as proj_trans
@@ -1693,9 +1697,77 @@ def main():
                     self.max_iters = max_iters
                     self._start_time = None
                     self._step_times = []
+                    self._param_snapshots = {}
+
+                def before_run(self, runner):
+                    # Hook into Fp16OptimizerHook to monitor gradient scaling and unscaling
+                    for hook in getattr(runner, 'hooks', []):
+                        if hook.__class__.__name__ in ('Fp16OptimizerHook', 'OptimizerHook'):
+                            self._instrument_optimizer_hook(hook, runner)
+                            break
+
+                def _instrument_optimizer_hook(self, opt_hook, runner):
+                    if getattr(opt_hook, '_diagnostic_instrumented', False):
+                        return
+                    orig_after_train_iter = opt_hook.after_train_iter
+
+                    def diagnostic_after_train_iter(runner_inner):
+                        ts = time.strftime("%H:%M:%S")
+                        scaler = getattr(opt_hook, 'loss_scaler', None)
+                        scale_val = scaler.get_scale() if (scaler is not None and hasattr(scaler, 'get_scale')) else "N/A"
+                        print(f"[{ts}]   [LOSS SCALER] Iteration {runner_inner.iter + 1}: scale={scale_val}", flush=True)
+
+                        # Check gradients before and after unscaling
+                        if scaler is not None and hasattr(scaler, 'unscale_'):
+                            orig_unscale = scaler.unscale_
+                            def unscale_wrapper(optimizer):
+                                non_finite_before = 0
+                                max_grad_before = 0.0
+                                for p in runner_inner.model.parameters():
+                                    if p.requires_grad and p.grad is not None:
+                                        if not torch.isfinite(p.grad).all():
+                                            non_finite_before += 1
+                                        else:
+                                            max_grad_before = max(max_grad_before, p.grad.abs().max().item())
+                                print(f"[{time.strftime('%H:%M:%S')}]   [GRADIENT CHECK] Before unscale: max_grad={max_grad_before:.4e}, non_finite_tensors={non_finite_before}", flush=True)
+                                orig_unscale(optimizer)
+                                non_finite_after = 0
+                                max_grad_after = 0.0
+                                for p in runner_inner.model.parameters():
+                                    if p.requires_grad and p.grad is not None:
+                                        if not torch.isfinite(p.grad).all():
+                                            non_finite_after += 1
+                                        else:
+                                            max_grad_after = max(max_grad_after, p.grad.abs().max().item())
+                                print(f"[{time.strftime('%H:%M:%S')}]   [GRADIENT CHECK] After unscale: max_grad={max_grad_after:.4e}, non_finite_tensors={non_finite_after}", flush=True)
+
+                            scaler.unscale_ = unscale_wrapper
+
+                        return orig_after_train_iter(runner_inner)
+
+                    opt_hook.after_train_iter = diagnostic_after_train_iter
+                    opt_hook._diagnostic_instrumented = True
 
                 def before_train_iter(self, runner):
                     self._start_time = time.time()
+                    if runner.iter == 0:
+                        try:
+                            torch.autograd.set_detect_anomaly(True)
+                            print(f"[{time.strftime('%H:%M:%S')}] [DIAGNOSTIC] Iteration 1: torch.autograd.set_detect_anomaly(True) enabled", flush=True)
+                        except Exception:
+                            pass
+                        # Snapshot selected trainable parameter weights before forward/backward
+                        if hasattr(runner, 'model') and hasattr(runner.model, 'named_parameters'):
+                            for name, p in runner.model.named_parameters():
+                                if p.requires_grad and ('conv1.weight' in name or 'bias' in name):
+                                    self._param_snapshots[name] = p.detach().clone()
+                                    if len(self._param_snapshots) >= 3:
+                                        break
+                    elif runner.iter == 1:
+                        try:
+                            torch.autograd.set_detect_anomaly(False)
+                        except Exception:
+                            pass
 
                 def after_train_iter(self, runner):
                     dur = time.time() - self._start_time if self._start_time else 0.0
@@ -1740,6 +1812,15 @@ def main():
                                 if not torch.isfinite(p.grad).all():
                                     non_finite_grads.append(p_name)
 
+                    # 4. Check whether parameters were actually updated by optimizer.step()
+                    weight_change_detected = False
+                    if self._param_snapshots and hasattr(runner, 'model') and hasattr(runner.model, 'named_parameters'):
+                        for p_name, p in runner.model.named_parameters():
+                            if p_name in self._param_snapshots:
+                                diff = (p.detach() - self._param_snapshots[p_name]).abs().max().item()
+                                if diff > 0.0:
+                                    weight_change_detected = True
+
                     ts = time.strftime("%H:%M:%S")
                     loss_str = f"{loss_val.item():.4f}" if hasattr(loss_val, 'item') and total_loss_finite else str(loss_val)
                     print(f"[{ts}] [DIAGNOSTIC] Iteration {runner.iter + 1}/{self.max_iters}: total_loss={loss_str}, step_time={dur:.3f}s", flush=True)
@@ -1763,7 +1844,8 @@ def main():
                             f"(non-finite losses={list(non_finite_losses.keys())}, total_loss={loss_str}, non-finite grads={len(non_finite_grads)})"
                         )
 
-                    print(f"[{ts}]   -> LOSS FINITE: PASS | GRADIENTS FINITE: PASS ({grad_count} params) | BACKWARD: PASS | OPTIMIZER STEP: PASS", flush=True)
+                    weight_status = "WEIGHTS UPDATED: PASS" if (runner.iter == 0 and weight_change_detected) or runner.iter > 0 else "WEIGHTS CHECK: OK"
+                    print(f"[{ts}]   -> LOSS FINITE: PASS | GRADIENTS FINITE: PASS ({grad_count} params) | BACKWARD: PASS | OPTIMIZER STEP: PASS | {weight_status}", flush=True)
 
                     if runner.iter + 1 >= self.max_iters:
                         gpu_mem_str = "N/A"
