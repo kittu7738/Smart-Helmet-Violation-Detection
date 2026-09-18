@@ -26,7 +26,7 @@ def test_deformable_attention_fp16():
     print(f"CUDA available  : {torch.cuda.is_available()}")
     if not torch.cuda.is_available():
         print("[SKIP] CUDA is not available on this machine. Test requires GPU.")
-        return True
+        return
 
     print(f"GPU device      : {torch.cuda.get_device_name(0)}")
 
@@ -36,7 +36,7 @@ def test_deformable_attention_fp16():
         print(f"MMCV version    : {mmcv.__version__}")
     except ImportError as e:
         print(f"[SKIP] MMCV not installed: {e}")
-        return True
+        return
 
     # Build small MultiScaleDeformableAttention module
     embed_dims = 64
@@ -130,7 +130,7 @@ def test_deformable_attention_fp16():
     print("\n" + "=" * 70)
     print("  SUMMARY: MultiScaleDeformableAttention FP16 patch is 100% OPERATIONAL!")
     print("=" * 70)
-    return True
+
 
 if __name__ == '__main__':
     test_deformable_attention_fp16()

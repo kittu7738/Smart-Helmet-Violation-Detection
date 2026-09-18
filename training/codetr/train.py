@@ -875,6 +875,508 @@ def install_deformable_attention_fp16_bridge():
         return False
 
 
+def patch_codetr_fp16_target_assignment():
+    """Install FP16 compatibility patches for Co-DETR target assignment and loss paths.
+
+    Prevents PyTorch 1.11 runtime errors where Float ground truth / cost matrices
+    interact with Half model predictions:
+      - RuntimeError: Index put requires the source and destination dtypes match,
+        got Half for the destination and Float for the source.
+      - RuntimeError: Index put requires the source and destination dtypes match,
+        got Float for the destination and Half for the source.
+      - ValueError: matrix contains invalid numeric entries (scipy linear_sum_assignment).
+    """
+    try:
+        import torch
+    except ImportError:
+        return False
+
+    # 1. Patch CoDeformableDETRHead target assignment
+    try:
+        from projects.models.co_deformable_detr_head import CoDeformableDETRHead
+        from mmdet.core.bbox.transforms import bbox_xyxy_to_cxcywh
+
+        if not getattr(CoDeformableDETRHead, '_fp16_target_patched', False):
+            def _get_target_single_fp16_safe(self, cls_score, bbox_pred, gt_bboxes,
+                                             gt_labels, img_meta, gt_bboxes_ignore=None):
+                num_bboxes = bbox_pred.size(0)
+                assign_result = self.assigner.assign(bbox_pred, cls_score, gt_bboxes,
+                                                     gt_labels, img_meta, gt_bboxes_ignore)
+                sampling_result = self.sampler.sample(assign_result, bbox_pred, gt_bboxes)
+                pos_inds = sampling_result.pos_inds
+                neg_inds = sampling_result.neg_inds
+
+                labels = gt_bboxes.new_full((num_bboxes, ), self.num_classes, dtype=torch.long)
+                labels[pos_inds] = gt_labels[sampling_result.pos_assigned_gt_inds]
+                label_weights = gt_bboxes.new_ones(num_bboxes)
+
+                bbox_targets = torch.zeros_like(bbox_pred)
+                bbox_weights = torch.zeros_like(bbox_pred)
+                bbox_weights[pos_inds] = 1.0
+                img_h, img_w, _ = img_meta['img_shape']
+
+                factor = bbox_pred.new_tensor([img_w, img_h, img_w, img_h]).unsqueeze(0)
+                pos_gt_bboxes_normalized = sampling_result.pos_gt_bboxes / factor
+                pos_gt_bboxes_targets = bbox_xyxy_to_cxcywh(pos_gt_bboxes_normalized)
+                bbox_targets[pos_inds] = pos_gt_bboxes_targets.to(bbox_targets.dtype)
+
+                return (labels, label_weights, bbox_targets, bbox_weights, pos_inds, neg_inds)
+
+            CoDeformableDETRHead._get_target_single = _get_target_single_fp16_safe
+            CoDeformableDETRHead._fp16_target_patched = True
+            print(f"[{time.strftime('%H:%M:%S')}] [FP16] CoDeformableDETRHead target assignment patch applied", flush=True)
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] CoDeformableDETRHead patch skipped: {e}", flush=True)
+
+    # 2. Patch CoDINOHead denoising targets and loss methods
+    try:
+        from projects.models.co_dino_head import CoDINOHead
+        from mmdet.core.bbox.transforms import bbox_xyxy_to_cxcywh, bbox_cxcywh_to_xyxy
+        from mmdet.core.bbox.iou_calculators import bbox_overlaps
+        from mmdet.core.utils import reduce_mean
+
+        if not getattr(CoDINOHead, '_fp16_dn_target_patched', False):
+            def _get_dn_target_single_fp16_safe(self, dn_bbox_pred, gt_bboxes, gt_labels,
+                                                img_meta, dn_meta):
+                num_groups = dn_meta['num_dn_group']
+                pad_size = dn_meta['pad_size']
+                assert pad_size % num_groups == 0
+                single_pad = pad_size // num_groups
+                num_bboxes = dn_bbox_pred.size(0)
+
+                device = gt_labels.device if hasattr(gt_labels, 'device') else dn_bbox_pred.device
+                if len(gt_labels) > 0:
+                    t = torch.arange(0, len(gt_labels), device=device).long()
+                    t = t.unsqueeze(0).repeat(num_groups, 1)
+                    pos_assigned_gt_inds = t.flatten()
+                    pos_inds = (torch.arange(num_groups, device=device) * single_pad).long().unsqueeze(1) + t
+                    pos_inds = pos_inds.flatten()
+                else:
+                    pos_inds = pos_assigned_gt_inds = torch.tensor([], device=device, dtype=torch.long)
+                neg_inds = pos_inds + single_pad // 2
+
+                labels = gt_bboxes.new_full((num_bboxes, ), self.num_classes, dtype=torch.long)
+                labels[pos_inds] = gt_labels[pos_assigned_gt_inds]
+                label_weights = gt_bboxes.new_ones(num_bboxes)
+
+                bbox_targets = torch.zeros_like(dn_bbox_pred)
+                bbox_weights = torch.zeros_like(dn_bbox_pred)
+                bbox_weights[pos_inds] = 1.0
+                img_h, img_w, _ = img_meta['img_shape']
+
+                factor = dn_bbox_pred.new_tensor([img_w, img_h, img_w, img_h]).unsqueeze(0)
+                gt_bboxes_normalized = gt_bboxes / factor
+                gt_bboxes_targets = bbox_xyxy_to_cxcywh(gt_bboxes_normalized)
+                bbox_targets[pos_inds] = gt_bboxes_targets.repeat([num_groups, 1]).to(bbox_targets.dtype)
+
+                return (labels, label_weights, bbox_targets, bbox_weights, pos_inds, neg_inds)
+
+            CoDINOHead._get_dn_target_single = _get_dn_target_single_fp16_safe
+
+            def loss_dn_single_fp16_safe(self, dn_cls_scores, dn_bbox_preds, gt_bboxes_list,
+                                         gt_labels_list, img_metas, dn_meta):
+                num_imgs = dn_cls_scores.size(0)
+                bbox_preds_list = [dn_bbox_preds[i] for i in range(num_imgs)]
+                cls_reg_targets = self.get_dn_target(bbox_preds_list, gt_bboxes_list,
+                                                     gt_labels_list, img_metas, dn_meta)
+                (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,
+                 num_total_pos, num_total_neg) = cls_reg_targets
+                labels = torch.cat(labels_list, 0)
+                label_weights = torch.cat(label_weights_list, 0)
+                bbox_targets = torch.cat(bbox_targets_list, 0)
+                bbox_weights = torch.cat(bbox_weights_list, 0)
+
+                cls_scores = dn_cls_scores.reshape(-1, self.cls_out_channels)
+                cls_avg_factor = num_total_pos * 1.0 + num_total_neg * self.bg_cls_weight
+                if self.sync_cls_avg_factor:
+                    cls_avg_factor = reduce_mean(cls_scores.new_tensor([cls_avg_factor]))
+                cls_avg_factor = max(cls_avg_factor, 1)
+
+                if len(cls_scores) > 0:
+                    bg_class_ind = self.num_classes
+                    pos_inds = ((labels >= 0) & (labels < bg_class_ind)).nonzero().squeeze(1)
+                    scores = label_weights.new_zeros(labels.shape)
+                    pos_bbox_targets = bbox_targets[pos_inds]
+                    pos_decode_bbox_targets = bbox_cxcywh_to_xyxy(pos_bbox_targets)
+                    pos_bbox_pred = dn_bbox_preds.reshape(-1, 4)[pos_inds]
+                    pos_decode_bbox_pred = bbox_cxcywh_to_xyxy(pos_bbox_pred)
+                    overlaps = bbox_overlaps(
+                        pos_decode_bbox_pred.detach(),
+                        pos_decode_bbox_targets,
+                        is_aligned=True)
+                    scores[pos_inds] = overlaps.to(scores.dtype)
+                    loss_cls = self.loss_cls(
+                        cls_scores, (labels, scores),
+                        weight=label_weights,
+                        avg_factor=cls_avg_factor)
+                else:
+                    loss_cls = torch.zeros(1, dtype=cls_scores.dtype, device=cls_scores.device)
+
+                num_total_pos = loss_cls.new_tensor([num_total_pos])
+                num_total_pos = torch.clamp(reduce_mean(num_total_pos), min=1).item()
+
+                factors = []
+                for img_meta, bbox_pred in zip(img_metas, dn_bbox_preds):
+                    img_h, img_w, _ = img_meta['img_shape']
+                    factor = bbox_pred.new_tensor([img_w, img_h, img_w, img_h]).unsqueeze(0).repeat(
+                        bbox_pred.size(0), 1)
+                    factors.append(factor)
+                factors = torch.cat(factors, 0)
+
+                bbox_preds = dn_bbox_preds.reshape(-1, 4)
+                bboxes = bbox_cxcywh_to_xyxy(bbox_preds) * factors
+                bboxes_gt = bbox_cxcywh_to_xyxy(bbox_targets) * factors
+
+                loss_iou = self.loss_iou(bboxes, bboxes_gt, bbox_weights, avg_factor=num_total_pos)
+                loss_bbox = self.loss_bbox(bbox_preds, bbox_targets, bbox_weights, avg_factor=num_total_pos)
+                return loss_cls, loss_bbox, loss_iou
+
+            CoDINOHead.loss_dn_single = loss_dn_single_fp16_safe
+
+            def loss_single_fp16_safe(self, cls_scores, bbox_preds, gt_bboxes_list,
+                                      gt_labels_list, img_metas, gt_bboxes_ignore_list=None):
+                num_imgs = cls_scores.size(0)
+                cls_scores_list = [cls_scores[i] for i in range(num_imgs)]
+                bbox_preds_list = [bbox_preds[i] for i in range(num_imgs)]
+                cls_reg_targets = self.get_targets(cls_scores_list, bbox_preds_list,
+                                                   gt_bboxes_list, gt_labels_list,
+                                                   img_metas, gt_bboxes_ignore_list)
+                (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,
+                 num_total_pos, num_total_neg) = cls_reg_targets
+                labels = torch.cat(labels_list, 0)
+                label_weights = torch.cat(label_weights_list, 0)
+                bbox_targets = torch.cat(bbox_targets_list, 0)
+                bbox_weights = torch.cat(bbox_weights_list, 0)
+
+                cls_scores = cls_scores.reshape(-1, self.cls_out_channels)
+                cls_avg_factor = num_total_pos * 1.0 + num_total_neg * self.bg_cls_weight
+                if self.sync_cls_avg_factor:
+                    cls_avg_factor = reduce_mean(cls_scores.new_tensor([cls_avg_factor]))
+                cls_avg_factor = max(cls_avg_factor, 1)
+
+                bg_class_ind = self.num_classes
+                pos_inds = ((labels >= 0) & (labels < bg_class_ind)).nonzero().squeeze(1)
+                scores = label_weights.new_zeros(labels.shape)
+                pos_bbox_targets = bbox_targets[pos_inds]
+                pos_decode_bbox_targets = bbox_cxcywh_to_xyxy(pos_bbox_targets)
+                pos_bbox_pred = bbox_preds.reshape(-1, 4)[pos_inds]
+                pos_decode_bbox_pred = bbox_cxcywh_to_xyxy(pos_bbox_pred)
+                overlaps = bbox_overlaps(
+                    pos_decode_bbox_pred.detach(),
+                    pos_decode_bbox_targets,
+                    is_aligned=True)
+                scores[pos_inds] = overlaps.to(scores.dtype)
+                loss_cls = self.loss_cls(
+                    cls_scores, (labels, scores),
+                    weight=label_weights,
+                    avg_factor=cls_avg_factor)
+
+                num_total_pos = loss_cls.new_tensor([num_total_pos])
+                num_total_pos = torch.clamp(reduce_mean(num_total_pos), min=1).item()
+
+                factors = []
+                for img_meta, bbox_pred in zip(img_metas, bbox_preds):
+                    img_h, img_w, _ = img_meta['img_shape']
+                    factor = bbox_pred.new_tensor([img_w, img_h, img_w, img_h]).unsqueeze(0).repeat(
+                        bbox_pred.size(0), 1)
+                    factors.append(factor)
+                factors = torch.cat(factors, 0)
+
+                bbox_preds = bbox_preds.reshape(-1, 4)
+                bboxes = bbox_cxcywh_to_xyxy(bbox_preds) * factors
+                bboxes_gt = bbox_cxcywh_to_xyxy(bbox_targets) * factors
+
+                loss_iou = self.loss_iou(bboxes, bboxes_gt, bbox_weights, avg_factor=num_total_pos)
+                loss_bbox = self.loss_bbox(bbox_preds, bbox_targets, bbox_weights, avg_factor=num_total_pos)
+                return loss_cls, loss_bbox, loss_iou
+
+            CoDINOHead.loss_single = loss_single_fp16_safe
+
+            if hasattr(CoDINOHead, 'loss_single_aux'):
+                def loss_single_aux_fp16_safe(self, cls_scores, bbox_preds, gt_bboxes_list,
+                                              gt_labels_list, img_metas, gt_bboxes_ignore_list=None):
+                    num_imgs = cls_scores.size(0)
+                    cls_scores_list = [cls_scores[i] for i in range(num_imgs)]
+                    bbox_preds_list = [bbox_preds[i] for i in range(num_imgs)]
+                    cls_reg_targets = self.get_targets(cls_scores_list, bbox_preds_list,
+                                                       gt_bboxes_list, gt_labels_list,
+                                                       img_metas, gt_bboxes_ignore_list)
+                    (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,
+                     num_total_pos, num_total_neg) = cls_reg_targets
+                    labels = torch.cat(labels_list, 0)
+                    label_weights = torch.cat(label_weights_list, 0)
+                    bbox_targets = torch.cat(bbox_targets_list, 0)
+                    bbox_weights = torch.cat(bbox_weights_list, 0)
+
+                    cls_scores = cls_scores.reshape(-1, self.cls_out_channels)
+                    cls_avg_factor = num_total_pos * 1.0 + num_total_neg * self.bg_cls_weight
+                    if self.sync_cls_avg_factor:
+                        cls_avg_factor = reduce_mean(cls_scores.new_tensor([cls_avg_factor]))
+                    cls_avg_factor = max(cls_avg_factor, 1)
+
+                    bg_class_ind = self.num_classes
+                    pos_inds = ((labels >= 0) & (labels < bg_class_ind)).nonzero().squeeze(1)
+                    scores = label_weights.new_zeros(labels.shape)
+                    pos_bbox_targets = bbox_targets[pos_inds]
+                    pos_decode_bbox_targets = bbox_cxcywh_to_xyxy(pos_bbox_targets)
+                    pos_bbox_pred = bbox_preds.reshape(-1, 4)[pos_inds]
+                    pos_decode_bbox_pred = bbox_cxcywh_to_xyxy(pos_bbox_pred)
+                    overlaps = bbox_overlaps(
+                        pos_decode_bbox_pred.detach(),
+                        pos_decode_bbox_targets,
+                        is_aligned=True)
+                    scores[pos_inds] = overlaps.to(scores.dtype)
+                    loss_cls = self.loss_cls(
+                        cls_scores, (labels, scores),
+                        weight=label_weights,
+                        avg_factor=cls_avg_factor)
+
+                    num_total_pos = loss_cls.new_tensor([num_total_pos])
+                    num_total_pos = torch.clamp(reduce_mean(num_total_pos), min=1).item()
+
+                    factors = []
+                    for img_meta, bbox_pred in zip(img_metas, bbox_preds):
+                        img_h, img_w, _ = img_meta['img_shape']
+                        factor = bbox_pred.new_tensor([img_w, img_h, img_w, img_h]).unsqueeze(0).repeat(
+                            bbox_pred.size(0), 1)
+                        factors.append(factor)
+                    factors = torch.cat(factors, 0)
+
+                    bbox_preds = bbox_preds.reshape(-1, 4)
+                    bboxes = bbox_cxcywh_to_xyxy(bbox_preds) * factors
+                    bboxes_gt = bbox_cxcywh_to_xyxy(bbox_targets) * factors
+
+                    loss_iou = self.loss_iou(bboxes, bboxes_gt, bbox_weights, avg_factor=num_total_pos)
+                    loss_bbox = self.loss_bbox(bbox_preds, bbox_targets, bbox_weights, avg_factor=num_total_pos)
+                    return loss_cls, loss_bbox, loss_iou
+
+                CoDINOHead.loss_single_aux = loss_single_aux_fp16_safe
+
+            CoDINOHead._fp16_dn_target_patched = True
+            print(f"[{time.strftime('%H:%M:%S')}] [FP16] CoDINOHead dn_target and loss dtype patches applied", flush=True)
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] CoDINOHead patch skipped: {e}", flush=True)
+
+    # 3. Patch DnQueryGenerator in query_denoising
+    try:
+        from projects.models.query_denoising import DnQueryGenerator
+        from mmdet.models.utils.transformer import inverse_sigmoid
+        from mmdet.core.bbox.transforms import bbox_xyxy_to_cxcywh
+
+        if not getattr(DnQueryGenerator, '_fp16_query_dn_patched', False):
+            def dn_call_fp16_safe(self, gt_bboxes, gt_labels=None, label_enc=None, img_metas=None):
+                if gt_labels is not None:
+                    assert len(gt_bboxes) == len(gt_labels)
+                assert gt_labels is not None and label_enc is not None and img_metas is not None
+                batch_size = len(gt_bboxes)
+
+                gt_bboxes_list = []
+                for img_meta, bboxes in zip(img_metas, gt_bboxes):
+                    img_h, img_w, _ = img_meta['img_shape']
+                    factor = bboxes.new_tensor([img_w, img_h, img_w, img_h]).unsqueeze(0)
+                    bboxes_normalized = bbox_xyxy_to_cxcywh(bboxes) / factor
+                    gt_bboxes_list.append(bboxes_normalized)
+                gt_bboxes = gt_bboxes_list
+
+                known = [torch.ones_like(labels) for labels in gt_labels]
+                known_num = [sum(k) for k in known]
+                num_groups = self.get_num_groups(int(max(known_num)))
+
+                unmask_bbox = unmask_label = torch.cat(known)
+                labels = torch.cat(gt_labels)
+                boxes = torch.cat(gt_bboxes)
+                batch_idx = torch.cat([torch.full_like(t.long(), i) for i, t in enumerate(gt_labels)])
+
+                known_indice = torch.nonzero(unmask_label + unmask_bbox).view(-1)
+                known_indice = known_indice.repeat(2 * num_groups, 1).view(-1)
+                known_labels = labels.repeat(2 * num_groups, 1).view(-1)
+                known_bid = batch_idx.repeat(2 * num_groups, 1).view(-1)
+                known_bboxs = boxes.repeat(2 * num_groups, 1)
+                known_labels_expand = known_labels.clone()
+                known_bbox_expand = known_bboxs.clone()
+
+                if self.label_noise_scale > 0:
+                    p = torch.rand_like(known_labels_expand.float())
+                    chosen_indice = torch.nonzero(p < (self.label_noise_scale * 0.5)).view(-1)
+                    new_label = torch.randint_like(chosen_indice, 0, self.num_classes)
+                    known_labels_expand.scatter_(0, chosen_indice, new_label)
+                single_pad = int(max(known_num))
+                pad_size = int(single_pad * 2 * num_groups)
+
+                if self.box_noise_scale > 0:
+                    known_bbox_ = torch.zeros_like(known_bboxs)
+                    known_bbox_[:, :2] = known_bboxs[:, :2] - known_bboxs[:, 2:] / 2
+                    known_bbox_[:, 2:] = known_bboxs[:, :2] + known_bboxs[:, 2:] / 2
+                    diff = torch.zeros_like(known_bboxs)
+                    diff[:, :2] = known_bboxs[:, 2:] / 2
+                    diff[:, 2:] = known_bboxs[:, 2:] / 2
+                    rand_sign = torch.randint_like(known_bboxs, low=0, high=2, dtype=torch.float32)
+                    rand_sign = rand_sign * 2.0 - 1.0
+                    rand_part = torch.rand_like(known_bboxs)
+                    rand_part = (rand_part >= 0.5).float() * (rand_part - 1.0) + (rand_part < 0.5).float() * (1.0 - rand_part)
+                    rand_part = torch.mul(rand_sign, rand_part)
+                    device = boxes.device if hasattr(boxes, 'device') else 'cuda'
+                    known_bbox_ = known_bbox_ + torch.mul(rand_part, diff).to(device) * self.box_noise_scale
+                    known_bbox_ = known_bbox_.clamp(min=0.0, max=1.0)
+                    known_bbox_expand[:, :2] = (known_bbox_[:, :2] + known_bbox_[:, 2:]) / 2
+                    known_bbox_expand[:, 2:] = known_bbox_[:, 2:] - known_bbox_[:, :2]
+
+                device = boxes.device if hasattr(boxes, 'device') else 'cuda'
+                m = known_labels_expand.long().to(device)
+                input_label_embed = label_enc(m)
+                input_bbox_embed = inverse_sigmoid(known_bbox_expand, eps=1e-3)
+
+                padding_label = torch.zeros(pad_size, self.hidden_dim, dtype=input_label_embed.dtype, device=device)
+                padding_bbox = torch.zeros(pad_size, 4, dtype=input_bbox_embed.dtype, device=device)
+
+                input_query_label = padding_label.repeat(batch_size, 1, 1)
+                input_query_bbox = padding_bbox.repeat(batch_size, 1, 1)
+
+                if len(known_num):
+                    map_known_indice = torch.cat([torch.arange(num, device=device) for num in known_num])
+                    map_known_indice = torch.cat([map_known_indice + single_pad * i for i in range(2 * num_groups)]).long()
+                if len(known_bid):
+                    input_query_label[(known_bid.long(), map_known_indice)] = input_label_embed.to(input_query_label.dtype)
+                    input_query_bbox[(known_bid.long(), map_known_indice)] = input_bbox_embed.to(input_query_bbox.dtype)
+
+                tgt_size = pad_size + self.num_queries
+                attn_mask = torch.ones(tgt_size, tgt_size, device=device) < 0
+                attn_mask[pad_size:, :pad_size] = True
+                for i in range(num_groups):
+                    if i == 0:
+                        attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), single_pad * 2 * (i + 1):pad_size] = True
+                    if i == num_groups - 1:
+                        attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), :single_pad * i * 2] = True
+                    else:
+                        attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), single_pad * 2 * (i + 1):pad_size] = True
+                        attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), :single_pad * 2 * i] = True
+
+                dn_meta = {'pad_size': pad_size, 'num_dn_group': num_groups}
+                return input_query_label, input_query_bbox, attn_mask, dn_meta
+
+            DnQueryGenerator.__call__ = dn_call_fp16_safe
+            DnQueryGenerator._fp16_query_dn_patched = True
+            print(f"[{time.strftime('%H:%M:%S')}] [FP16] DnQueryGenerator query denoising patch applied", flush=True)
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] DnQueryGenerator patch skipped: {e}", flush=True)
+
+    # 4. Patch HungarianAssigner for float32 matching & cost sanitization
+    try:
+        from mmdet.core.bbox.assigners.hungarian_assigner import HungarianAssigner
+        from mmdet.core.bbox.transforms import bbox_cxcywh_to_xyxy
+        from mmdet.core.bbox.assigners.assign_result import AssignResult
+        try:
+            from scipy.optimize import linear_sum_assignment
+        except ImportError:
+            linear_sum_assignment = None
+
+        if not getattr(HungarianAssigner, '_fp16_cost_patched', False):
+            def assign_fp16_safe(self, bbox_pred, cls_score, gt_bboxes, gt_labels,
+                                 img_meta, gt_bboxes_ignore=None):
+                assert gt_bboxes_ignore is None, 'Only support gt_bboxes_ignore is None.'
+                num_gts, num_bboxes = gt_bboxes.size(0), bbox_pred.size(0)
+
+                assigned_gt_inds = bbox_pred.new_full((num_bboxes, ), 0, dtype=torch.long)
+                assigned_labels = bbox_pred.new_full((num_bboxes, ), -1, dtype=torch.long)
+                if num_gts == 0 or num_bboxes == 0:
+                    return AssignResult(num_gts, assigned_gt_inds, None, labels=assigned_labels)
+
+                img_h, img_w, _ = img_meta['img_shape']
+                factor = gt_bboxes.new_tensor([img_w, img_h, img_w, img_h]).unsqueeze(0)
+
+                cls_cost = self.cls_cost(cls_score.float(), gt_labels)
+                normalize_gt_bboxes = gt_bboxes / factor
+                reg_cost = self.reg_cost(bbox_pred.float(), normalize_gt_bboxes.float())
+                bboxes = bbox_cxcywh_to_xyxy(bbox_pred.float()) * factor.float()
+                iou_cost = self.iou_cost(bboxes, gt_bboxes.float())
+                cost = cls_cost + reg_cost + iou_cost
+
+                cost = torch.nan_to_num(cost.float(), nan=1e5, posinf=1e5, neginf=-1e5)
+                cost = cost.detach().cpu()
+                if linear_sum_assignment is None:
+                    raise ImportError('Please run "pip install scipy" to install scipy first.')
+                matched_row_inds, matched_col_inds = linear_sum_assignment(cost)
+                matched_row_inds = torch.from_numpy(matched_row_inds).to(bbox_pred.device)
+                matched_col_inds = torch.from_numpy(matched_col_inds).to(bbox_pred.device)
+
+                assigned_gt_inds[:] = 0
+                assigned_gt_inds[matched_row_inds] = matched_col_inds + 1
+                assigned_labels[matched_row_inds] = gt_labels[matched_col_inds]
+                return AssignResult(num_gts, assigned_gt_inds, None, labels=assigned_labels)
+
+            HungarianAssigner.assign = assign_fp16_safe
+            HungarianAssigner._fp16_cost_patched = True
+            print(f"[{time.strftime('%H:%M:%S')}] [FP16] HungarianAssigner float32 cost & nan_to_num patch applied", flush=True)
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] HungarianAssigner patch skipped: {e}", flush=True)
+
+    # 5. Patch CoATSSHead auxiliary head
+    try:
+        from projects.models.co_atss_head import CoATSSHead
+        if not getattr(CoATSSHead, '_fp16_target_patched', False):
+            orig_atss_get_target_single = CoATSSHead._get_target_single
+            def atss_get_target_single_fp16_safe(self, flat_anchors, valid_flags,
+                                                 num_level_anchors, gt_bboxes,
+                                                 gt_bboxes_ignore, gt_labels,
+                                                 img_meta, label_channels=1,
+                                                 unmap_outputs=True):
+                orig_dtype = flat_anchors.dtype
+                res = orig_atss_get_target_single(
+                    self, flat_anchors.float(), valid_flags, num_level_anchors,
+                    gt_bboxes.float(), gt_bboxes_ignore, gt_labels, img_meta,
+                    label_channels=label_channels, unmap_outputs=unmap_outputs)
+                labels, label_weights, bbox_targets, bbox_weights, pos_inds, neg_inds = res
+                return (labels, label_weights, bbox_targets.to(orig_dtype), bbox_weights.to(orig_dtype), pos_inds, neg_inds)
+
+            CoATSSHead._get_target_single = atss_get_target_single_fp16_safe
+            CoATSSHead._fp16_target_patched = True
+            print(f"[{time.strftime('%H:%M:%S')}] [FP16] CoATSSHead target assignment patch applied", flush=True)
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] CoATSSHead patch skipped: {e}", flush=True)
+
+    # 6. Patch AnchorHead (RPN) and BBoxHead (RoI) auxiliary heads
+    try:
+        from mmdet.models.dense_heads.anchor_head import AnchorHead
+        if not getattr(AnchorHead, '_fp16_target_patched', False):
+            orig_anchor_get_target_single = AnchorHead._get_target_single
+            def anchor_get_target_single_fp16_safe(self, flat_anchors, valid_flags,
+                                                   gt_bboxes, gt_bboxes_ignore,
+                                                   gt_labels, img_meta,
+                                                   label_channels=1, unmap_outputs=True):
+                orig_dtype = flat_anchors.dtype
+                res = orig_anchor_get_target_single(
+                    self, flat_anchors.float(), valid_flags, gt_bboxes.float(),
+                    gt_bboxes_ignore, gt_labels, img_meta,
+                    label_channels=label_channels, unmap_outputs=unmap_outputs)
+                labels, label_weights, bbox_targets, bbox_weights, pos_inds, neg_inds = res
+                return (labels, label_weights, bbox_targets.to(orig_dtype), bbox_weights.to(orig_dtype), pos_inds, neg_inds)
+
+            AnchorHead._get_target_single = anchor_get_target_single_fp16_safe
+            AnchorHead._fp16_target_patched = True
+            print(f"[{time.strftime('%H:%M:%S')}] [FP16] AnchorHead (RPN) target assignment patch applied", flush=True)
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] AnchorHead patch skipped: {e}", flush=True)
+
+    try:
+        from mmdet.models.roi_heads.bbox_heads.bbox_head import BBoxHead
+        if not getattr(BBoxHead, '_fp16_target_patched', False):
+            orig_bbox_get_target_single = BBoxHead._get_target_single
+            def bbox_get_target_single_fp16_safe(self, pos_bboxes, neg_bboxes,
+                                                 pos_gt_bboxes, pos_gt_labels, cfg):
+                orig_dtype = pos_bboxes.dtype
+                labels, label_weights, bbox_targets, bbox_weights = orig_bbox_get_target_single(
+                    self, pos_bboxes.float(), neg_bboxes.float(), pos_gt_bboxes.float(), pos_gt_labels, cfg)
+                return labels, label_weights, bbox_targets.to(orig_dtype), bbox_weights.to(orig_dtype)
+
+            BBoxHead._get_target_single = bbox_get_target_single_fp16_safe
+            BBoxHead._fp16_target_patched = True
+            print(f"[{time.strftime('%H:%M:%S')}] [FP16] BBoxHead (RoI) target assignment patch applied", flush=True)
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] BBoxHead patch skipped: {e}", flush=True)
+
+    return True
+
+
 def main():
     t_start = time.time()
     args = _parse_args()
@@ -904,6 +1406,7 @@ def main():
 
         # Install FP16 compatibility bridge and register MultiScaleDeformAttn
         install_deformable_attention_fp16_bridge()
+        patch_codetr_fp16_target_assignment()
 
         from mmcv.runner.hooks import HOOKS, Hook
         if 'StartupLivenessHook' not in HOOKS:
