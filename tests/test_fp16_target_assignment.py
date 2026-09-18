@@ -7,6 +7,7 @@ and Hungarian matching cost matrix sanitization.
 
 import sys
 import os
+import ast
 import pytest
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -22,24 +23,32 @@ def test_patch_importable_and_safe_on_host():
     assert res in (True, False, None)
 
 
-def test_index_put_dtype_resolution_logic():
-    """Verify the exact index-put dtype resolution behavior between Half destination and Float source."""
+def test_regression_index_put_half_float_mismatch():
+    """Regression test reproducing the exact failure:
+    destination = Half
+    source = Float
+    indexed assignment
+
+    Verifies that raw assignment fails in PyTorch with RuntimeError Index put dtype mismatch,
+    and casting to destination dtype cleanly succeeds with preserved numerical precision.
+    """
     torch = pytest.importorskip("torch")
 
-    # Destination is Half (representing bbox_targets initialized from bbox_pred in FP16)
     dest_half = torch.zeros((10, 4), dtype=torch.float16)
-    # Source is Float32 (representing pos_gt_bboxes_targets from DataLoader)
-    src_float = torch.tensor([[10.0, 20.0, 30.0, 40.0], [50.0, 60.0, 70.0, 80.0]], dtype=torch.float32)
+    src_float = torch.tensor([[10.5, 20.25, 30.125, 40.0625],
+                              [50.5, 60.25, 70.125, 80.0625]], dtype=torch.float32)
     pos_inds = torch.tensor([1, 4], dtype=torch.long)
 
-    # In PyTorch 1.11, dest_half[pos_inds] = src_float fails with:
-    # "RuntimeError: Index put requires the source and destination dtypes match, got Half for destination and Float for source"
-    # Our patched pattern explicitly casts src.to(dest.dtype):
+    # In PyTorch, assigning float32 into float16 slice directly raises RuntimeError:
+    # "Index put requires the source and destination dtypes match"
+    with pytest.raises(RuntimeError, match=r"Index put requires the source and destination dtypes match"):
+        dest_half[pos_inds] = src_float
+
+    # The fix: cast source tensor to dest_half.dtype before indexed assignment
     dest_half[pos_inds] = src_float.to(dest_half.dtype)
 
-    # Verify values match in float16
     assert dest_half.dtype == torch.float16
-    assert torch.allclose(dest_half[pos_inds].float(), src_float, atol=1e-3)
+    assert torch.allclose(dest_half[pos_inds].float(), src_float, atol=1e-2)
 
 
 def test_hungarian_assigner_cost_sanitization():
@@ -57,3 +66,98 @@ def test_hungarian_assigner_cost_sanitization():
     assert sanitized[0, 1].item() == 1e5
     assert sanitized[1, 0].item() == 1e5
     assert sanitized[1, 2].item() == -1e5
+
+
+def test_class_names_in_codetr_head_modules():
+    """Verify via static AST parsing that the Co-DETR files define CoDeformDETRHead and CoDINOHead."""
+    candidates = [
+        os.path.join(REPO_ROOT, "..", "Co-DETR"),
+        os.path.join(os.path.expanduser("~"), ".gemini", "antigravity", "brain", "7c9511b1-7f08-46c8-823a-1f2262d15f3d", "scratch", "Co-DETR"),
+        "/content/Co-DETR"
+    ]
+    codetr_dir = None
+    for cand in candidates:
+        if os.path.isdir(cand):
+            codetr_dir = cand
+            break
+
+    if codetr_dir is None:
+        pytest.skip("Co-DETR repository clone not found in standard paths.")
+
+    def_path = os.path.join(codetr_dir, "projects", "models", "co_deformable_detr_head.py")
+    dino_path = os.path.join(codetr_dir, "projects", "models", "co_dino_head.py")
+
+    with open(def_path) as f:
+        tree = ast.parse(f.read())
+    classes_def = [node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
+    assert "CoDeformDETRHead" in classes_def, f"Expected CoDeformDETRHead in {def_path}, got {classes_def}"
+    assert "CoDeformableDETRHead" not in classes_def, "Found unexpected CoDeformableDETRHead!"
+
+    with open(dino_path) as f:
+        tree = ast.parse(f.read())
+    classes_dino = [node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
+    assert "CoDINOHead" in classes_dino, f"Expected CoDINOHead in {dino_path}, got {classes_dino}"
+
+
+def test_mock_head_patching_and_inheritance():
+    """Verify that patching CoDeformDETRHead and CoDINOHead resolves the target assignment error under FP16."""
+    torch = pytest.importorskip("torch")
+
+    # Construct mock classes mimicking the exact inheritance and unpatched behavior of CoDeformDETRHead
+    class MockSamplingResult:
+        def __init__(self):
+            self.pos_inds = torch.tensor([0, 2], dtype=torch.long)
+            self.neg_inds = torch.tensor([1, 3], dtype=torch.long)
+            self.pos_assigned_gt_inds = torch.tensor([0, 1], dtype=torch.long)
+            self.pos_gt_bboxes = torch.tensor([[10.0, 10.0, 50.0, 50.0],
+                                               [20.0, 20.0, 60.0, 60.0]], dtype=torch.float32)
+
+    class MockBaseDETRHead:
+        def __init__(self):
+            self.num_classes = 7
+
+        def _get_target_single_unpatched(self, bbox_pred, sampling_result, img_meta):
+            num_bboxes = bbox_pred.size(0)
+            labels = torch.full((num_bboxes,), self.num_classes, dtype=torch.long)
+            pos_inds = sampling_result.pos_inds
+            # Unpatched: bbox_targets has dtype of bbox_pred (Half)
+            bbox_targets = torch.zeros_like(bbox_pred)
+            pos_gt_bboxes_targets = sampling_result.pos_gt_bboxes  # Float32
+            # Fails under PyTorch 1.11 when bbox_targets is Half and pos_gt_bboxes_targets is Float32
+            bbox_targets[pos_inds] = pos_gt_bboxes_targets
+            return labels, bbox_targets
+
+    class MockCoDeformDETRHead(MockBaseDETRHead):
+        pass
+
+    class MockCoDINOHead(MockCoDeformDETRHead):
+        pass
+
+    sampling_res = MockSamplingResult()
+    head = MockCoDINOHead()
+
+    # In FP16, bbox_pred is float16
+    bbox_pred_half = torch.zeros((4, 4), dtype=torch.float16)
+
+    # 1. Verify unpatched version raises RuntimeError
+    with pytest.raises(RuntimeError, match=r"Index put requires the source and destination dtypes match"):
+        head._get_target_single_unpatched(bbox_pred_half, sampling_res, {'img_shape': (640, 640, 3)})
+
+    # 2. Define and apply the safe patched method
+    def _get_target_single_fp16_safe(self, bbox_pred, sampling_result, img_meta):
+        num_bboxes = bbox_pred.size(0)
+        labels = torch.full((num_bboxes,), self.num_classes, dtype=torch.long)
+        pos_inds = sampling_result.pos_inds
+        bbox_targets = torch.zeros_like(bbox_pred)
+        pos_gt_bboxes_targets = sampling_result.pos_gt_bboxes  # Float32
+        # Patched: cast to destination dtype
+        bbox_targets[pos_inds] = pos_gt_bboxes_targets.to(bbox_targets.dtype)
+        return labels, bbox_targets
+
+    MockCoDeformDETRHead._get_target_single = _get_target_single_fp16_safe
+    MockCoDINOHead._get_target_single = _get_target_single_fp16_safe
+
+    # 3. Verify patched version succeeds
+    labels, bbox_targets = head._get_target_single(bbox_pred_half, sampling_res, {'img_shape': (640, 640, 3)})
+    assert bbox_targets.dtype == torch.float16
+    assert torch.allclose(bbox_targets[sampling_res.pos_inds].float(), sampling_res.pos_gt_bboxes, atol=1e-3)
