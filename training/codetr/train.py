@@ -37,6 +37,7 @@ See docs/colab_codetr_setup.md for full Colab setup instructions.
 import os
 import sys
 import time
+import math
 
 # ---------------------------------------------------------------------------
 # 1. Immediate visual confirmation (FIRST EXECUTABLE ACTION)
@@ -1034,12 +1035,12 @@ def patch_codetr_fp16_target_assignment():
                     factors.append(factor)
                 factors = torch.cat(factors, 0)
 
-                bbox_preds = dn_bbox_preds.reshape(-1, 4)
-                bboxes = bbox_cxcywh_to_xyxy(bbox_preds) * factors
-                bboxes_gt = bbox_cxcywh_to_xyxy(bbox_targets) * factors
+                bbox_preds_flat = dn_bbox_preds.reshape(-1, 4)
+                bboxes = bbox_cxcywh_to_xyxy(bbox_preds_flat.float()) * factors.float()
+                bboxes_gt = bbox_cxcywh_to_xyxy(bbox_targets.float()) * factors.float()
 
-                loss_iou = self.loss_iou(bboxes, bboxes_gt, bbox_weights, avg_factor=num_total_pos)
-                loss_bbox = self.loss_bbox(bbox_preds, bbox_targets, bbox_weights, avg_factor=num_total_pos)
+                loss_iou = self.loss_iou(bboxes, bboxes_gt, bbox_weights.float() if bbox_weights is not None else None, avg_factor=num_total_pos)
+                loss_bbox = self.loss_bbox(bbox_preds_flat.float(), bbox_targets.float(), bbox_weights.float() if bbox_weights is not None else None, avg_factor=num_total_pos)
                 return loss_cls, loss_bbox, loss_iou
 
             CoDINOHead.loss_dn_single = loss_dn_single_fp16_safe
@@ -1093,12 +1094,12 @@ def patch_codetr_fp16_target_assignment():
                     factors.append(factor)
                 factors = torch.cat(factors, 0)
 
-                bbox_preds = bbox_preds.reshape(-1, 4)
-                bboxes = bbox_cxcywh_to_xyxy(bbox_preds) * factors
-                bboxes_gt = bbox_cxcywh_to_xyxy(bbox_targets) * factors
+                bbox_preds_flat = bbox_preds.reshape(-1, 4)
+                bboxes = bbox_cxcywh_to_xyxy(bbox_preds_flat.float()) * factors.float()
+                bboxes_gt = bbox_cxcywh_to_xyxy(bbox_targets.float()) * factors.float()
 
-                loss_iou = self.loss_iou(bboxes, bboxes_gt, bbox_weights, avg_factor=num_total_pos)
-                loss_bbox = self.loss_bbox(bbox_preds, bbox_targets, bbox_weights, avg_factor=num_total_pos)
+                loss_iou = self.loss_iou(bboxes, bboxes_gt, bbox_weights.float() if bbox_weights is not None else None, avg_factor=num_total_pos)
+                loss_bbox = self.loss_bbox(bbox_preds_flat.float(), bbox_targets.float(), bbox_weights.float() if bbox_weights is not None else None, avg_factor=num_total_pos)
                 return loss_cls, loss_bbox, loss_iou
 
             CoDINOHead.loss_single = loss_single_fp16_safe
@@ -1155,12 +1156,12 @@ def patch_codetr_fp16_target_assignment():
                         factors.append(factor)
                     factors = torch.cat(factors, 0)
 
-                    bbox_preds = bbox_preds.reshape(-1, 4)
-                    bboxes = bbox_cxcywh_to_xyxy(bbox_preds) * factors
-                    bboxes_gt = bbox_cxcywh_to_xyxy(bbox_targets) * factors
+                    bbox_preds_flat = bbox_preds.reshape(-1, 4)
+                    bboxes = bbox_cxcywh_to_xyxy(bbox_preds_flat.float()) * factors.float()
+                    bboxes_gt = bbox_cxcywh_to_xyxy(bbox_targets.float()) * factors.float()
 
-                    loss_iou = self.loss_iou(bboxes, bboxes_gt, bbox_weights, avg_factor=num_total_pos)
-                    loss_bbox = self.loss_bbox(bbox_preds, bbox_targets, bbox_weights, avg_factor=num_total_pos)
+                    loss_iou = self.loss_iou(bboxes, bboxes_gt, bbox_weights.float() if bbox_weights is not None else None, avg_factor=num_total_pos)
+                    loss_bbox = self.loss_bbox(bbox_preds_flat.float(), bbox_targets.float(), bbox_weights.float() if bbox_weights is not None else None, avg_factor=num_total_pos)
                     return loss_cls * self.lambda_1, loss_bbox * self.lambda_1, loss_iou * self.lambda_1
 
                 CoDINOHead.loss_single_aux = loss_single_aux_fp16_safe
@@ -1463,17 +1464,129 @@ def patch_codetr_fp16_target_assignment():
     except Exception as e:
         print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] QualityFocalLoss patch skipped: {e}", flush=True)
 
-    # 8. Explicit Verification of Active Methods on Active Classes
+    # 8. Patch GIoULoss, IoULoss, and bbox_overlaps for FP16 numerical stability
+    try:
+        from mmdet.models.losses.iou_loss import GIoULoss, IoULoss
+        if not getattr(GIoULoss, '_fp16_safe_patched', False):
+            orig_giou_forward = GIoULoss.forward
+            def giou_forward_fp16_safe(self, pred, target, weight=None, avg_factor=None, reduction_override=None, **kwargs):
+                if pred.dtype == torch.float16:
+                    pred = pred.float()
+                if target.dtype == torch.float16:
+                    target = target.float()
+                if weight is not None and weight.dtype == torch.float16:
+                    weight = weight.float()
+                return orig_giou_forward(
+                    self, pred, target, weight=weight, avg_factor=avg_factor,
+                    reduction_override=reduction_override, **kwargs)
+            GIoULoss.forward = giou_forward_fp16_safe
+            GIoULoss._fp16_safe_patched = True
+
+        if not getattr(IoULoss, '_fp16_safe_patched', False):
+            orig_iou_forward = IoULoss.forward
+            def iou_forward_fp16_safe(self, pred, target, weight=None, avg_factor=None, reduction_override=None, **kwargs):
+                if pred.dtype == torch.float16:
+                    pred = pred.float()
+                if target.dtype == torch.float16:
+                    target = target.float()
+                if weight is not None and weight.dtype == torch.float16:
+                    weight = weight.float()
+                return orig_iou_forward(
+                    self, pred, target, weight=weight, avg_factor=avg_factor,
+                    reduction_override=reduction_override, **kwargs)
+            IoULoss.forward = iou_forward_fp16_safe
+            IoULoss._fp16_safe_patched = True
+
+        try:
+            import mmdet.core.bbox.iou_calculators.iou2d_calculator as iou_calc_mod
+            if not getattr(iou_calc_mod, '_fp16_safe_patched', False):
+                orig_bbox_overlaps = iou_calc_mod.bbox_overlaps
+                def bbox_overlaps_fp16_safe(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
+                    orig_dtype = bboxes1.dtype
+                    if bboxes1.dtype == torch.float16 or bboxes2.dtype == torch.float16:
+                        res = orig_bbox_overlaps(bboxes1.float(), bboxes2.float(), mode=mode, is_aligned=is_aligned, eps=eps)
+                        return res.to(orig_dtype)
+                    return orig_bbox_overlaps(bboxes1, bboxes2, mode=mode, is_aligned=is_aligned, eps=eps)
+                iou_calc_mod.bbox_overlaps = bbox_overlaps_fp16_safe
+                iou_calc_mod._fp16_safe_patched = True
+
+                try:
+                    import mmdet.core.bbox as bbox_mod
+                    bbox_mod.bbox_overlaps = bbox_overlaps_fp16_safe
+                except Exception:
+                    pass
+                try:
+                    import mmdet.models.losses.iou_loss as iou_loss_mod
+                    iou_loss_mod.bbox_overlaps = bbox_overlaps_fp16_safe
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16] GIoULoss, IoULoss & bbox_overlaps float32 numerical stability patch applied", flush=True)
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] GIoULoss patch skipped: {e}", flush=True)
+
+    # 9. Patch inverse_sigmoid for FP16 numerical stability (prevents 1/1e-5 = 100k overflow to inf)
+    try:
+        def inverse_sigmoid_fp16_safe(x, eps=1e-5):
+            x_f = x.float().clamp(min=0.0, max=1.0)
+            x1 = x_f.clamp(min=eps)
+            x2 = (1.0 - x_f).clamp(min=eps)
+            return torch.log(x1 / x2).to(x.dtype)
+
+        try:
+            import projects.models.transformer as proj_trans
+            if hasattr(proj_trans, 'inverse_sigmoid'):
+                proj_trans.inverse_sigmoid = inverse_sigmoid_fp16_safe
+        except Exception:
+            pass
+
+        try:
+            import mmdet.models.utils.transformer as mmdet_trans
+            if hasattr(mmdet_trans, 'inverse_sigmoid'):
+                mmdet_trans.inverse_sigmoid = inverse_sigmoid_fp16_safe
+        except Exception:
+            pass
+
+        try:
+            import projects.models.query_denoising as qd_mod
+            if hasattr(qd_mod, 'inverse_sigmoid'):
+                qd_mod.inverse_sigmoid = inverse_sigmoid_fp16_safe
+        except Exception:
+            pass
+
+        try:
+            import projects.models.co_dino_head as cd_mod
+            if hasattr(cd_mod, 'inverse_sigmoid'):
+                cd_mod.inverse_sigmoid = inverse_sigmoid_fp16_safe
+        except Exception:
+            pass
+
+        try:
+            import projects.models.co_deformable_detr_head as cdd_mod
+            if hasattr(cdd_mod, 'inverse_sigmoid'):
+                cdd_mod.inverse_sigmoid = inverse_sigmoid_fp16_safe
+        except Exception:
+            pass
+
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16] inverse_sigmoid float32 numerical stability patch applied", flush=True)
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] [FP16 NOTE] inverse_sigmoid patch skipped: {e}", flush=True)
+
+    # 10. Explicit Verification of Active Methods on Active Classes
     try:
         from projects.models.co_deformable_detr_head import CoDeformDETRHead
         from projects.models.co_dino_head import CoDINOHead
         from projects.models.co_atss_head import CoATSSHead
         from mmdet.models.losses.gfocal_loss import QualityFocalLoss
+        from mmdet.models.losses.iou_loss import GIoULoss
         assert getattr(CoDeformDETRHead, '_fp16_target_patched', False), "CoDeformDETRHead not patched!"
         assert getattr(CoDINOHead, '_fp16_target_patched', False), "CoDINOHead _get_target_single not patched!"
         assert getattr(CoDINOHead, '_fp16_dn_target_patched', False), "CoDINOHead _get_dn_target_single not patched!"
         assert getattr(CoATSSHead, '_fp16_target_patched', False), "CoATSSHead _get_target_single not patched!"
         assert getattr(QualityFocalLoss, '_fp16_safe_patched', False), "QualityFocalLoss not patched!"
+        assert getattr(GIoULoss, '_fp16_safe_patched', False), "GIoULoss not patched!"
         print(f"[{time.strftime('%H:%M:%S')}] [FP16 VERIFIED] All active Co-DETR target and loss patches confirmed active!", flush=True)
     except Exception as e:
         print(f"[{time.strftime('%H:%M:%S')}] [FP16 VERIFICATION ERROR] Active head verification failed: {e}", flush=True)
@@ -1588,15 +1701,73 @@ def main():
                     dur = time.time() - self._start_time if self._start_time else 0.0
                     self._step_times.append(dur)
                     loss_val = runner.outputs.get('loss', None) if hasattr(runner, 'outputs') and isinstance(runner.outputs, dict) else None
-                    loss_str = f"{loss_val.item():.4f}" if hasattr(loss_val, 'item') else str(loss_val)
+                    log_vars = runner.outputs.get('log_vars', {}) if hasattr(runner, 'outputs') and isinstance(runner.outputs, dict) else {}
+
+                    # 1. Check finiteness of EVERY individual loss component in log_vars
+                    non_finite_losses = {}
+                    finite_losses = {}
+                    for k, v in log_vars.items():
+                        is_finite = True
+                        if isinstance(v, (int, float)):
+                            if not math.isfinite(v):
+                                is_finite = False
+                        elif hasattr(v, 'item'):
+                            val = v.item() if v.numel() == 1 else float('nan')
+                            if not math.isfinite(val):
+                                is_finite = False
+                        if not is_finite:
+                            non_finite_losses[k] = v
+                        else:
+                            finite_losses[k] = v
+
+                    # 2. Check total loss
+                    total_loss_finite = True
+                    if loss_val is not None:
+                        if hasattr(loss_val, 'item'):
+                            total_loss_finite = math.isfinite(loss_val.item())
+                        elif isinstance(loss_val, (int, float)):
+                            total_loss_finite = math.isfinite(loss_val)
+                    else:
+                        total_loss_finite = False
+
+                    # 3. Check gradients of trainable parameters
+                    non_finite_grads = []
+                    grad_count = 0
+                    if hasattr(runner, 'model') and hasattr(runner.model, 'named_parameters'):
+                        for p_name, p in runner.model.named_parameters():
+                            if p.requires_grad and p.grad is not None:
+                                grad_count += 1
+                                if not torch.isfinite(p.grad).all():
+                                    non_finite_grads.append(p_name)
 
                     ts = time.strftime("%H:%M:%S")
-                    print(f"[{ts}] [DIAGNOSTIC] Iteration {runner.iter + 1}/{self.max_iters} complete: loss={loss_str}, step_time={dur:.3f}s, optimizer.step() OK", flush=True)
+                    loss_str = f"{loss_val.item():.4f}" if hasattr(loss_val, 'item') and total_loss_finite else str(loss_val)
+                    print(f"[{ts}] [DIAGNOSTIC] Iteration {runner.iter + 1}/{self.max_iters}: total_loss={loss_str}, step_time={dur:.3f}s", flush=True)
+
+                    # Print key loss components for inspection
+                    key_losses_str = ", ".join(f"{k}={v:.4f}" if isinstance(v, (int, float)) else f"{k}={v}" for k, v in list(finite_losses.items())[:6])
+                    if key_losses_str:
+                        print(f"[{ts}]   -> Losses: {key_losses_str}", flush=True)
+
+                    # Strict Gate: reject any non-finite loss or gradient
+                    if non_finite_losses or not total_loss_finite or non_finite_grads:
+                        print(f"[{ts}] [DIAGNOSTIC FAILED] Non-finite value detected on iteration {runner.iter + 1}!", flush=True)
+                        if non_finite_losses:
+                            print(f"[{ts}]   Non-finite loss components: {non_finite_losses}", flush=True)
+                        if not total_loss_finite:
+                            print(f"[{ts}]   Total loss is non-finite: {loss_val}", flush=True)
+                        if non_finite_grads:
+                            print(f"[{ts}]   Non-finite parameter gradients ({len(non_finite_grads)} params): {non_finite_grads[:5]}", flush=True)
+                        raise RuntimeError(
+                            f"TrainingDiagnostic failed on iteration {runner.iter + 1}: non-finite loss/gradient "
+                            f"(non-finite losses={list(non_finite_losses.keys())}, total_loss={loss_str}, non-finite grads={len(non_finite_grads)})"
+                        )
+
+                    print(f"[{ts}]   -> LOSS FINITE: PASS | GRADIENTS FINITE: PASS ({grad_count} params) | BACKWARD: PASS | OPTIMIZER STEP: PASS", flush=True)
 
                     if runner.iter + 1 >= self.max_iters:
                         gpu_mem_str = "N/A"
                         try:
-                            import torch
                             if torch.cuda.is_available():
                                 alloc = torch.cuda.max_memory_allocated(0) / (1024**3)
                                 total = torch.cuda.get_device_properties(0).total_memory / (1024**3)

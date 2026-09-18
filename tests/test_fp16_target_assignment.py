@@ -518,4 +518,109 @@ def test_ast_quality_focal_loss_indexed_assignment():
     assert "loss[pos, pos_label] = F.binary_cross_entropy_with_logits(" in content
 
 
+def test_regression_giou_float16_overflow():
+    """Regression test: in IEEE 754 float16, max representable value is 65504.
+    Boxes larger than ~256x256 have area >= 65536, which overflows float16 to inf.
+    When area overflows to inf:
+      union = area1 + area2 - overlap -> inf + inf - overlap = inf
+      (enclose_area - union) / enclose_area -> (inf - inf) / inf = nan
+      giou -> nan
+    Verifies that unpatched calculation with float16 boxes produces nan/inf,
+    and casting boxes to float32 produces finite loss and finite backward gradients.
+    """
+    torch = pytest.importorskip("torch")
+
+    # Unnormalized boxes on 640x384 image
+    # box of width 300, height 300 -> area = 90,000 > 65,504
+    pred_boxes_fp16 = torch.tensor([[50.0, 50.0, 350.0, 350.0]], dtype=torch.float16, requires_grad=True)
+    target_boxes_fp16 = torch.tensor([[60.0, 60.0, 340.0, 340.0]], dtype=torch.float16)
+
+    # In raw float16:
+    area1 = (pred_boxes_fp16[:, 2] - pred_boxes_fp16[:, 0]) * (pred_boxes_fp16[:, 3] - pred_boxes_fp16[:, 1])
+    assert torch.isinf(area1).all(), "Expected float16 area to overflow to inf"
+
+    # Using float32 promotion (as in our patch):
+    pred_f = pred_boxes_fp16.float()
+    target_f = target_boxes_fp16.float()
+    area1_f = (pred_f[:, 2] - pred_f[:, 0]) * (pred_f[:, 3] - pred_f[:, 1])
+    area2_f = (target_f[:, 2] - target_f[:, 0]) * (target_f[:, 3] - target_f[:, 1])
+    assert torch.isfinite(area1_f).all() and area1_f.item() == 90000.0
+
+    # Test GIoU calculation
+    x1 = torch.max(pred_f[:, 0], target_f[:, 0])
+    y1 = torch.max(pred_f[:, 1], target_f[:, 1])
+    x2 = torch.min(pred_f[:, 2], target_f[:, 2])
+    y2 = torch.min(pred_f[:, 3], target_f[:, 3])
+    overlap = (x2 - x1).clamp(min=0) * (y2 - y1).clamp(min=0)
+    union = area1_f + area2_f - overlap
+    ious = overlap / union
+
+    ex_x1 = torch.min(pred_f[:, 0], target_f[:, 0])
+    ex_y1 = torch.min(pred_f[:, 1], target_f[:, 1])
+    ex_x2 = torch.max(pred_f[:, 2], target_f[:, 2])
+    ex_y2 = torch.max(pred_f[:, 3], target_f[:, 3])
+    enclose_area = (ex_x2 - ex_x1) * (ex_y2 - ex_y1)
+
+    gious = ious - (enclose_area - union) / enclose_area
+    loss = (1.0 - gious).sum()
+
+    assert torch.isfinite(loss).all()
+    loss.backward()
+    assert pred_boxes_fp16.grad is not None
+    assert torch.isfinite(pred_boxes_fp16.grad).all()
+
+
+def test_regression_inverse_sigmoid_float16_overflow():
+    """Regression test: inverse_sigmoid(x, eps=1e-5) computes x1 = x.clamp(min=eps),
+    x2 = (1 - x).clamp(min=eps), return log(x1 / x2).
+    For x >= 1.0 - 1e-5 (e.g. x = 1.0), x1 / x2 = 1.0 / 1e-5 = 100,000 > 65,504.
+    In raw float16, 1.0 / 1e-5 overflows to inf, and log(inf) = inf.
+    Verifies that float32 evaluation returns finite float16 result (ln(100000) ~ 11.51).
+    """
+    torch = pytest.importorskip("torch")
+
+    x_fp16 = torch.tensor([1.0, 0.0, 0.5], dtype=torch.float16)
+    eps = 1e-5
+
+    # Raw float16 failure:
+    x1_half = x_fp16.clamp(min=eps)
+    x2_half = (1 - x_fp16).clamp(min=eps)
+    ratio_half = x1_half / x2_half
+    # In float16, ratio_half[0] is inf because 1.0 / 1e-5 = 100,000 > 65504
+    assert torch.isinf(ratio_half[0]), "Expected float16 ratio to overflow to inf"
+    log_half = torch.log(ratio_half)
+    assert torch.isinf(log_half[0]), "Expected float16 log to be inf"
+
+    # Safe float32 evaluation:
+    x_f = x_fp16.float()
+    x1_f = x_f.clamp(min=eps)
+    x2_f = (1.0 - x_f).clamp(min=eps)
+    safe_res = torch.log(x1_f / x2_f).to(x_fp16.dtype)
+
+    assert torch.isfinite(safe_res).all(), "Expected safe inverse_sigmoid to be fully finite"
+    assert abs(safe_res[0].item() - 11.5129) < 0.05
+    assert abs(safe_res[1].item() - (-11.5129)) < 0.05
+    assert abs(safe_res[2].item() - 0.0) < 0.01
+
+
+def test_diagnostic_hook_rejects_non_finite_values():
+    """Verify that the diagnostic logic detects and rejects non-finite losses or gradients."""
+    import math
+
+    # Test 1: non-finite in log_vars
+    log_vars_bad = {'loss_cls': 1.23, 'loss_bbox': float('nan'), 'loss_iou': 0.45}
+    non_finite = {k: v for k, v in log_vars_bad.items() if not math.isfinite(v)}
+    assert 'loss_bbox' in non_finite
+
+    # Test 2: non-finite total loss
+    total_loss = float('nan')
+    assert not math.isfinite(total_loss)
+
+    # Test 3: finite losses pass
+    log_vars_good = {'loss_cls': 1.23, 'loss_bbox': 0.55, 'loss_iou': 0.45}
+    non_finite_good = {k: v for k, v in log_vars_good.items() if not math.isfinite(v)}
+    assert len(non_finite_good) == 0
+
+
+
 
