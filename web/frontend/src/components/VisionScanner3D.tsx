@@ -3,7 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Html, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import { DetectionItem } from '../services/api';
-import { Camera, Scan, Sparkles, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Camera, Scan, CheckCircle2, AlertTriangle, RefreshCw, Layers } from 'lucide-react';
 
 export type ScannerState = 'IDLE' | 'READY' | 'SCANNING' | 'ANALYZING' | 'RESULT_READY' | 'ERROR';
 
@@ -243,9 +243,9 @@ export const VisionScanner3D: React.FC<VisionScanner3DProps> = ({
         );
       case 'ANALYZING':
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 shadow-sm animate-pulse">
-            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-            Query Attention Forward Pass...
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm animate-pulse">
+            <Scan className="w-3.5 h-3.5 text-blue-600 animate-spin" />
+            Evaluating Co-DETR proposals...
           </span>
         );
       case 'RESULT_READY':
@@ -310,7 +310,8 @@ export const VisionScanner3D: React.FC<VisionScanner3DProps> = ({
       {/* WebGL 3D Canvas */}
       {webGlSupported ? (
         <Canvas
-          camera={{ position: [0, 0, 4.4], fov: 42 }}
+          camera={{ position: [0, 0, 3.8], fov: 45 }}
+          gl={{ antialias: true, alpha: true }}
           className="w-full h-full flex-1 cursor-grab active:cursor-grabbing"
           style={{ background: '#F8FAFC' }}
         >
@@ -366,8 +367,8 @@ export const VisionScanner3D: React.FC<VisionScanner3DProps> = ({
 
       {/* Bottom 3D Helper Hint */}
       <div className="absolute bottom-3 left-3.5 z-10 pointer-events-none flex items-center gap-1.5 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-lg text-[11px] text-gray-500 border border-gray-200/80 shadow-xs">
-        <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-        <span>3D Vision Scanner • Drag to rotate perspective • Scroll to zoom</span>
+        <Layers className="w-3.5 h-3.5 text-blue-600" />
+        <span>3D Projection View • Drag to rotate perspective • Scroll to zoom</span>
       </div>
     </div>
   );

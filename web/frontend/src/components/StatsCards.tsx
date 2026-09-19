@@ -48,9 +48,9 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
       sparkline: [40, 65, 50, 75, 45, 80, 70, 85],
     },
     {
-      title: 'AI VISION CORE',
+      title: 'INFERENCE ENGINE',
       value: 'ONLINE',
-      unit: 'Tesla T4 • ~100ms latency',
+      unit: 'Tesla T4 • ~112ms latency',
       change: 'Co-DETR FP16',
       isPositive: true,
       icon: Cpu,

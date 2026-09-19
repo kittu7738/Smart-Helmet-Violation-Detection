@@ -23,12 +23,7 @@ export const Navigation: React.FC<NavigationProps> = ({
     { id: 'dashboard' as NavTab, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'detection' as NavTab, label: 'Detection', icon: ScanLine },
     { id: 'video' as NavTab, label: 'Video Analysis', icon: Video },
-    {
-      id: 'camera' as NavTab,
-      label: 'Live Camera',
-      icon: Camera,
-      pill: 'Coming Soon'
-    },
+    { id: 'camera' as NavTab, label: 'Live Camera', icon: Camera },
     { id: 'analytics' as NavTab, label: 'Analytics', icon: BarChart3 },
     { id: 'about' as NavTab, label: 'About', icon: Info }
   ];
@@ -55,11 +50,6 @@ export const Navigation: React.FC<NavigationProps> = ({
                 >
                   <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
                   <span>{tab.label}</span>
-                  {tab.pill && (
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                      {tab.pill}
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -83,9 +73,6 @@ export const Navigation: React.FC<NavigationProps> = ({
             >
               <Icon className="w-5 h-5 mb-0.5" />
               <span>{tab.label}</span>
-              {tab.pill && (
-                <span className="absolute top-0 right-1 w-2 h-2 rounded-full bg-amber-500" />
-              )}
             </button>
           );
         })}
