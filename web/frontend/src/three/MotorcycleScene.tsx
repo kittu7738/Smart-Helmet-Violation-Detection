@@ -52,27 +52,27 @@ export const MotorcycleScene: React.FC<MotorcycleSceneProps> = ({
 
   return (
     <group ref={groupRef} position={[0, -0.4, 0]}>
-      {/* ================= 1. CLEAN LIGHT PLATFORM ================= */}
-      {/* Base platform (Clean White / Light Slate) */}
+      {/* ================= 1. CYBER DARK PLATFORM ================= */}
+      {/* Base platform (Dark Slate / Metal) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.06, 0]}>
         <cylinderGeometry args={[3.4, 3.5, 0.12, 48]} />
-        <meshStandardMaterial color="#FFFFFF" roughness={0.3} metalness={0.1} />
+        <meshStandardMaterial color="#0F172A" roughness={0.4} metalness={0.6} />
       </mesh>
 
       {/* Subtle outer platform ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
         <ringGeometry args={[3.34, 3.38, 48]} />
-        <meshBasicMaterial color="#93C5FD" side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#3B82F6" side={THREE.DoubleSide} />
       </mesh>
 
       {/* Single rotating detection ring */}
       <mesh ref={radarRingRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]}>
         <ringGeometry args={[2.2, 2.23, 36]} />
-        <meshBasicMaterial color="#60A5FA" transparent opacity={0.5} side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#60A5FA" transparent opacity={0.6} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Very light floor grid */}
-      <gridHelper args={[6.4, 20, '#94A3B8', '#E2E8F0']} position={[0, 0.01, 0]} />
+      {/* Cyber floor grid */}
+      <gridHelper args={[6.4, 20, '#334155', '#1E293B']} position={[0, 0.01, 0]} />
 
       {/* Clean vertical scan line */}
       {isScanning && (

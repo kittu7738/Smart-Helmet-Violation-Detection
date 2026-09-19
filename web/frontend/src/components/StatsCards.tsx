@@ -15,10 +15,10 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
       change: '+12% vs avg',
       isPositive: true,
       icon: Users,
-      color: '#2563EB',
-      textColor: 'text-blue-600',
-      iconBg: 'bg-blue-50 text-blue-600 border border-blue-100',
-      badgeBg: 'bg-blue-50 text-blue-700',
+      color: '#3B82F6',
+      textColor: 'text-blue-400',
+      iconBg: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
+      badgeBg: 'bg-blue-500/10 text-blue-300 border border-blue-500/20',
       sparkline: [25, 40, 35, 55, 60, 50, 75, 90],
     },
     {
@@ -28,10 +28,10 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
       change: '+1.8% vs last week',
       isPositive: true,
       icon: ShieldCheck,
-      color: '#16A34A',
-      textColor: 'text-green-600',
-      iconBg: 'bg-green-50 text-green-600 border border-green-100',
-      badgeBg: 'bg-green-50 text-green-700',
+      color: '#10B981',
+      textColor: 'text-emerald-400',
+      iconBg: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
+      badgeBg: 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20',
       sparkline: [80, 84, 82, 88, 90, 89, 93, 95],
     },
     {
@@ -41,23 +41,23 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
       change: '1 driver, 2 pillion',
       isPositive: false,
       icon: AlertOctagon,
-      color: '#DC2626',
-      textColor: 'text-red-600',
-      iconBg: 'bg-red-50 text-red-600 border border-red-100',
-      badgeBg: 'bg-red-50 text-red-700',
+      color: '#EF4444',
+      textColor: 'text-rose-400',
+      iconBg: 'bg-rose-500/10 text-rose-400 border border-rose-500/20',
+      badgeBg: 'bg-rose-500/10 text-rose-300 border border-rose-500/20',
       sparkline: [40, 65, 50, 75, 45, 80, 70, 85],
     },
     {
-      title: 'DETECTION FPS',
-      value: stats.detectionFps.toString(),
-      unit: 'real-time inference',
-      change: 'GPU Active',
+      title: 'INFERENCE SPEED',
+      value: `${stats.detectionFps} FPS`,
+      unit: '~100ms per frame',
+      change: 'Tesla T4 Active',
       isPositive: true,
       icon: Gauge,
-      color: '#7C3AED',
-      textColor: 'text-purple-600',
-      iconBg: 'bg-purple-50 text-purple-600 border border-purple-100',
-      badgeBg: 'bg-purple-50 text-purple-700',
+      color: '#8B5CF6',
+      textColor: 'text-purple-400',
+      iconBg: 'bg-purple-500/10 text-purple-400 border border-purple-500/20',
+      badgeBg: 'bg-purple-500/10 text-purple-300 border border-purple-500/20',
       sparkline: [24, 26, 27, 28, 28, 29, 28, 28],
     },
   ];
@@ -82,14 +82,14 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
         return (
           <div
             key={idx}
-            className="rounded-xl p-5 bg-white border border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between"
+            className="rounded-xl p-5 bg-slate-900/80 backdrop-blur-md border border-slate-800 shadow-lg hover:border-slate-700 transition-all duration-200 flex flex-col justify-between"
           >
             {/* Header: Title and Icon */}
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-mono font-semibold tracking-wider text-slate-500 uppercase">
+              <span className="text-xs font-mono font-semibold tracking-wider text-slate-400 uppercase">
                 {card.title}
               </span>
-              <div className={`p-2.5 rounded-lg ${card.iconBg}`}>
+              <div className={`p-2 rounded-lg ${card.iconBg}`}>
                 <Icon className="w-4 h-4" />
               </div>
             </div>
@@ -100,7 +100,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
                 {card.value}
               </div>
 
-              {/* Clean Sparkline */}
+              {/* Sparkline */}
               <div className="w-24 h-8 flex-shrink-0">
                 <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
                   <polyline
@@ -116,8 +116,8 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
             </div>
 
             {/* Subtext and Trend Indicator */}
-            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-1 text-xs">
-              <span className="text-slate-500 font-medium text-xs">{card.unit}</span>
+            <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-1 text-xs">
+              <span className="text-slate-400 font-medium text-xs">{card.unit}</span>
               <span className={`flex items-center gap-1 font-mono text-[11px] font-semibold px-2 py-0.5 rounded ${card.badgeBg}`}>
                 {card.isPositive ? (
                   <ArrowUpRight className="w-3 h-3 flex-shrink-0" />

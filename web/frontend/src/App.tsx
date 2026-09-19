@@ -3,33 +3,35 @@ import { Header } from './components/Header';
 import { Navigation, NavTab } from './components/Navigation';
 import { DashboardPage } from './pages/DashboardPage';
 import { DetectionPage } from './pages/DetectionPage';
-import { ViolationsPage } from './pages/ViolationsPage';
+import { VideoAnalysisPage } from './pages/VideoAnalysisPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
-import { SettingsPage } from './pages/SettingsPage';
+import { LiveCameraPage } from './pages/LiveCameraPage';
+import { AboutPage } from './pages/AboutPage';
+import { ViolationsPage } from './pages/ViolationsPage';
 import { api } from './services/api';
 import { DashboardStats, LiveDetectionSummary, RecentViolation } from './types/detection';
 import { mockDashboardStats, mockLiveDetection, mockRecentViolations } from './data/mockDashboard';
 
 export const App: React.FC = () => {
-  const getInitialTab = (): NavTab => {
-    const hash = window.location.hash.replace('#', '') as NavTab;
-    const validTabs: NavTab[] = ['dashboard', 'detection', 'violations', 'analytics', 'settings'];
-    return validTabs.includes(hash) ? hash : 'dashboard';
+  const getInitialTab = (): NavTab | 'violations' => {
+    const hash = window.location.hash.replace('#', '');
+    const validTabs = ['dashboard', 'detection', 'video', 'analytics', 'camera', 'about', 'violations'];
+    return validTabs.includes(hash) ? (hash as any) : 'dashboard';
   };
 
-  const [activeTab, setActiveTabState] = useState<NavTab>(getInitialTab);
+  const [activeTab, setActiveTabState] = useState<NavTab | 'violations'>(getInitialTab);
 
-  const setActiveTab = (tab: NavTab) => {
+  const setActiveTab = (tab: NavTab | 'violations') => {
     setActiveTabState(tab);
     window.location.hash = tab;
   };
 
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '') as NavTab;
-      const validTabs: NavTab[] = ['dashboard', 'detection', 'violations', 'analytics', 'settings'];
+      const hash = window.location.hash.replace('#', '');
+      const validTabs = ['dashboard', 'detection', 'video', 'analytics', 'camera', 'about', 'violations'];
       if (validTabs.includes(hash)) {
-        setActiveTabState(hash);
+        setActiveTabState(hash as any);
       }
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -60,15 +62,14 @@ export const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-slate-900 selection:bg-blue-100 selection:text-blue-900">
-      {/* Clean White Header */}
+    <div className="min-h-screen flex flex-col bg-[#0B0F19] text-slate-100 selection:bg-blue-500/30 selection:text-blue-200">
+      {/* Dark Modern Header */}
       <Header backendConnected={backendConnected} />
 
-      {/* Clean Navigation Bar */}
+      {/* Dark Navigation Bar */}
       <Navigation
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        violationsCount={stats.violations}
+        activeTab={activeTab === 'violations' ? 'dashboard' : activeTab}
+        onTabChange={(tab) => setActiveTab(tab)}
       />
 
       {/* Main Content Area */}
@@ -80,28 +81,33 @@ export const App: React.FC = () => {
             violations={violations}
             onNavigateToViolations={() => setActiveTab('violations')}
             onNavigateToDetection={() => setActiveTab('detection')}
+            onNavigateToVideo={() => setActiveTab('video')}
           />
         )}
 
         {activeTab === 'detection' && <DetectionPage />}
 
-        {activeTab === 'violations' && <ViolationsPage />}
+        {activeTab === 'video' && <VideoAnalysisPage />}
 
         {activeTab === 'analytics' && <AnalyticsPage />}
 
-        {activeTab === 'settings' && <SettingsPage />}
+        {activeTab === 'camera' && <LiveCameraPage />}
+
+        {activeTab === 'about' && <AboutPage />}
+
+        {activeTab === 'violations' && <ViolationsPage />}
       </main>
 
-      {/* Clean Professional Footer */}
-      <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
+      {/* Modern Dark Footer */}
+      <footer className="border-t border-slate-800/80 bg-slate-950/80 backdrop-blur-md py-4 text-center text-xs text-slate-400">
         <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500" />
-            <span className="font-semibold text-slate-700">Smart Helmet AI Violation Detection System</span>
-            <span className="text-slate-300">|</span>
-            <span className="text-blue-600 font-medium">Co-DETR Swin-L Vision Core</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="font-semibold text-slate-200">Smart Helmet AI Violation Detection System</span>
+            <span className="text-slate-700">|</span>
+            <span className="text-blue-400 font-mono">Co-DETR ResNet-18 FP16</span>
           </div>
-          <div className="text-slate-500">
+          <div className="text-slate-400 font-mono text-[11px]">
             IIITVICD AI City Challenge Research Project
           </div>
         </div>

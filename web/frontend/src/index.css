@@ -5,17 +5,20 @@
 @layer base {
   body {
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #F8FAFC;
-    color: #0F172A;
+    background-color: #0B0F19;
+    color: #F8FAFC;
     background-image: 
-      radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.03) 0%, transparent 40%),
-      radial-gradient(circle at 90% 20%, rgba(14, 165, 233, 0.03) 0%, transparent 40%);
+      radial-gradient(circle at 15% 15%, rgba(59, 130, 246, 0.08) 0%, transparent 45%),
+      radial-gradient(circle at 85% 25%, rgba(139, 92, 246, 0.06) 0%, transparent 45%),
+      radial-gradient(circle at 50% 85%, rgba(16, 185, 129, 0.04) 0%, transparent 45%);
     background-attachment: fixed;
+    min-height: 100vh;
   }
 
-  h1, h2, h3 {
+  h1, h2, h3, h4, h5, h6 {
     font-family: 'Inter', system-ui, sans-serif;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
+    color: #F8FAFC;
   }
 
   .font-tech {
@@ -23,78 +26,76 @@
   }
 
   .font-mono-code {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
   }
 }
 
-/* Clean Custom Scrollbars for Light Theme */
+/* Custom Sleek Dark Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #F1F5F9;
+  background: #0F172A;
 }
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
+  background: #334155;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
+  background: #475569;
 }
 
-/* Clean Professional Light Cards */
-.neon-glass-panel {
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+/* Dark Glassmorphic Card Surfaces */
+.glass-panel {
+  background: rgba(17, 24, 39, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
 }
 
-.neon-glass-card {
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+.glass-card {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  box-shadow: 0 4px 16px -1px rgba(0, 0, 0, 0.35);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.neon-card-hover {
-  transition: all 0.2s ease-in-out;
-}
-.neon-card-hover:hover {
-  border-color: #CBD5E1;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+.glass-card:hover {
+  border-color: rgba(99, 102, 241, 0.5);
+  box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.45);
 }
 
-/* Subtle clean border accents */
-.neon-border-cyan {
-  border: 1px solid #BAE6FD;
+/* Status Pill Glowing Effects */
+.status-pill-online {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34D399;
 }
 
-.neon-border-green {
-  border: 1px solid #BBF7D0;
+.status-pill-blue {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #60A5FA;
 }
 
-.neon-border-red {
-  border: 1px solid #FECACA;
+.status-pill-danger {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #F87171;
 }
 
-.neon-border-purple {
-  border: 1px solid #E9D5FF;
+.status-pill-warning {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #FBBF24;
 }
 
-.neon-border-amber {
-  border: 1px solid #FDE68A;
-}
-
-/* Clean accessible text colors without glowing blur */
-.text-glow-cyan {
-  color: #0284C7;
-}
-.text-glow-green {
-  color: #16A34A;
-}
-.text-glow-red {
-  color: #DC2626;
-}
-.text-glow-purple {
-  color: #7C3AED;
+.status-pill-purple {
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  color: #A78BFA;
 }
