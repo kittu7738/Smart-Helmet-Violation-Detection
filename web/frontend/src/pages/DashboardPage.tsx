@@ -10,8 +10,6 @@ import {
   CheckCircle2,
   TrendingUp,
   Activity,
-  Zap,
-  Eye,
   Camera
 } from 'lucide-react';
 import {
@@ -440,33 +438,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         ))}
       </div>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          BOTTOM STATS BAR — Cameras & system info
-      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginTop: '20px'
-      }}>
-        {[
-          { icon: <Camera size={18} color="#60A5FA" />, label: 'Active Cameras', value: '3 / 3', sub: 'All feeds online', bg: '#EFF6FF', border: '#BFDBFE', accent: '#1D4ED8' },
-          { icon: <Zap size={18} color="#34D399" />, label: 'System Uptime', value: '99.7%', sub: 'No interruptions', bg: '#F0FDF4', border: '#BBF7D0', accent: '#15803D' },
-          { icon: <Eye size={18} color="#C084FC" />, label: 'Model Classes', value: '7 Classes', sub: 'ResNet-18 backbone', bg: '#FAF5FF', border: '#E9D5FF', accent: '#7E22CE' }
-        ].map((item, i) => (
-          <div key={i} style={{
-            background: item.bg, border: `1.5px solid ${item.border}`,
-            borderRadius: '18px', padding: '18px 20px',
-            display: 'flex', alignItems: 'center', gap: '14px'
-          }}>
-            <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#fff', border: `1.5px solid ${item.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              {item.icon}
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{item.label}</div>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: item.accent, fontFamily: 'monospace', lineHeight: 1.2 }}>{item.value}</div>
-              <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 600 }}>{item.sub}</div>
-            </div>
-          </div>
-        ))}
-      </div>
 
     </div>
   );
