@@ -111,132 +111,38 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
   return (
     <div className="space-y-12 w-full max-w-7xl mx-auto pb-16">
-      {/* ============================================================ */}
-      {/* 1. HERO COMPOSITION (Rich Colorful Indigo & Sky Surface) */}
-      {/* ============================================================ */}
-      <section className="relative overflow-hidden rounded-3xl p-6 sm:p-10 lg:p-12 border-2 border-indigo-200/90 bg-gradient-to-br from-blue-50/95 via-indigo-50/70 to-purple-50/85 shadow-xl shadow-indigo-100/50 tech-grid-subtle">
-        {/* Colorful Floating Glow Accents */}
-        <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full bg-blue-400/20 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-20 -right-20 w-80 h-80 rounded-full bg-purple-400/20 blur-3xl pointer-events-none" />
-        <div className="absolute top-1/2 left-1/3 w-64 h-64 rounded-full bg-cyan-400/15 blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-          {/* Left Hero Column (~58%) */}
-          <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold tracking-wider uppercase shadow-md shadow-blue-500/20">
-              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-              <span>SMART HELMET AI • ROAD SAFETY PLATFORM</span>
-            </div>
-
-            <div className="space-y-3">
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-950 leading-[1.08]">
-                See the road.<br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
-                  Detect the risk.
-                </span>
-              </h1>
-              <p className="text-base sm:text-lg text-slate-700 max-w-xl leading-relaxed font-medium">
-                AI-powered motorcycle rider and helmet violation detection using computer vision with verified Co-DETR transformer accuracy.
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="pt-2 flex flex-wrap items-center gap-4">
-              <button
-                onClick={onNavigateToDetection}
-                className="px-7 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white font-bold text-sm shadow-lg shadow-indigo-500/30 transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <ScanLine className="w-4 h-4" />
-                <span>Start Detection</span>
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </button>
-
-              {onNavigateToVideo && (
-                <button
-                  onClick={onNavigateToVideo}
-                  className="px-6 py-3.5 rounded-xl bg-white/95 hover:bg-white text-indigo-950 font-bold text-sm border-2 border-indigo-200 shadow-sm transition-all flex items-center gap-2 cursor-pointer hover:border-indigo-300"
-                >
-                  <Video className="w-4 h-4 text-indigo-600" />
-                  <span>Analyze Video</span>
-                </button>
-              )}
-            </div>
-
-            {/* Verified Architectural Telemetry Badge (Color-Coded Pills) */}
-            <div className="pt-4 flex flex-wrap items-center gap-3 text-xs font-mono border-t border-indigo-200/60">
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-100 border border-emerald-300 text-emerald-900 font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-                <span>AP50: 54.30%</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-100 border border-blue-300 text-blue-900 font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-                <span>RoI Proposal Acc: 95.75%</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-100 border border-purple-300 text-purple-900 font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
-                <span>Latency: ~112 ms</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Hero Column: Clean Architecture & Telemetry Card (~42%) */}
-          <div className="lg:col-span-5">
-            <div className="rounded-2xl border-2 border-indigo-200/90 bg-white/90 backdrop-blur-sm p-6 sm:p-7 shadow-lg shadow-indigo-100/60 space-y-5">
-              <div className="flex items-center justify-between pb-3 border-b border-indigo-100">
-                <div className="flex items-center gap-2">
-                  <Cpu className="w-5 h-5 text-indigo-600" />
-                  <h3 className="font-extrabold text-slate-900 text-sm tracking-wide uppercase">
-                    Model Architecture & Specs
-                  </h3>
-                </div>
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-mono font-bold flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                  ONLINE
-                </span>
-              </div>
-
-              {/* Specs Rows */}
-              <div className="space-y-3 text-xs">
-                <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-indigo-50/80 border border-indigo-100">
-                  <span className="text-slate-600 font-medium">Detector Architecture</span>
-                  <span className="font-bold text-indigo-950 font-mono">Co-DETR (Deformable)</span>
-                </div>
-
-                <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-blue-50/80 border border-blue-100">
-                  <span className="text-slate-600 font-medium">Feature Backbone</span>
-                  <span className="font-bold text-blue-950 font-mono">ResNet-18 (FP16)</span>
-                </div>
-
-                <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-emerald-50/80 border border-emerald-100">
-                  <span className="text-slate-600 font-medium">Validation AP50</span>
-                  <span className="font-bold text-emerald-700 font-mono text-sm">54.30%</span>
-                </div>
-
-                <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-violet-50/80 border border-violet-100">
-                  <span className="text-slate-600 font-medium">Candidate RoI Accuracy</span>
-                  <span className="font-bold text-violet-700 font-mono text-sm">95.75%</span>
-                </div>
-
-                <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-amber-50/80 border border-amber-100">
-                  <span className="text-slate-600 font-medium">Target Taxonomy</span>
-                  <span className="font-bold text-amber-900 font-mono">7 Custom Classes</span>
-                </div>
-
-                <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="text-slate-600 font-medium">Inference Latency</span>
-                  <span className="font-bold text-slate-900 font-mono">~112 ms (Tesla T4)</span>
-                </div>
-              </div>
-
-              {/* Bottom Verification Footer */}
-              <div className="pt-2 flex items-center justify-between text-[11px] text-slate-500 font-medium border-t border-indigo-100">
-                <span>Verified Checkpoint: epoch_12.pth</span>
-                <span className="text-indigo-600 font-semibold font-mono">PyTorch 2.0+</span>
-              </div>
-            </div>
-          </div>
+      {/* Top Header & Quick Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-indigo-200/60">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
+            Violation Monitoring Dashboard
+          </h1>
+          <p className="text-sm text-slate-600 font-medium mt-0.5">
+            Real-time motorcycle helmet compliance surveillance and automated infraction tracking
+          </p>
         </div>
-      </section>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onNavigateToDetection}
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <ScanLine className="w-4 h-4" />
+            <span>Image Detection</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+
+          {onNavigateToVideo && (
+            <button
+              onClick={onNavigateToVideo}
+              className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs border border-slate-200 shadow-xs transition-all flex items-center gap-2 cursor-pointer hover:border-slate-300"
+            >
+              <Video className="w-4 h-4 text-indigo-600" />
+              <span>Analyze Video</span>
+            </button>
+          )}
+        </div>
+      </div>
 
 
       {/* ============================================================ */}
