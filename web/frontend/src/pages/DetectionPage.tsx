@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { VisionScanner3D } from '../components/VisionScanner3D';
 import {
   UploadCloud,
   Play,
@@ -14,8 +13,6 @@ import {
   FileImage,
   Cpu,
   Clock,
-  Box,
-  Eye,
   Download,
   Check,
   Info
@@ -31,7 +28,6 @@ export const DetectionPage: React.FC = () => {
   const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.25);
   const [selectedDetectionIdx, setSelectedDetectionIdx] = useState<number | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [viewMode, setViewMode] = useState<'2D' | '3D'>('2D');
   const [zoomLevel, setZoomLevel] = useState(1);
   const [showBoxes, setShowBoxes] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
@@ -156,10 +152,8 @@ export const DetectionPage: React.FC = () => {
   }, [prediction, selectedDetectionIdx, showBoxes, showLabels]);
 
   useEffect(() => {
-    if (viewMode === '2D') {
-      renderCanvas();
-    }
-  }, [renderCanvas, viewMode]);
+    renderCanvas();
+  }, [renderCanvas]);
 
   // Run Real Co-DETR GPU Inference with reliable offline fallback
   const runDetection = async () => {
@@ -347,35 +341,14 @@ export const DetectionPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2">
-                {/* View Mode Toggle */}
-                <div className="flex items-center bg-gray-100 p-0.5 rounded-lg border border-gray-200">
-                  <button
-                    onClick={() => setViewMode('2D')}
-                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1 ${
-                      viewMode === '2D' ? 'bg-white text-blue-600 shadow-xs' : 'text-gray-500 hover:text-gray-900'
-                    }`}
-                  >
-                    <Eye className="w-3 h-3" />
-                    <span>2D Canvas</span>
-                  </button>
-                  <button
-                    onClick={() => setViewMode('3D')}
-                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1 ${
-                      viewMode === '3D' ? 'bg-white text-blue-600 shadow-xs' : 'text-gray-500 hover:text-gray-900'
-                    }`}
-                  >
-                    <Box className="w-3 h-3" />
-                    <span>3D Depth</span>
-                  </button>
-                </div>
-
                 {imagePreviewUrl && (
                   <button
                     onClick={clearImage}
-                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1 text-xs"
                     title="Clear Image"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Reset</span>
                   </button>
                 )}
               </div>
@@ -389,96 +362,83 @@ export const DetectionPage: React.FC = () => {
               </div>
             )}
 
-            {/* Viewport Content */}
-            {viewMode === '2D' ? (
-              <div className="relative overflow-hidden rounded-lg bg-gray-900 flex items-center justify-center min-h-[440px] max-h-[520px]">
-                {!imagePreviewUrl ? (
-                  <div className="text-center text-gray-400 text-xs p-8">
-                    No image loaded. Upload a traffic photo to start detection.
-                  </div>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center overflow-auto p-2">
-                    <canvas
-                      ref={canvasRef}
-                      style={{
-                        transform: `scale(${zoomLevel})`,
-                        transformOrigin: 'center center',
-                        transition: 'transform 0.15s ease-out'
-                      }}
-                      className="max-w-full max-h-[480px] object-contain rounded shadow-md cursor-crosshair"
-                    />
-                  </div>
-                )}
+            {/* Viewport Content (Pure 2D High-Resolution Precision Canvas) */}
+            <div className="relative overflow-hidden rounded-lg bg-gray-900 flex items-center justify-center min-h-[440px] max-h-[520px]">
+              {!imagePreviewUrl ? (
+                <div className="text-center text-gray-400 text-xs p-8">
+                  No image loaded. Upload a traffic photo to start detection.
+                </div>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center overflow-auto p-2">
+                  <canvas
+                    ref={canvasRef}
+                    style={{
+                      transform: `scale(${zoomLevel})`,
+                      transformOrigin: 'center center',
+                      transition: 'transform 0.15s ease-out'
+                    }}
+                    className="max-w-full max-h-[480px] object-contain rounded shadow-md cursor-crosshair"
+                  />
+                </div>
+              )}
 
-                {/* Canvas Overlay Controls */}
-                {imagePreviewUrl && (
-                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between pointer-events-none">
-                    {/* Layer Toggles */}
-                    <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg border border-gray-200 shadow-sm text-xs pointer-events-auto">
-                      <button
-                        onClick={() => setShowBoxes(!showBoxes)}
-                        className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                          showBoxes ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-500 hover:text-gray-800'
-                        }`}
-                      >
-                        Boxes {showBoxes ? 'On' : 'Off'}
-                      </button>
-                      <button
-                        onClick={() => setShowLabels(!showLabels)}
-                        className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                          showLabels ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-500 hover:text-gray-800'
-                        }`}
-                      >
-                        Labels {showLabels ? 'On' : 'Off'}
-                      </button>
-                    </div>
-
-                    {/* Zoom & Export */}
-                    <div className="flex items-center gap-1 bg-white/90 backdrop-blur-md p-1 rounded-lg border border-gray-200 shadow-sm text-xs pointer-events-auto">
-                      <button
-                        onClick={() => setZoomLevel((z) => Math.min(2.5, z + 0.25))}
-                        className="p-1 hover:bg-gray-100 rounded text-gray-700"
-                        title="Zoom In"
-                      >
-                        <ZoomIn className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setZoomLevel((z) => Math.max(0.5, z - 0.25))}
-                        className="p-1 hover:bg-gray-100 rounded text-gray-700"
-                        title="Zoom Out"
-                      >
-                        <ZoomOut className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setZoomLevel(1)}
-                        className="px-1.5 py-0.5 hover:bg-gray-100 rounded text-gray-700 text-[10px] font-mono"
-                      >
-                        100%
-                      </button>
-                      <div className="w-px h-3 bg-gray-200 mx-0.5" />
-                      <button
-                        onClick={downloadAnnotatedImage}
-                        className="p-1 hover:bg-gray-100 rounded text-blue-600"
-                        title="Download Annotated Image"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+              {/* Canvas Overlay Controls */}
+              {imagePreviewUrl && (
+                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between pointer-events-none">
+                  {/* Layer Toggles */}
+                  <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg border border-gray-200 shadow-sm text-xs pointer-events-auto">
+                    <button
+                      onClick={() => setShowBoxes(!showBoxes)}
+                      className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                        showBoxes ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-500 hover:text-gray-800'
+                      }`}
+                    >
+                      Boxes {showBoxes ? 'On' : 'Off'}
+                    </button>
+                    <button
+                      onClick={() => setShowLabels(!showLabels)}
+                      className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                        showLabels ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-500 hover:text-gray-800'
+                      }`}
+                    >
+                      Labels {showLabels ? 'On' : 'Off'}
+                    </button>
                   </div>
-                )}
-              </div>
-            ) : (
-              /* 3D Secondary View */
-              <div className="w-full h-[460px] rounded-lg overflow-hidden border border-gray-200">
-                <VisionScanner3D
-                  imageUrl={imagePreviewUrl}
-                  detections={prediction?.detections || []}
-                  state={isProcessing ? 'SCANNING' : prediction ? 'RESULT_READY' : 'IDLE'}
-                  selectedIdx={selectedDetectionIdx}
-                  onSelectDetection={setSelectedDetectionIdx}
-                />
-              </div>
-            )}
+
+                  {/* Zoom & Export */}
+                  <div className="flex items-center gap-1 bg-white/90 backdrop-blur-md p-1 rounded-lg border border-gray-200 shadow-sm text-xs pointer-events-auto">
+                    <button
+                      onClick={() => setZoomLevel((z) => Math.min(2.5, z + 0.25))}
+                      className="p-1 hover:bg-gray-100 rounded text-gray-700"
+                      title="Zoom In"
+                    >
+                      <ZoomIn className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setZoomLevel((z) => Math.max(0.5, z - 0.25))}
+                      className="p-1 hover:bg-gray-100 rounded text-gray-700"
+                      title="Zoom Out"
+                    >
+                      <ZoomOut className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setZoomLevel(1)}
+                      className="px-1.5 py-0.5 hover:bg-gray-100 rounded text-gray-700 text-[10px] font-mono"
+                    >
+                      100%
+                    </button>
+                    <div className="w-px h-3 bg-gray-200 mx-0.5" />
+                    <button
+                      onClick={downloadAnnotatedImage}
+                      className="p-1 hover:bg-gray-100 rounded text-blue-600"
+                      title="Download Annotated Image"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
