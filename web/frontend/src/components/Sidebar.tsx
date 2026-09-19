@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Home,
+  LayoutDashboard,
   Camera,
   PlayCircle,
   Video,
@@ -26,7 +26,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile
 }) => {
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'detection', label: 'Detection', icon: Camera },
     { id: 'video', label: 'Video Analysis', icon: PlayCircle },
     { id: 'camera', label: 'Live Camera', icon: Video },
@@ -57,18 +57,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <aside
-        className={`fixed top-0 left-0 bottom-0 z-50 w-64 bg-[#070D1E] text-slate-300 flex flex-col justify-between border-r border-slate-800/80 transition-transform duration-300 ease-in-out lg:translate-x-0 overflow-y-auto ${
+        className={`fixed top-0 left-0 bottom-0 z-50 w-64 text-slate-300 flex flex-col justify-between border-r border-slate-800/80 transition-transform duration-300 ease-in-out lg:translate-x-0 overflow-y-auto ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
-          background: 'linear-gradient(180deg, #070D1E 0%, #0A142F 50%, #060B1A 100%)'
+          background: "linear-gradient(180deg, rgba(7, 13, 30, 0.95) 0%, rgba(7, 13, 30, 0.88) 35%, rgba(7, 13, 30, 0.45) 65%, rgba(7, 13, 30, 0.82) 100%), url('/sidebar_rider.jpg') center bottom / cover no-repeat"
         }}
       >
-        {/* Top: Logo & Branding */}
+        {/* Top: Branding matching reference */}
         <div>
-          <div className="px-5 py-5 border-b border-slate-800/60 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 shrink-0">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="px-5 py-5 border-b border-slate-800/60 flex items-center gap-3 backdrop-blur-xs">
+            {/* Small White Helmet Logo Icon */}
+            <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 shadow-sm">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2a9 9 0 0 0-9 9c0 3.5 1.5 6.5 4 8v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1c2.5-1.5 4-4.5 4-8a9 9 0 0 0-9-9z" />
                 <path d="M4 11h16" />
                 <path d="M12 2v9" />
@@ -95,10 +96,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   key={item.id}
                   onClick={() => handleItemClick(item)}
-                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 text-left cursor-pointer group ${
+                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 text-left cursor-pointer group backdrop-blur-xs ${
                     isSelected
                       ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold shadow-md shadow-blue-600/30'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
                   }`}
                 >
                   <Icon
@@ -114,42 +115,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </nav>
         </div>
 
-        {/* Bottom Section: Hero Helmet Visual matching Reference 4 */}
-        <div className="p-4 mt-auto">
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-blue-950/60 to-slate-950/90 border border-blue-500/20 p-4 text-left">
-            {/* Glowing blue radial backdrop behind helmet */}
-            <div
-              className="absolute -top-4 -left-4 w-40 h-40 rounded-full pointer-events-none"
-              style={{
-                background: 'radial-gradient(circle, rgba(37, 99, 235, 0.45) 0%, rgba(6, 182, 212, 0.15) 50%, transparent 70%)',
-                filter: 'blur(16px)'
-              }}
-            />
-
-            {/* Prominent White/Blue Helmet Image */}
-            <div className="relative w-full flex justify-center mb-3">
-              <img
-                src="/helmet_hero.png"
-                alt="Smart Helmet"
-                className="w-28 h-28 object-contain drop-shadow-[0_8px_18px_rgba(0,0,0,0.6)]"
-              />
-            </div>
-
-            {/* Typography matching reference */}
-            <div className="relative">
-              <h3 className="text-sm font-extrabold text-white leading-tight">
-                Ride Safe
-              </h3>
-              <p className="text-sm font-extrabold text-sky-400 leading-tight">
-                Stay Protected
-              </p>
-              <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[9px] font-bold tracking-widest text-slate-400 uppercase">
-                <span>Safer Roads</span>
-                <span className="text-slate-600">•</span>
-                <span>Brighter Tomorrow</span>
-              </div>
-            </div>
-          </div>
+        {/* Lower Sidebar: Natural Rider View through background + Motto */}
+        <div className="p-5 mt-auto">
+          <p
+            className="text-[14px] font-bold text-white leading-snug tracking-wide"
+            style={{
+              fontFamily: '"Caveat", "Brush Script MT", "Segoe Script", cursive',
+              textShadow: '0 2px 8px rgba(0, 0, 0, 0.9)'
+            }}
+          >
+            Safer Roads<br />
+            <span className="text-sky-200">Stronger Tomorrow</span>
+          </p>
         </div>
       </aside>
     </>
