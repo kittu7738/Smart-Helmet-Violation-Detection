@@ -6,14 +6,12 @@ import {
   Camera,
   BarChart3,
   FileText,
-  Database,
-  Cpu,
   Settings
 } from 'lucide-react';
 import { NavTab } from './Navigation';
 
 interface SidebarProps {
-  activeTab: NavTab | 'violations' | 'reports' | 'dataset' | 'model';
+  activeTab: NavTab | 'violations' | 'reports';
   onTabChange: (tab: NavTab | 'violations') => void;
   onOpenSettings: () => void;
   mobileOpen?: boolean;
@@ -34,8 +32,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'camera', label: 'Live Camera', icon: Camera },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'reports', label: 'Reports', icon: FileText, target: 'analytics' },
-    { id: 'dataset', label: 'Dataset', icon: Database, target: 'about' },
-    { id: 'model', label: 'Model', icon: Cpu, target: 'about' },
     { id: 'settings', label: 'Settings', icon: Settings, isAction: true }
   ];
 
