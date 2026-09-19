@@ -67,22 +67,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Top: Compact horizontal branding matching reference exactly */}
         <div>
           <div className="px-5 py-4 flex flex-row items-center gap-3 select-none border-b border-white/10">
-            {/* Small Compact White Helmet Logo Icon */}
-            <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shrink-0 shadow-sm">
-              <svg
-                width="28"
-                height="28"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="2.1"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                {/* Full-face motorcycle helmet profile facing left */}
-                <path d="M19 14.5c1.2 0 2.2-.9 2.2-2.1 0-5.7-4.6-10.4-10.2-10.4S1 6.7 1 12.4c0 2.5.8 4.7 2.2 6.5l.8 2.1c.3.7 1 1 1.7 1h5.8c.8 0 1.5-.5 1.8-1.2l.9-2.2c.8.3 1.7.5 2.6.5h1.2c1 0 1.8-.8 1.8-1.8v-1.8z" />
-                <path d="M4 11.5h10.5c.8 0 1.5-.6 1.5-1.4V8.3c0-1.8-1.4-3.3-3.2-3.3H7.5C5.6 5 4 6.5 4 8.3v3.2z" />
-              </svg>
+            {/* Exact Helmet Logo Icon matching user upload media_1789849385366.png */}
+            <div className="w-11 h-11 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shrink-0 shadow-sm">
+              <img
+                src="/helmet_logo_icon.png"
+                alt="Smart Helmet"
+                className="w-6.5 h-6.5 object-contain select-none pointer-events-none drop-shadow-sm"
+              />
             </div>
 
             {/* Horizontal Brand Text: Strictly single-line, no wrapping */}
