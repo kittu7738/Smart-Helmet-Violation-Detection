@@ -64,14 +64,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           background: "linear-gradient(180deg, rgba(7, 15, 35, 0.64) 0%, rgba(7, 15, 35, 0.48) 30%, rgba(7, 15, 35, 0.16) 62%, rgba(7, 15, 35, 0.50) 100%), url('/sidebar_rider.jpg') center bottom / cover no-repeat"
         }}
       >
-        {/* Top: Branding matching reference */}
+        {/* Top: Compact horizontal branding matching reference exactly */}
         <div>
-          <div className="px-6 pt-6 pb-5 flex items-center gap-3.5 select-none">
-            {/* Small Simple White Helmet Icon inside rounded-square glass container */}
-            <div className="w-[58px] h-[58px] rounded-2xl bg-white/10 backdrop-blur-md border border-white/25 flex items-center justify-center text-white shrink-0 shadow-sm">
+          <div className="px-5 py-4 flex flex-row items-center gap-3 select-none border-b border-white/10">
+            {/* Small Compact White Helmet Logo Icon */}
+            <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shrink-0 shadow-sm">
               <svg
-                width="34"
-                height="34"
+                width="28"
+                height="28"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="white"
@@ -84,11 +84,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <path d="M4 11.5h10.5c.8 0 1.5-.6 1.5-1.4V8.3c0-1.8-1.4-3.3-3.2-3.3H7.5C5.6 5 4 6.5 4 8.3v3.2z" />
               </svg>
             </div>
-            <div className="min-w-0 flex flex-col justify-center">
-              <h1 className="text-[25px] font-bold text-white tracking-tight leading-tight drop-shadow-sm">
+
+            {/* Horizontal Brand Text: Strictly single-line, no wrapping */}
+            <div className="flex flex-col justify-center shrink-0">
+              <h1 className="text-[20px] font-bold text-white tracking-tight leading-snug whitespace-nowrap drop-shadow-sm">
                 Smart Helmet
               </h1>
-              <p className="text-[14px] text-slate-300/90 font-normal tracking-tight leading-snug drop-shadow-xs">
+              <p className="text-[12px] text-slate-300 font-medium tracking-tight leading-tight whitespace-nowrap drop-shadow-2xs">
                 Violation Detection System
               </p>
             </div>
