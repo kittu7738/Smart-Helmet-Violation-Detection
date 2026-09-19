@@ -100,15 +100,12 @@ export const App: React.FC = () => {
 
       {/* Clean Modern Footer */}
       <footer className="border-t border-gray-200 bg-white py-4 text-xs text-gray-500">
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             <span className="font-semibold text-gray-800">Smart Helmet AI Violation Detection System</span>
             <span className="text-gray-300">|</span>
             <span className="text-blue-600 font-medium">Co-DETR ResNet-18 FP16</span>
-          </div>
-          <div className="text-gray-500 text-[11px]">
-            Traffic Safety Computer Vision Platform
           </div>
         </div>
       </footer>
