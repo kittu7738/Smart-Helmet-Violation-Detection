@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Cpu, Settings, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Cpu, Settings, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
 
 interface HeaderProps {
@@ -56,24 +56,12 @@ export const Header: React.FC<HeaderProps> = ({ backendConnected = true }) => {
     <>
       <header className="w-full border-b border-gray-200 bg-white sticky top-0 z-40 transition-all">
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          {/* Left: Custom Smart Helmet AI Mark & Product Title */}
+          {/* Left: Brand name only */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 text-white shadow-md shadow-blue-500/20 flex-shrink-0">
-              <Shield className="w-5 h-5" />
-            </div>
-
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-base font-extrabold text-slate-900 tracking-tight">
-                  SMART HELMET AI
-                </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wide hidden sm:inline-block">
-                  Vision Platform
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 hidden sm:block font-medium">
-                Computer Vision for Safer Roads
-              </p>
+              <span className="text-base font-extrabold text-slate-900 tracking-tight">
+                SMART HELMET AI
+              </span>
             </div>
           </div>
 
