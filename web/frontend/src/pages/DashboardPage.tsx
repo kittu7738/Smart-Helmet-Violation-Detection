@@ -1,22 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Scene } from '../three/Scene';
+import React, { useState } from 'react';
+import { VisionScanner3D } from '../components/VisionScanner3D';
 import { StatsCards } from '../components/StatsCards';
-import { LiveDetectionPanel } from '../components/LiveDetectionPanel';
 import { ViolationsTable } from '../components/ViolationsTable';
 import { TrafficFlowChart } from '../components/TrafficFlowChart';
 import { ViolationTypesCard } from '../components/ViolationTypesCard';
 import { DashboardStats, LiveDetectionSummary, RecentViolation } from '../types/detection';
-import { api, ModelStatusResponse } from '../services/api';
+import { DetectionItem } from '../services/api';
 import {
-  ArrowUpRight,
-  Cpu,
-  ShieldAlert,
-  AlertTriangle,
-  FileText,
+  ArrowRight,
+  ScanLine,
   Video,
-  Zap,
-  Server,
-  Database
+  AlertTriangle,
+  Sparkles,
+  FileText
 } from 'lucide-react';
 
 interface DashboardPageProps {
@@ -30,177 +26,166 @@ interface DashboardPageProps {
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
   stats,
-  live,
   violations,
   onNavigateToViolations,
   onNavigateToDetection,
   onNavigateToVideo
 }) => {
-  const [highlightViolation, setHighlightViolation] = useState(false);
-  const [modelStatus, setModelStatus] = useState<ModelStatusResponse | null>(null);
+  // Sample detections mapped to sample traffic image for hero 3D scanner demo
+  const sampleDetections: DetectionItem[] = [
+    {
+      class_id: 1,
+      class_name: 'bike',
+      display_name: 'Motorcycle',
+      confidence: 0.963,
+      bbox: [45, 120, 310, 380],
+      violation: false
+    },
+    {
+      class_id: 0,
+      class_name: 'driver_with_helmet',
+      display_name: 'Driver — Helmet',
+      confidence: 0.942,
+      bbox: [80, 50, 240, 210],
+      violation: false
+    }
+  ];
 
-  useEffect(() => {
-    let isMounted = true;
-    api.getModelStatus().then((status) => {
-      if (isMounted && status) setModelStatus(status);
-    });
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const [scannerState, setScannerState] = useState<'IDLE' | 'READY' | 'SCANNING' | 'ANALYZING' | 'RESULT_READY'>('RESULT_READY');
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   return (
-    <div className="space-y-6 w-full">
-      {/* Top Banner: Co-DETR Vision Model & Actions */}
-      <div className="rounded-xl px-5 py-4 bg-slate-900/80 backdrop-blur-md border border-slate-800 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 flex-shrink-0">
-            <Cpu className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              <span>Co-DETR ResNet-18 Vision Pipeline</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                GPU Engine Active
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Real-time inference stream • 7-Class AI City Challenge automated helmet & vehicle classification
-            </p>
-          </div>
+    <div className="space-y-10 sm:space-y-12 w-full max-w-7xl mx-auto">
+      {/* 1. HERO SECTION (Spacious, Elegant, Light) */}
+      <section className="text-center pt-4 pb-2 max-w-3xl mx-auto space-y-4">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold shadow-xs">
+          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+          <span>Co-DETR ResNet-18 Computer Vision Platform</span>
         </div>
 
-        <div className="flex items-center gap-2.5 w-full sm:w-auto">
+        <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
+          Intelligent Helmet Compliance & Traffic Safety AI
+        </h1>
+
+        <p className="text-sm sm:text-base text-gray-600 max-w-2xl mx-auto leading-relaxed">
+          Automated multi-rider motorcycle detection and protective helmet violation tracking powered by Collaborative DETR with real-time GPU inference.
+        </p>
+
+        <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
           <button
-            onClick={() => setHighlightViolation((prev) => !prev)}
-            className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 border ${
-              highlightViolation
-                ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-sm shadow-rose-500/20'
-                : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-800 hover:text-white'
-            }`}
+            onClick={onNavigateToDetection}
+            className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md shadow-blue-500/20 transition-all flex items-center gap-2 cursor-pointer"
           >
-            <ShieldAlert className="w-4 h-4 text-rose-400" />
-            <span>{highlightViolation ? 'Violation Simulated' : 'Simulate Violation'}</span>
+            <ScanLine className="w-4 h-4" />
+            <span>Start Live Detection</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
 
           {onNavigateToVideo && (
             <button
               onClick={onNavigateToVideo}
-              className="flex-1 sm:flex-initial px-3.5 py-2 rounded-lg bg-slate-800/90 hover:bg-slate-800 text-slate-200 font-semibold text-xs border border-slate-700 transition-all flex items-center justify-center gap-1.5"
+              className="px-6 py-3 rounded-xl bg-white hover:bg-gray-50 text-gray-700 font-semibold text-sm border border-gray-300 shadow-xs transition-all flex items-center gap-2 cursor-pointer"
             >
-              <Video className="w-4 h-4 text-purple-400" />
-              <span>Video Analysis</span>
+              <Video className="w-4 h-4 text-gray-500" />
+              <span>Analyze Video Stream</span>
             </button>
           )}
-
-          <button
-            onClick={onNavigateToDetection}
-            className="flex-1 sm:flex-initial px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-1.5"
-          >
-            <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>Image Detector</span>
-          </button>
         </div>
-      </div>
+      </section>
 
-      {/* GPU Backend Live Telemetry Strip */}
-      <div className="rounded-xl px-5 py-3 bg-gradient-to-r from-blue-950/40 via-slate-900/90 to-purple-950/40 border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2 text-slate-300 font-mono">
-          <Zap className="w-4 h-4 text-amber-400 flex-shrink-0" />
-          <span className="text-slate-400">GPU Device:</span>
-          <span className="text-white font-bold">{modelStatus?.gpu_name || 'NVIDIA Tesla T4 (Cloud GPU)'}</span>
-          <span className="text-slate-600">|</span>
-          <span className="text-slate-400">VRAM:</span>
-          <span className="text-emerald-400 font-semibold">{modelStatus?.memory_allocated_mb || 149.6} MB</span>
-          <span className="text-slate-600">|</span>
-          <span className="text-slate-400">Resolution:</span>
-          <span className="text-blue-300">640×384 FP16</span>
-        </div>
-
-        <div className="flex items-center gap-3 text-slate-400 font-mono text-[11px]">
-          <div className="flex items-center gap-1.5">
-            <Server className="w-3.5 h-3.5 text-blue-400" />
-            <span>FastAPI Bridge</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Database className="w-3.5 h-3.5 text-purple-400" />
-            <span>Epoch 10 Checkpoint</span>
-          </div>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <StatsCards stats={stats} />
-
-      {/* Main Center Grid: 3D Visualization Hero (8 cols) + Live Detection (4 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-        {/* 3D Hero Viewport (8 cols) */}
-        <div className="lg:col-span-8 flex flex-col">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-300 font-mono">
-              3D VEHICLE & RIDER VISUALIZATION
+      {/* 2. 3D AI VISION SCANNER (The Real Image is the Hero) */}
+      <section className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+          <div>
+            <h2 className="text-sm sm:text-base font-bold text-gray-900 uppercase tracking-wide">
+              3D AI VISION SCANNER
             </h2>
-            <span className="text-xs font-mono font-medium text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
-              Interactive 3D Sensor
-            </span>
+            <p className="text-xs text-gray-500">
+              Interactive 3D depth viewport showcasing real Co-DETR bounding box predictions
+            </p>
           </div>
 
-          <div className="flex-1 w-full min-h-[460px] sm:min-h-[520px] lg:min-h-[580px]">
-            <Scene highlightViolation={highlightViolation} />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setScannerState('SCANNING');
+                setTimeout(() => setScannerState('ANALYZING'), 1000);
+                setTimeout(() => setScannerState('RESULT_READY'), 2200);
+              }}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors flex items-center gap-1.5"
+            >
+              <ScanLine className="w-3.5 h-3.5 text-blue-600" />
+              <span>Simulate Scan</span>
+            </button>
+
+            <button
+              onClick={onNavigateToDetection}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors flex items-center gap-1"
+            >
+              <span>Upload Custom Photo</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
           </div>
         </div>
 
-        {/* Live Detection Panel (4 cols) */}
-        <div className="lg:col-span-4 flex flex-col">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-300 font-mono">
-              STREAM TELEMETRY
-            </h2>
-            <span className="text-xs font-mono text-slate-500">Live Camera</span>
-          </div>
-          <div className="flex-1">
-            <LiveDetectionPanel data={live} />
-          </div>
+        {/* 3D Floating Image Viewport */}
+        <div className="w-full h-[480px] sm:h-[540px] shadow-sm rounded-2xl overflow-hidden">
+          <VisionScanner3D
+            imageUrl="/sample_traffic.jpg"
+            detections={sampleDetections}
+            state={scannerState}
+            selectedIdx={selectedIdx}
+            onSelectDetection={setSelectedIdx}
+          />
         </div>
-      </div>
+      </section>
 
-      {/* Middle Grid: Traffic Flow & Compliance (8 cols) + Violation Types (4 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+      {/* 3. KEY METRICS CARDS */}
+      <section className="space-y-3">
+        <div className="px-1">
+          <h2 className="text-sm sm:text-base font-bold text-gray-900 uppercase tracking-wide">
+            SYSTEM TELEMETRY
+          </h2>
+        </div>
+        <StatsCards stats={stats} />
+      </section>
+
+      {/* 4. TRAFFIC FLOW & VIOLATION ANALYSIS (Two Clean Columns) */}
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         <div className="lg:col-span-8">
           <TrafficFlowChart />
         </div>
         <div className="lg:col-span-4">
           <ViolationTypesCard />
         </div>
-      </div>
+      </section>
 
-      {/* Bottom Section: Recent Infractions Audit Log */}
-      <div className="rounded-xl p-5 sm:p-6 bg-slate-900/80 backdrop-blur-md border border-slate-800 shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800">
+      {/* 5. RECENT INFRACTIONS AUDIT LOG */}
+      <section className="light-card p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
           <div>
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-rose-400" />
-              <h2 className="text-base sm:text-lg font-bold tracking-tight text-white uppercase font-mono">
+              <AlertTriangle className="w-4 h-4 text-red-600" />
+              <h2 className="text-base font-bold text-gray-900 uppercase">
                 RECENT INFRACTIONS AUDIT LOG
               </h2>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Automated Co-DETR detections with license plates and violation triage
+            <p className="text-xs text-gray-500 mt-0.5">
+              Verified computer-vision infractions with license numbers and review triage
             </p>
           </div>
+
           <button
             onClick={onNavigateToViolations}
-            className="flex items-center gap-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300 transition-colors self-start sm:self-auto bg-blue-500/10 px-3.5 py-1.5 rounded-lg border border-blue-500/20"
+            className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-3.5 py-1.5 rounded-lg border border-blue-200 transition-colors"
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>Full Violations Log</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
+            <span>Full Violations Database</span>
           </button>
         </div>
 
         <ViolationsTable violations={violations.slice(0, 5)} compact={true} />
-      </div>
+      </section>
     </div>
   );
 };

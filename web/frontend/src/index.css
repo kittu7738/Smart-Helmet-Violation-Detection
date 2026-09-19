@@ -5,97 +5,114 @@
 @layer base {
   body {
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #0B0F19;
-    color: #F8FAFC;
+    background-color: #F7F8FA;
+    color: #111827;
     background-image: 
-      radial-gradient(circle at 15% 15%, rgba(59, 130, 246, 0.08) 0%, transparent 45%),
-      radial-gradient(circle at 85% 25%, rgba(139, 92, 246, 0.06) 0%, transparent 45%),
-      radial-gradient(circle at 50% 85%, rgba(16, 185, 129, 0.04) 0%, transparent 45%);
+      radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.025) 0%, transparent 40%),
+      radial-gradient(circle at 90% 20%, rgba(99, 102, 241, 0.02) 0%, transparent 40%),
+      radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.015) 0%, transparent 40%);
     background-attachment: fixed;
     min-height: 100vh;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Inter', system-ui, sans-serif;
-    letter-spacing: -0.015em;
-    color: #F8FAFC;
-  }
-
-  .font-tech {
-    font-family: 'Inter', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    color: #111827;
+    font-weight: 700;
   }
 
   .font-mono-code {
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-family: 'JetBrains Mono', monospace;
   }
 }
 
-/* Custom Sleek Dark Scrollbars */
+/* Subtle Modern Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0F172A;
+  background: #F3F4F6;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
+  background: #D1D5DB;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #9CA3AF;
 }
 
-/* Dark Glassmorphic Card Surfaces */
-.glass-panel {
-  background: rgba(17, 24, 39, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(51, 65, 85, 0.6);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
-}
-
-.glass-card {
-  background: rgba(30, 41, 59, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(51, 65, 85, 0.5);
-  box-shadow: 0 4px 16px -1px rgba(0, 0, 0, 0.35);
+/* Premium Light Card Surfaces */
+.light-card {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.glass-card:hover {
-  border-color: rgba(99, 102, 241, 0.5);
-  box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.45);
+.light-card-hover:hover {
+  border-color: #D1D5DB;
+  box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.06), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+  transform: translateY(-1px);
 }
 
-/* Status Pill Glowing Effects */
-.status-pill-online {
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  color: #34D399;
+/* Light Glassmorphic Header & Nav */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid #E5E7EB;
 }
 
-.status-pill-blue {
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  color: #60A5FA;
+/* Modern Status Badges */
+.badge-compliant {
+  background-color: #ECFDF5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
 }
 
-.status-pill-danger {
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #F87171;
+.badge-violation {
+  background-color: #FEF2F2;
+  color: #991B1B;
+  border: 1px solid #FECACA;
 }
 
-.status-pill-warning {
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  color: #FBBF24;
+.badge-warning {
+  background-color: #FFFBEB;
+  color: #92400E;
+  border: 1px solid #FDE68A;
 }
 
-.status-pill-purple {
-  background: rgba(139, 92, 246, 0.12);
-  border: 1px solid rgba(139, 92, 246, 0.35);
-  color: #A78BFA;
+.badge-blue {
+  background-color: #EFF6FF;
+  color: #1E40AF;
+  border: 1px solid #BFDBFE;
+}
+
+.badge-neutral {
+  background-color: #F9FAFB;
+  color: #374151;
+  border: 1px solid #E5E7EB;
+}
+
+/* Subtle Laser Scan Keyframe */
+@keyframes scannerSweep {
+  0% {
+    top: 0%;
+    opacity: 0.8;
+  }
+  50% {
+    top: 96%;
+    opacity: 1;
+  }
+  100% {
+    top: 0%;
+    opacity: 0.8;
+  }
+}
+
+.animate-scan-sweep {
+  animation: scannerSweep 2.8s ease-in-out infinite;
 }

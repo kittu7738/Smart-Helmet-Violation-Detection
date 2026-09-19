@@ -4,8 +4,8 @@ import { Navigation, NavTab } from './components/Navigation';
 import { DashboardPage } from './pages/DashboardPage';
 import { DetectionPage } from './pages/DetectionPage';
 import { VideoAnalysisPage } from './pages/VideoAnalysisPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
 import { LiveCameraPage } from './pages/LiveCameraPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
 import { AboutPage } from './pages/AboutPage';
 import { ViolationsPage } from './pages/ViolationsPage';
 import { api } from './services/api';
@@ -15,7 +15,7 @@ import { mockDashboardStats, mockLiveDetection, mockRecentViolations } from './d
 export const App: React.FC = () => {
   const getInitialTab = (): NavTab | 'violations' => {
     const hash = window.location.hash.replace('#', '');
-    const validTabs = ['dashboard', 'detection', 'video', 'analytics', 'camera', 'about', 'violations'];
+    const validTabs = ['dashboard', 'detection', 'video', 'camera', 'analytics', 'about', 'violations'];
     return validTabs.includes(hash) ? (hash as any) : 'dashboard';
   };
 
@@ -29,7 +29,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      const validTabs = ['dashboard', 'detection', 'video', 'analytics', 'camera', 'about', 'violations'];
+      const validTabs = ['dashboard', 'detection', 'video', 'camera', 'analytics', 'about', 'violations'];
       if (validTabs.includes(hash)) {
         setActiveTabState(hash as any);
       }
@@ -62,18 +62,18 @@ export const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0B0F19] text-slate-100 selection:bg-blue-500/30 selection:text-blue-200">
-      {/* Dark Modern Header */}
+    <div className="min-h-screen flex flex-col bg-[#F7F8FA] text-gray-900 selection:bg-blue-100 selection:text-blue-900">
+      {/* Clean White SaaS Header */}
       <Header backendConnected={backendConnected} />
 
-      {/* Dark Navigation Bar */}
+      {/* Clean Navigation Bar */}
       <Navigation
         activeTab={activeTab === 'violations' ? 'dashboard' : activeTab}
         onTabChange={(tab) => setActiveTab(tab)}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 pb-24 md:pb-12">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-12">
         {activeTab === 'dashboard' && (
           <DashboardPage
             stats={stats}
@@ -89,25 +89,25 @@ export const App: React.FC = () => {
 
         {activeTab === 'video' && <VideoAnalysisPage />}
 
-        {activeTab === 'analytics' && <AnalyticsPage />}
-
         {activeTab === 'camera' && <LiveCameraPage />}
+
+        {activeTab === 'analytics' && <AnalyticsPage />}
 
         {activeTab === 'about' && <AboutPage />}
 
         {activeTab === 'violations' && <ViolationsPage />}
       </main>
 
-      {/* Modern Dark Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-950/80 backdrop-blur-md py-4 text-center text-xs text-slate-400">
-        <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 flex flex-col sm:flex-row items-center justify-between gap-2">
+      {/* Clean Modern Footer */}
+      <footer className="border-t border-gray-200 bg-white py-4 text-xs text-gray-500">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="font-semibold text-slate-200">Smart Helmet AI Violation Detection System</span>
-            <span className="text-slate-700">|</span>
-            <span className="text-blue-400 font-mono">Co-DETR ResNet-18 FP16</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="font-semibold text-gray-800">Smart Helmet AI Violation Detection System</span>
+            <span className="text-gray-300">|</span>
+            <span className="text-blue-600 font-medium">Co-DETR ResNet-18 FP16</span>
           </div>
-          <div className="text-slate-400 font-mono text-[11px]">
+          <div className="text-gray-500 text-[11px]">
             IIITVICD AI City Challenge Research Project
           </div>
         </div>
