@@ -62,7 +62,7 @@ export const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F7F8FA] text-gray-900 selection:bg-blue-100 selection:text-blue-900">
+    <div className="min-h-screen flex flex-col bg-transparent text-slate-900 selection:bg-blue-200 selection:text-blue-900">
       {/* Clean White SaaS Header */}
       <Header backendConnected={backendConnected} />
 
