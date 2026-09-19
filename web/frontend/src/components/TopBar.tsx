@@ -8,13 +8,15 @@ interface TopBarProps {
   onOpenSettings?: () => void;
   isSettingsOpen?: boolean;
   setIsSettingsOpen?: (open: boolean) => void;
+  activeTab?: string;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
   backendConnected = true,
   onOpenMobileMenu,
   isSettingsOpen,
-  setIsSettingsOpen
+  setIsSettingsOpen,
+  activeTab
 }) => {
   const [localModalOpen, setLocalModalOpen] = useState(false);
   const isModalOpen = isSettingsOpen !== undefined ? isSettingsOpen : localModalOpen;
@@ -66,12 +68,12 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <>
-      <header className="w-full bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between">
+      <header className="w-full bg-[#EEF2F8]/90 backdrop-blur-xs sticky top-0 z-30 px-6 sm:px-8 py-4 flex items-center justify-between">
         {/* Mobile menu trigger */}
         <div className="flex items-center gap-3 lg:hidden">
           <button
             onClick={onOpenMobileMenu}
-            className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700"
+            className="p-2 rounded-xl border border-slate-200 hover:bg-white text-slate-700 bg-white shadow-2xs"
           >
             <Menu size={18} />
           </button>
@@ -83,24 +85,45 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
         </div>
 
-        {/* Empty left spacer on desktop to keep items aligned right */}
-        <div className="hidden lg:block"></div>
+        {/* Page Title on Desktop matching mockup (media_1789848605006.png) */}
+        <div className="hidden lg:flex items-center">
+          {activeTab === 'detection' && (
+            <h1 className="text-2xl sm:text-[28px] font-extrabold text-slate-900 tracking-tight">
+              Detection
+            </h1>
+          )}
+          {activeTab === 'video' && (
+            <h1 className="text-2xl sm:text-[28px] font-extrabold text-slate-900 tracking-tight">
+              Video Analysis
+            </h1>
+          )}
+          {activeTab === 'camera' && (
+            <h1 className="text-2xl sm:text-[28px] font-extrabold text-slate-900 tracking-tight">
+              Live Camera
+            </h1>
+          )}
+          {activeTab === 'analytics' && (
+            <h1 className="text-2xl sm:text-[28px] font-extrabold text-slate-900 tracking-tight">
+              Analytics &amp; Reports
+            </h1>
+          )}
+        </div>
 
         {/* Right controls matching mockup */}
         <div className="flex items-center gap-3 ml-auto">
           {/* Settings Trigger Icon Button */}
           <button
             onClick={() => setModalOpen(true)}
-            className="w-9 h-9 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
+            className="w-9 h-9 rounded-xl border border-slate-200/90 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
             title="Configure Server Endpoint"
           >
             <Settings size={16} />
           </button>
 
-          {/* System Online Pill Matching Mockup */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-xs font-semibold shadow-xs">
+          {/* System Ready / Online Pill Matching Mockup */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100/70 border border-emerald-200/80 text-emerald-800 text-xs font-semibold shadow-xs">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>{backendConnected ? 'System Online' : 'System Standby'}</span>
+            <span>{backendConnected ? 'System Ready' : 'System Standby'}</span>
           </div>
         </div>
       </header>

@@ -84,6 +84,7 @@ export const App: React.FC = () => {
           onOpenSettings={() => setIsSettingsOpen(true)}
           isSettingsOpen={isSettingsOpen}
           setIsSettingsOpen={setIsSettingsOpen}
+          activeTab={activeTab}
         />
 
         {/* Dynamic Page Content */}
