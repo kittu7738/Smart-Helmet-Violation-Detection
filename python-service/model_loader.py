@@ -30,22 +30,25 @@ def apply_codetr_compatibility_patches():
     """
     try:
         import torch
+        import mmcv.ops.multi_scale_deform_attn as msda_mod
         from mmcv.cnn.bricks.registry import ATTENTION
-        from mmcv.ops.multi_scale_deform_attn import (
-            MultiScaleDeformableAttention,
-            MultiScaleDeformableAttnFunction,
-        )
+
+        # Resolve function class
+        func_cls = getattr(msda_mod, 'MultiScaleDeformableAttnFunction', None)
+        if func_cls is None:
+            func_cls = getattr(msda_mod, 'MultiScaleDeformAttnFunction', None)
 
         # 1. Register MultiScaleDeformAttn
-        if "MultiScaleDeformAttn" not in ATTENTION:
-            ATTENTION.register_module(name="MultiScaleDeformAttn", module=MultiScaleDeformableAttention)
+        attn_cls = getattr(msda_mod, 'MultiScaleDeformableAttention', None)
+        if attn_cls is not None and "MultiScaleDeformAttn" not in ATTENTION:
+            ATTENTION.register_module(name="MultiScaleDeformAttn", module=attn_cls)
 
         # 2. MultiScaleDeformAttnFunction FP32 kernel bridge
-        if not getattr(MultiScaleDeformAttnFunction, "_fp16_kernel_patched", False):
-            _orig_forward = MultiScaleDeformAttnFunction.forward
+        if func_cls is not None and not getattr(func_cls, "_fp16_patched", False):
+            _orig_forward = func_cls.forward
 
             @staticmethod
-            def _fp16_safe_forward(ctx, value, value_spatial_shapes, value_level_start_index,
+            def _fp16_safe_forward(ctx, value, spatial_shapes, level_start_index,
                                    sampling_locations, attention_weights, im2col_step):
                 orig_dtype = value.dtype
                 if value.dtype == torch.float16:
@@ -54,14 +57,14 @@ def apply_codetr_compatibility_patches():
                     sampling_locations = sampling_locations.float()
                 if attention_weights.dtype == torch.float16:
                     attention_weights = attention_weights.float()
-                out = _orig_forward(ctx, value, value_spatial_shapes, value_level_start_index,
+                out = _orig_forward(ctx, value, spatial_shapes, level_start_index,
                                     sampling_locations, attention_weights, im2col_step)
                 if orig_dtype == torch.float16 and out.dtype != torch.float16:
                     out = out.half()
                 return out
 
-            MultiScaleDeformAttnFunction.forward = _fp16_safe_forward
-            MultiScaleDeformAttnFunction._fp16_kernel_patched = True
+            func_cls.forward = _fp16_safe_forward
+            func_cls._fp16_patched = True
 
         # 3. Patch CoDeformDETRHead & CoDINOHead get_bboxes & _get_bboxes_single for Float32 NMS
         try:
@@ -138,6 +141,7 @@ def load_model_and_config(config_path: str, checkpoint_path: str, device_name: s
 
     print(f"[{time.strftime('%H:%M:%S')}] Building detector...")
     model = build_detector(cfg.model, test_cfg=cfg.get("test_cfg"))
+    model.cfg = cfg
 
     print(f"[{time.strftime('%H:%M:%S')}] Loading checkpoint weights: {checkpoint_path}")
     checkpoint = load_checkpoint(model, checkpoint_path, map_location="cpu")
