@@ -2,12 +2,15 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { MockDetectionService } from '../services/mockDetectionService';
 
 const router = Router();
 
-// Configure multer storage for video uploads
-const uploadDir = path.join(__dirname, '../../uploads');
+// Configure multer storage for video uploads (safe for Vercel /tmp)
+const uploadDir = process.env.VERCEL
+  ? path.join(os.tmpdir(), 'uploads')
+  : path.join(__dirname, '../../uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
