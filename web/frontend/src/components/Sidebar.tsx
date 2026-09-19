@@ -67,13 +67,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Top: Compact horizontal branding matching reference exactly */}
         <div>
           <div className="px-5 py-4 flex flex-row items-center gap-3 select-none border-b border-white/10">
-            {/* Exact Helmet Logo Icon matching user upload media_1789849385366.png */}
-            <div className="w-11 h-11 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shrink-0 shadow-sm">
-              <img
-                src="/helmet_logo_icon.png"
-                alt="Smart Helmet"
-                className="w-6.5 h-6.5 object-contain select-none pointer-events-none drop-shadow-sm"
-              />
+            {/* Crisp Pure Vector Helmet Logo Icon matching media_1789850022298.png */}
+            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shrink-0 shadow-sm">
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 32 32"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="text-white drop-shadow-xs"
+              >
+                {/* Top Helmet Shell Arch */}
+                <path
+                  d="M 8.5 13.5 C 9.5 7.8 19.5 7.8 21.5 13.5"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+                {/* Head & Face Contour Profile */}
+                <path
+                  d="M 8 14 C 6.8 17.5 7.2 21.5 9 24.5 C 10.5 26.2 13 26.5 15 25.5 C 16.5 24.5 17.2 24.2 18 23.8 C 19.2 23.8 21 23 21.2 21 C 21.2 20 20.2 19.6 19.8 19.2 C 20.8 18.5 22.2 17.8 22.2 16.2 C 22.2 15 21 14.5 20.5 13.5"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                {/* Inner Brain / Visor Block */}
+                <path
+                  d="M 11 17.5 H 18.2 C 18.8 17.5 19.3 17 19.3 16.4 V 14.5 C 19.3 13 18 11.8 15.1 11.8 C 12.2 11.8 11 13 11 14.5 V 16.4 C 11 17 11.4 17.5 11.8 17.5 Z"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </div>
 
             {/* Horizontal Brand Text: Strictly single-line, no wrapping */}
