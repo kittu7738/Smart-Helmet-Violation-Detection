@@ -247,9 +247,7 @@ export const DetectionPage: React.FC = () => {
             <input type="range" min="0.10" max="0.80" step="0.05" value={confidenceThreshold}
               onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
               style={{ width: '100%', accentColor: '#FDE68A', cursor: 'pointer' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'rgba(253,230,138,0.6)', marginTop: '4px', fontFamily: 'monospace' }}>
-              <span>10% Recall</span><span>80% Precision</span>
-            </div>
+
           </div>
 
           {/* Run button — EMERALD */}
