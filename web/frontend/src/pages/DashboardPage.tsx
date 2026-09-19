@@ -210,8 +210,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           ROW 2: MIDDLE SECTION (Trends, Compliance, Sample Detection)
       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-        {/* Detection Trends Area Chart (5 cols) */}
-        <div className="lg:col-span-5 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
+        {/* Detection Trends Area Chart (5 cols on xl, full width on lg) */}
+        <div className="lg:col-span-12 xl:col-span-5 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2">
@@ -295,8 +295,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
         </div>
 
-        {/* Helmet Compliance Donut (3.5 cols) */}
-        <div className="lg:col-span-3.5 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
+        {/* Helmet Compliance Donut (4 cols on xl, 6 cols on lg) */}
+        <div className="lg:col-span-6 xl:col-span-4 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Video size={18} className="text-blue-600" />
@@ -306,15 +306,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
             {/* Donut and Legend */}
             <div className="flex items-center justify-center gap-3 my-2">
-              <div className="relative w-36 h-36 shrink-0">
+              <div className="relative w-32 h-32 shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={complianceData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={48}
-                      outerRadius={65}
+                      innerRadius={40}
+                      outerRadius={56}
                       paddingAngle={2}
                       dataKey="value"
                       startAngle={90}
@@ -328,8 +328,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 </ResponsiveContainer>
                 {/* Center metric */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                  <span className="text-xl font-extrabold text-slate-900 leading-none">87.7%</span>
-                  <span className="text-[10px] text-slate-500 font-semibold mt-0.5">Compliant</span>
+                  <span className="text-lg font-extrabold text-slate-900 leading-none">87.7%</span>
+                  <span className="text-[9px] text-slate-500 font-semibold mt-0.5">Compliant</span>
                 </div>
               </div>
 
@@ -368,8 +368,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
         </div>
 
-        {/* Sample Detection Preview (3.5 cols) */}
-        <div className="lg:col-span-3.5 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
+        {/* Sample Detection Preview (3 cols on xl, 6 cols on lg) */}
+        <div className="lg:col-span-6 xl:col-span-3 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <ImageIcon size={18} className="text-blue-600" />
