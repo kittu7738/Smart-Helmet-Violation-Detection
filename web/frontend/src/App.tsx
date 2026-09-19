@@ -76,7 +76,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Workspace Area to the right of the sidebar */}
-      <div className="flex-1 lg:pl-64 flex flex-col min-h-screen min-w-0">
+      <div className="flex-1 lg:pl-[280px] flex flex-col min-h-screen min-w-0">
         {/* Minimalist SaaS Top Header */}
         <TopBar
           backendConnected={backendConnected}

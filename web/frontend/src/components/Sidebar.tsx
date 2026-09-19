@@ -57,30 +57,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <aside
-        className={`fixed top-0 left-0 bottom-0 z-50 w-64 text-slate-300 flex flex-col justify-between border-r border-slate-800/80 transition-transform duration-300 ease-in-out lg:translate-x-0 overflow-y-auto ${
+        className={`fixed top-0 left-0 bottom-0 z-50 w-[280px] text-slate-300 flex flex-col justify-between border-r border-slate-800/70 transition-transform duration-300 ease-in-out lg:translate-x-0 overflow-y-auto ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
-          background: "linear-gradient(180deg, rgba(7, 13, 30, 0.95) 0%, rgba(7, 13, 30, 0.88) 35%, rgba(7, 13, 30, 0.45) 65%, rgba(7, 13, 30, 0.82) 100%), url('/sidebar_rider.jpg') center bottom / cover no-repeat"
+          background: "linear-gradient(180deg, rgba(7, 15, 35, 0.64) 0%, rgba(7, 15, 35, 0.48) 30%, rgba(7, 15, 35, 0.16) 62%, rgba(7, 15, 35, 0.50) 100%), url('/sidebar_rider.jpg') center bottom / cover no-repeat"
         }}
       >
         {/* Top: Branding matching reference */}
         <div>
-          <div className="px-5 py-5 border-b border-slate-800/60 flex items-center gap-3 backdrop-blur-xs">
-            {/* Small White Helmet Logo Icon */}
-            <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 shadow-sm">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2a9 9 0 0 0-9 9c0 3.5 1.5 6.5 4 8v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1c2.5-1.5 4-4.5 4-8a9 9 0 0 0-9-9z" />
-                <path d="M4 11h16" />
-                <path d="M12 2v9" />
-                <path d="M7 16a3 3 0 0 0 5 0" />
+          <div className="px-6 pt-6 pb-5 flex items-center gap-3.5 select-none">
+            {/* Small Simple White Helmet Icon inside rounded-square glass container */}
+            <div className="w-[58px] h-[58px] rounded-2xl bg-white/10 backdrop-blur-md border border-white/25 flex items-center justify-center text-white shrink-0 shadow-sm">
+              <svg
+                width="34"
+                height="34"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2.1"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                {/* Full-face motorcycle helmet profile facing left */}
+                <path d="M19 14.5c1.2 0 2.2-.9 2.2-2.1 0-5.7-4.6-10.4-10.2-10.4S1 6.7 1 12.4c0 2.5.8 4.7 2.2 6.5l.8 2.1c.3.7 1 1 1.7 1h5.8c.8 0 1.5-.5 1.8-1.2l.9-2.2c.8.3 1.7.5 2.6.5h1.2c1 0 1.8-.8 1.8-1.8v-1.8z" />
+                <path d="M4 11.5h10.5c.8 0 1.5-.6 1.5-1.4V8.3c0-1.8-1.4-3.3-3.2-3.3H7.5C5.6 5 4 6.5 4 8.3v3.2z" />
               </svg>
             </div>
-            <div className="min-w-0">
-              <h1 className="text-[15px] font-bold text-white tracking-tight leading-tight truncate">
+            <div className="min-w-0 flex flex-col justify-center">
+              <h1 className="text-[25px] font-bold text-white tracking-tight leading-tight drop-shadow-sm">
                 Smart Helmet
               </h1>
-              <p className="text-[10px] text-slate-400 font-medium tracking-wide truncate">
+              <p className="text-[14px] text-slate-300/90 font-normal tracking-tight leading-snug drop-shadow-xs">
                 Violation Detection System
               </p>
             </div>
