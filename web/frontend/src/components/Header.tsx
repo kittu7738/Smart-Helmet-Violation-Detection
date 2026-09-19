@@ -60,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({ backendConnected = true }) => {
           <div className="flex items-center gap-3">
             <div>
               <span className="text-base font-extrabold text-slate-900 tracking-tight">
-                SMART HELMET AI
+                Helmet Detection
               </span>
             </div>
           </div>
