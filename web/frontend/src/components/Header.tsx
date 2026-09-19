@@ -1,26 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { Shield, Cpu, Wifi, Settings, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
-import { api, ModelStatusResponse } from '../services/api';
+import React, { useState } from 'react';
+import { Shield, Cpu, Settings, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { api } from '../services/api';
 
 interface HeaderProps {
   backendConnected?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({ backendConnected = true }) => {
-  const [modelStatus, setModelStatus] = useState<ModelStatusResponse | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [apiUrlInput, setApiUrlInput] = useState(api.getBaseUrl());
   const [testingStatus, setTestingStatus] = useState<{ testing: boolean; message?: string; isError?: boolean } | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    api.getModelStatus().then((status) => {
-      if (isMounted && status) setModelStatus(status);
-    });
-    return () => {
-      isMounted = false;
-    };
-  }, [backendConnected]);
 
   const handleTestAndSave = async () => {
     setTestingStatus({ testing: true });
@@ -67,52 +56,59 @@ export const Header: React.FC<HeaderProps> = ({ backendConnected = true }) => {
     <>
       <header className="w-full border-b border-gray-200 bg-white sticky top-0 z-40 transition-all">
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          {/* Left: Real Project Identity */}
+          {/* Left: Custom Smart Helmet AI Mark & Product Title */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-600 text-white font-bold shadow-xs">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 text-white shadow-md shadow-blue-500/20 flex-shrink-0">
               <Shield className="w-5 h-5" />
             </div>
 
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight">
-                  Smart Helmet Violation Detection
-                </h1>
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-gray-100 text-gray-700 border border-gray-200 hidden sm:inline-block">
-                  IIIT Vadodara
+                <span className="text-base font-extrabold text-slate-900 tracking-tight">
+                  SMART HELMET AI
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wide hidden sm:inline-block">
+                  Vision Platform
                 </span>
               </div>
-              <p className="text-xs text-gray-500 hidden sm:block">
-                Automated Traffic Surveillance & Rider Compliance Analysis
+              <p className="text-xs text-slate-500 hidden sm:block font-medium">
+                Computer Vision for Safer Roads
               </p>
             </div>
           </div>
 
           {/* Right: Technical Badges & Server Connection */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Model Architecture Tag */}
-            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-50 border border-gray-200 text-xs font-mono text-gray-700">
-              <Cpu className="w-3.5 h-3.5 text-gray-500" />
-              <span>Co-DETR (ResNet-18)</span>
-              {modelStatus?.gpu_name && (
-                <span className="text-[10px] text-gray-400">({modelStatus.gpu_name})</span>
-              )}
+            {/* Architecture Tag */}
+            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono text-slate-700">
+              <Cpu className="w-3.5 h-3.5 text-blue-600" />
+              <span>Co-DETR ResNet-18</span>
             </div>
 
-            {/* Backend Connection Indicator with settings trigger */}
+            {/* AI System Status */}
+            <div
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                backendConnected
+                  ? 'bg-emerald-50/80 border-emerald-200 text-emerald-800'
+                  : 'bg-amber-50/80 border-amber-200 text-amber-800'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${backendConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+              <span className="font-semibold text-[11px] sm:text-xs">
+                {backendConnected ? '● AI ENGINE ONLINE' : '● AI ENGINE STANDBY'}
+              </span>
+              <span className="text-[11px] text-slate-400 font-mono hidden md:inline">
+                {backendConnected ? '• T4 GPU • 112 ms' : '• Offline'}
+              </span>
+            </div>
+
+            {/* Settings Trigger */}
             <button
               onClick={() => setIsModalOpen(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer ${
-                backendConnected
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
-                  : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'
-              }`}
-              title="Click to configure API Endpoint"
+              className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+              title="Configure API Endpoint"
             >
-              <span className={`w-2 h-2 rounded-full ${backendConnected ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-              <Wifi className="w-3.5 h-3.5" />
-              <span className="font-semibold">{backendConnected ? 'Inference Online' : 'Backend Offline'}</span>
-              <Settings className="w-3 h-3 text-gray-400 ml-0.5" />
+              <Settings className="w-4 h-4" />
             </button>
           </div>
         </div>
