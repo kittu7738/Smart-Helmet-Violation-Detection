@@ -1,16 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  ArrowRight,
-  ScanLine,
-  Video,
+  Bike,
   ShieldCheck,
   AlertTriangle,
-  FileText,
-  Bike,
-  CheckCircle2,
+  CreditCard,
+  BarChart3,
+  Video,
+  Image as ImageIcon,
+  Clock,
+  ArrowRight,
   TrendingUp,
-  Activity,
-  Camera
+  Target,
+  Crosshair,
+  RotateCw,
+  Zap,
+  ChevronDown
 } from 'lucide-react';
 import {
   AreaChart,
@@ -33,412 +37,539 @@ interface DashboardPageProps {
   onNavigateToViolations: () => void;
   onNavigateToDetection: () => void;
   onNavigateToVideo?: () => void;
+  onNavigateToAnalytics?: () => void;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
-  stats,
-  onNavigateToViolations,
   onNavigateToDetection,
-  onNavigateToVideo
+  onNavigateToAnalytics,
+  onNavigateToViolations
 }) => {
-  const trafficActivityData = [
-    { time: '06:00', total: 46, violations: 4 },
-    { time: '08:00', total: 170, violations: 28 },
-    { time: '10:00', total: 124, violations: 14 },
-    { time: '12:00', total: 100, violations: 11 },
-    { time: '14:00', total: 94, violations: 10 },
-    { time: '16:00', total: 147, violations: 22 },
-    { time: '18:00', total: 139, violations: 19 },
-    { time: '20:00', total: 82, violations: 8 }
+  const [timeRange, setTimeRange] = useState('Last 24 Hours');
+
+  // Chart data matching the smooth dual peaks in mockup
+  const trendData = [
+    { time: '06:00', withHelmet: 48, withoutHelmet: 12 },
+    { time: '08:00', withHelmet: 162, withoutHelmet: 34 },
+    { time: '10:00', withHelmet: 118, withoutHelmet: 20 },
+    { time: '12:00', withHelmet: 104, withoutHelmet: 14 },
+    { time: '14:00', withHelmet: 112, withoutHelmet: 18 },
+    { time: '16:00', withHelmet: 165, withoutHelmet: 35 },
+    { time: '18:00', withHelmet: 138, withoutHelmet: 26 },
+    { time: '20:00', withHelmet: 84, withoutHelmet: 14 }
   ];
 
-  const complianceDistribution = [
-    { name: 'Helmeted', value: 92.4, color: '#22C55E' },
-    { name: 'Violation', value: 7.6, color: '#EF4444' }
+  // Compliance donut data (87.7% vs 12.3%)
+  const complianceData = [
+    { name: 'With Helmet', value: 87.7, color: '#10B981' },
+    { name: 'Without Helmet', value: 12.3, color: '#EF4444' }
   ];
 
-  const activityEvents = [
-    { time: '08:42', vehicle: 'Motorcycle #01', plate: 'MH-04-EK-9214', camera: 'Cam 01 • Main Toll Plaza', role: 'Driver — Helmet', confidence: 94.2, isViolation: false },
-    { time: '08:47', vehicle: 'Motorcycle #03', plate: 'DL-08-KL-9122', camera: 'Cam 02 • North Intersection', role: 'Driver — No Helmet', confidence: 87.1, isViolation: true },
-    { time: '08:53', vehicle: 'Motorcycle #07', plate: 'GJ-01-AX-3819', camera: 'Cam 01 • Main Toll Plaza', role: 'Passenger — No Helmet', confidence: 91.4, isViolation: true },
-    { time: '09:12', vehicle: 'Motorcycle #11', plate: 'KA-03-EM-4580', camera: 'Cam 03 • Expressway Flyover', role: 'Driver — Helmet', confidence: 96.8, isViolation: false },
-    { time: '09:28', vehicle: 'Motorcycle #14', plate: 'MH-12-PQ-7721', camera: 'Cam 02 • North Intersection', role: 'Driver — No Helmet', confidence: 89.5, isViolation: true }
+  // Table rows exactly matching the reference mockup
+  const recentDetections = [
+    {
+      id: 1,
+      type: 'Motorcycle',
+      plate: 'MH-12-AB-4580',
+      detection: 'No Helmet',
+      hasHelmet: false,
+      camera: 'Cam 01 - Toll Plaza',
+      status: 'Violation'
+    },
+    {
+      id: 2,
+      type: 'Scooter',
+      plate: 'GJ-05-CD-3290',
+      detection: 'Helmet',
+      hasHelmet: true,
+      camera: 'Cam 02 - Main Road',
+      status: 'Compliant'
+    },
+    {
+      id: 3,
+      type: 'Motorcycle',
+      plate: 'TS-09-EF-7781',
+      detection: 'No Helmet',
+      hasHelmet: false,
+      camera: 'Cam 03 - City Center',
+      status: 'Violation'
+    },
+    {
+      id: 4,
+      type: 'Scooter',
+      plate: 'KA-03-GH-6650',
+      detection: 'Helmet',
+      hasHelmet: true,
+      camera: 'Cam 02 - Main Road',
+      status: 'Compliant'
+    },
+    {
+      id: 5,
+      type: 'Motorcycle',
+      plate: 'AP-28-XY-4671',
+      detection: 'No Helmet',
+      hasHelmet: false,
+      camera: 'Cam 01 - Toll Plaza',
+      status: 'Violation'
+    }
   ];
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 0 80px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          PAGE TITLE — plain, confident, no fancy borders
-      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <p style={{ fontSize: '12px', fontWeight: 700, color: '#6366F1', textTransform: 'uppercase', letterSpacing: '0.12em', margin: '0 0 6px' }}>
-            ● Live &nbsp;·&nbsp; Today
-          </p>
-          <h1 style={{ fontSize: 'clamp(26px, 5vw, 40px)', fontWeight: 900, color: '#0F172A', margin: 0, letterSpacing: '-0.04em', lineHeight: 1 }}>
-            Monitoring Dashboard
-          </h1>
-        </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={onNavigateToDetection} style={{
-            display: 'flex', alignItems: 'center', gap: '7px', padding: '11px 22px',
-            borderRadius: '12px', background: '#4F46E5', color: '#fff',
-            fontSize: '13px', fontWeight: 700, border: 'none', cursor: 'pointer',
-            boxShadow: '0 4px 16px rgba(79,70,229,0.35)'
-          }}>
-            <ScanLine size={15} /> Detect Image <ArrowRight size={14} />
-          </button>
-          {onNavigateToVideo && (
-            <button onClick={onNavigateToVideo} style={{
-              display: 'flex', alignItems: 'center', gap: '7px', padding: '11px 22px',
-              borderRadius: '12px', background: '#0EA5E9', color: '#fff',
-              fontSize: '13px', fontWeight: 700, border: 'none', cursor: 'pointer',
-              boxShadow: '0 4px 16px rgba(14,165,233,0.35)'
-            }}>
-              <Video size={15} /> Analyze Video
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          TOP HERO ROW — Asymmetric: big compliance card + 3 right-side cards
-      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: 'auto auto', gap: '16px', marginBottom: '20px' }}>
-
-        {/* BIG CARD — Helmet Compliance — spans 1 col, 2 rows — DARK GREEN */}
-        <div style={{
-          gridColumn: '1', gridRow: '1 / 3',
-          background: 'linear-gradient(160deg, #14532D 0%, #166534 40%, #15803D 100%)',
-          borderRadius: '24px', padding: '32px 28px',
-          display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-          boxShadow: '0 12px 40px rgba(21,128,61,0.35)',
-          minHeight: '240px'
-        }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ShieldCheck size={20} color="#4ADE80" />
+    <div className="space-y-6 max-w-[1400px] mx-auto">
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          ROW 1: FOUR TOP STAT CARDS (Blue, Green, Red, Orange Gradients)
+      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+        {/* Card 1: Total Vehicles (Azure Blue) */}
+        <div className="relative overflow-hidden rounded-2xl p-5 text-white shadow-md shadow-blue-500/15 transition-transform hover:-translate-y-0.5"
+          style={{ background: 'linear-gradient(135deg, #0284C7 0%, #2563EB 100%)' }}
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-xs border border-white/25">
+              <Bike size={22} />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-blue-100/90 tracking-wide">Total Vehicles</div>
+              <div className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">1,248</div>
+              <div className="text-[11px] font-medium text-cyan-200 flex items-center gap-1 mt-0.5">
+                <span>↑ +12% from previous period</span>
               </div>
-              <span style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#86EFAC' }}>
-                Helmet Compliance
-              </span>
             </div>
-            <div style={{ fontSize: '76px', fontWeight: 900, color: '#FFFFFF', lineHeight: 1, fontFamily: 'monospace', letterSpacing: '-0.04em' }}>
-              92.4<span style={{ fontSize: '36px', color: '#4ADE80' }}>%</span>
-            </div>
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', fontWeight: 600, margin: '12px 0 0' }}>
-              of riders wearing helmets correctly
-            </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-            <span style={{ background: 'rgba(74,222,128,0.2)', color: '#4ADE80', fontSize: '12px', fontWeight: 800, padding: '5px 12px', borderRadius: '20px' }}>
-              ↑ +1.8% this week
-            </span>
-            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>Target: 95%</span>
-          </div>
+          {/* Subtle wave in card background */}
+          <svg className="absolute bottom-0 right-0 w-32 h-12 text-white/15 pointer-events-none" viewBox="0 0 100 40" fill="currentColor" preserveAspectRatio="none">
+            <path d="M0 30 Q 25 10, 50 25 T 100 15 L 100 40 L 0 40 Z" />
+          </svg>
         </div>
 
-        {/* CARD — Total Riders — DARK BLUE */}
-        <div style={{
-          gridColumn: '2', gridRow: '1',
-          background: 'linear-gradient(135deg, #1E3A8A 0%, #1D4ED8 100%)',
-          borderRadius: '20px', padding: '24px',
-          boxShadow: '0 8px 28px rgba(29,78,216,0.30)',
-          display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#93C5FD' }}>Total Riders</span>
-            <Bike size={18} color="#60A5FA" />
-          </div>
-          <div>
-            <div style={{ fontSize: '52px', fontWeight: 900, color: '#FFFFFF', fontFamily: 'monospace', lineHeight: 1, letterSpacing: '-0.03em' }}>
-              {stats.totalRiders ? stats.totalRiders.toLocaleString() : '1,284'}
+        {/* Card 2: With Helmet (Emerald Green) */}
+        <div className="relative overflow-hidden rounded-2xl p-5 text-white shadow-md shadow-emerald-500/15 transition-transform hover:-translate-y-0.5"
+          style={{ background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)' }}
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-xs border border-white/25">
+              <ShieldCheck size={22} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '8px' }}>
-              <TrendingUp size={13} color="#93C5FD" />
-              <span style={{ fontSize: '12px', color: '#93C5FD', fontWeight: 700 }}>+12.4% vs last week</span>
-            </div>
-          </div>
-        </div>
-
-        {/* CARD — Active Violations — HOT RED/ORANGE */}
-        <div style={{
-          gridColumn: '3', gridRow: '1',
-          background: 'linear-gradient(135deg, #7F1D1D 0%, #DC2626 100%)',
-          borderRadius: '20px', padding: '24px',
-          boxShadow: '0 8px 28px rgba(220,38,38,0.35)',
-          display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#FCA5A5' }}>Violations</span>
-            <AlertTriangle size={18} color="#FCA5A5" />
-          </div>
-          <div>
-            <div style={{ fontSize: '52px', fontWeight: 900, color: '#FFFFFF', fontFamily: 'monospace', lineHeight: 1, letterSpacing: '-0.03em' }}>
-              {stats.violations ?? '17'}
-            </div>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.15)', color: '#fff', padding: '3px 9px', borderRadius: '12px', fontWeight: 700 }}>12 Driver</span>
-              <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.15)', color: '#fff', padding: '3px 9px', borderRadius: '12px', fontWeight: 700 }}>5 Pillion</span>
-            </div>
-          </div>
-        </div>
-
-        {/* CARD — Co-DETR Status — row 2, col 2 — VIOLET */}
-        <div style={{
-          gridColumn: '2', gridRow: '2',
-          background: 'linear-gradient(135deg, #2E1065 0%, #6D28D9 100%)',
-          borderRadius: '20px', padding: '20px 24px',
-          boxShadow: '0 8px 28px rgba(109,40,217,0.30)',
-          display: 'flex', flexDirection: 'column', gap: '8px'
-        }}>
-          <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#C4B5FD' }}>Co-DETR Engine</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF' }}>ONLINE</span>
-            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#4ADE80', boxShadow: '0 0 0 3px rgba(74,222,128,0.3)', display: 'inline-block' }} />
-          </div>
-          <div style={{ display: 'flex', gap: '10px', fontSize: '11px', fontFamily: 'monospace', fontWeight: 700, color: '#C4B5FD' }}>
-            <span style={{ background: 'rgba(255,255,255,0.1)', padding: '3px 8px', borderRadius: '6px' }}>~112 ms</span>
-            <span style={{ background: 'rgba(255,255,255,0.1)', padding: '3px 8px', borderRadius: '6px' }}>Tesla T4</span>
-          </div>
-        </div>
-
-        {/* CARD — mAP / Accuracy — row 2, col 3 — AMBER */}
-        <div style={{
-          gridColumn: '3', gridRow: '2',
-          background: 'linear-gradient(135deg, #78350F 0%, #D97706 100%)',
-          borderRadius: '20px', padding: '20px 24px',
-          boxShadow: '0 8px 28px rgba(217,119,6,0.30)',
-          display: 'flex', flexDirection: 'column', gap: '6px'
-        }}>
-          <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#FDE68A' }}>Model Stats</span>
-          <div style={{ display: 'flex', gap: '14px', alignItems: 'baseline' }}>
             <div>
-              <div style={{ fontSize: '22px', fontWeight: 900, color: '#fff', fontFamily: 'monospace' }}>22.4%</div>
-              <div style={{ fontSize: '10px', color: '#FDE68A', fontWeight: 700, textTransform: 'uppercase' }}>mAP</div>
-            </div>
-            <div style={{ width: '1px', height: '36px', background: 'rgba(255,255,255,0.2)' }} />
-            <div>
-              <div style={{ fontSize: '22px', fontWeight: 900, color: '#fff', fontFamily: 'monospace' }}>54.3%</div>
-              <div style={{ fontSize: '10px', color: '#FDE68A', fontWeight: 700, textTransform: 'uppercase' }}>AP50</div>
-            </div>
-            <div style={{ width: '1px', height: '36px', background: 'rgba(255,255,255,0.2)' }} />
-            <div>
-              <div style={{ fontSize: '22px', fontWeight: 900, color: '#fff', fontFamily: 'monospace' }}>95.8%</div>
-              <div style={{ fontSize: '10px', color: '#FDE68A', fontWeight: 700, textTransform: 'uppercase' }}>acc0</div>
+              <div className="text-xs font-semibold text-emerald-100/90 tracking-wide">With Helmet</div>
+              <div className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">1,095</div>
+              <div className="text-[11px] font-medium text-emerald-100/90 mt-0.5">
+                87.7% compliance
+              </div>
             </div>
           </div>
+          <svg className="absolute bottom-0 right-0 w-32 h-12 text-white/15 pointer-events-none" viewBox="0 0 100 40" fill="currentColor" preserveAspectRatio="none">
+            <path d="M0 32 Q 25 20, 50 28 T 100 18 L 100 40 L 0 40 Z" />
+          </svg>
+        </div>
+
+        {/* Card 3: Without Helmet (Crimson Red) */}
+        <div className="relative overflow-hidden rounded-2xl p-5 text-white shadow-md shadow-rose-500/15 transition-transform hover:-translate-y-0.5"
+          style={{ background: 'linear-gradient(135deg, #E11D48 0%, #F43F5E 100%)' }}
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-xs border border-white/25">
+              <AlertTriangle size={22} />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-rose-100/90 tracking-wide">Without Helmet</div>
+              <div className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">153</div>
+              <div className="text-[11px] font-medium text-rose-100/90 mt-0.5">
+                12.3% violations
+              </div>
+            </div>
+          </div>
+          <svg className="absolute bottom-0 right-0 w-32 h-12 text-white/15 pointer-events-none" viewBox="0 0 100 40" fill="currentColor" preserveAspectRatio="none">
+            <path d="M0 25 Q 30 35, 60 20 T 100 25 L 100 40 L 0 40 Z" />
+          </svg>
+        </div>
+
+        {/* Card 4: Number Plates (Amber / Orange) */}
+        <div className="relative overflow-hidden rounded-2xl p-5 text-white shadow-md shadow-orange-500/15 transition-transform hover:-translate-y-0.5"
+          style={{ background: 'linear-gradient(135deg, #EA580C 0%, #F59E0B 100%)' }}
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-xs border border-white/25">
+              <CreditCard size={22} />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-orange-100/90 tracking-wide">Number Plates</div>
+              <div className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">1,102</div>
+              <div className="text-[11px] font-medium text-orange-100/90 mt-0.5">
+                Detected &amp; Logged
+              </div>
+            </div>
+          </div>
+          <svg className="absolute bottom-0 right-0 w-32 h-12 text-white/15 pointer-events-none" viewBox="0 0 100 40" fill="currentColor" preserveAspectRatio="none">
+            <path d="M0 30 Q 30 15, 65 28 T 100 12 L 100 40 L 0 40 Z" />
+          </svg>
         </div>
       </div>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          CHARTS ROW — Full-width area chart + compact donut side panel
-      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px', marginBottom: '20px', alignItems: 'stretch' }}>
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          ROW 2: MIDDLE SECTION (Trends, Compliance, Sample Detection)
+      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+        {/* Detection Trends Area Chart (5 cols) */}
+        <div className="lg:col-span-5 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2">
+                <BarChart3 size={18} className="text-blue-600" />
+                <h2 className="text-sm font-bold text-slate-900 tracking-tight">Detection Trends</h2>
+              </div>
 
-        {/* Area Chart */}
-        <div style={{
-          background: '#FFFFFF',
-          border: '2px solid #E2E8F0',
-          borderRadius: '24px',
-          padding: '28px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.06)'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '10px' }}>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', margin: 0 }}>24-Hour Traffic</h3>
-              <p style={{ fontSize: '12px', color: '#64748B', margin: '3px 0 0', fontWeight: 500 }}>Riders detected vs. infractions flagged</p>
+              {/* Time Range Selector */}
+              <div className="relative">
+                <select
+                  value={timeRange}
+                  onChange={(e) => setTimeRange(e.target.value)}
+                  className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 pr-6 text-xs font-semibold text-slate-700 cursor-pointer focus:outline-none"
+                >
+                  <option>Last 24 Hours</option>
+                  <option>Last 7 Days</option>
+                  <option>Last 30 Days</option>
+                </select>
+                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#1D4ED8' }}>
-                <span style={{ width: '24px', height: '3px', background: '#3B82F6', borderRadius: '2px', display: 'inline-block' }} />
-                Riders
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#DC2626' }}>
-                <span style={{ width: '24px', height: '3px', background: '#EF4444', borderRadius: '2px', display: 'inline-block' }} />
-                Violations
-              </span>
+            <p className="text-[11px] text-slate-500 mb-3">Vehicles with and without helmet over time</p>
+
+            {/* Custom Legend */}
+            <div className="flex items-center gap-4 text-xs font-semibold mb-2">
+              <div className="flex items-center gap-1.5 text-blue-600">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                <span>With Helmet</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-rose-500">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                <span>Without Helmet</span>
+              </div>
             </div>
           </div>
-          <div style={{ height: '220px' }}>
+
+          <div className="h-52 w-full mt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trafficActivityData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="gTotal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#3B82F6" stopOpacity={0.03} />
+                  <linearGradient id="colorWithHelmet" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2563EB" stopOpacity={0.28} />
+                    <stop offset="95%" stopColor="#2563EB" stopOpacity={0.0} />
                   </linearGradient>
-                  <linearGradient id="gViol" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#EF4444" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="#EF4444" stopOpacity={0.03} />
+                  <linearGradient id="colorWithoutHelmet" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.28} />
+                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="2 4" vertical={false} stroke="#F1F5F9" />
-                <XAxis dataKey="time" stroke="#94A3B8" fontSize={11} fontWeight={600} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94A3B8" fontSize={11} fontWeight={600} tickLine={false} axisLine={false} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} domain={[0, 200]} />
                 <Tooltip
-                  contentStyle={{ background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: '10px', fontSize: '12px', fontWeight: 700, boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
+                  contentStyle={{
+                    backgroundColor: '#0F172A',
+                    borderRadius: '10px',
+                    border: 'none',
+                    color: '#fff',
+                    fontSize: '11px',
+                    padding: '8px 12px'
+                  }}
                 />
-                <Area type="monotone" dataKey="total" name="Total Riders" stroke="#2563EB" strokeWidth={2.5} fill="url(#gTotal)" />
-                <Area type="monotone" dataKey="violations" name="Violations" stroke="#DC2626" strokeWidth={2.5} fill="url(#gViol)" />
+                <Area
+                  type="monotone"
+                  dataKey="withHelmet"
+                  stroke="#2563EB"
+                  strokeWidth={2.5}
+                  fillOpacity={1}
+                  fill="url(#colorWithHelmet)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="withoutHelmet"
+                  stroke="#EF4444"
+                  strokeWidth={2.5}
+                  fillOpacity={1}
+                  fill="url(#colorWithoutHelmet)"
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Compliance Donut */}
-        <div style={{
-          background: '#0F172A',
-          borderRadius: '24px',
-          padding: '28px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-          display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
-        }}>
+        {/* Helmet Compliance Donut (3.5 cols) */}
+        <div className="lg:col-span-3.5 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
           <div>
-            <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#F1F5F9', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Status Split</h3>
-            <p style={{ fontSize: '12px', color: '#64748B', margin: 0, fontWeight: 500 }}>Helmet vs. No-Helmet</p>
-          </div>
+            <div className="flex items-center gap-2 mb-1">
+              <Video size={18} className="text-blue-600" />
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">Helmet Compliance</h2>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-2">Overall compliance distribution</p>
 
-          <div style={{ position: 'relative', height: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={complianceDistribution} innerRadius={52} outerRadius={70} paddingAngle={5} dataKey="value">
-                  {complianceDistribution.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-              <span style={{ fontSize: '28px', fontWeight: 900, color: '#fff', fontFamily: 'monospace', lineHeight: 1 }}>92.4%</span>
-              <span style={{ fontSize: '10px', fontWeight: 800, color: '#22C55E', textTransform: 'uppercase', marginTop: '2px' }}>Safe</span>
+            {/* Donut and Legend */}
+            <div className="flex items-center justify-center gap-3 my-2">
+              <div className="relative w-36 h-36 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={complianceData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={48}
+                      outerRadius={65}
+                      paddingAngle={2}
+                      dataKey="value"
+                      startAngle={90}
+                      endAngle={-270}
+                    >
+                      {complianceData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* Center metric */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                  <span className="text-xl font-extrabold text-slate-900 leading-none">87.7%</span>
+                  <span className="text-[10px] text-slate-500 font-semibold mt-0.5">Compliant</span>
+                </div>
+              </div>
+
+              {/* Legend with exact numbers from mockup */}
+              <div className="space-y-2.5 text-xs">
+                <div>
+                  <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span>With Helmet</span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 pl-4 font-mono font-bold">
+                    1,095 (87.7%)
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+                    <span>Without Helmet</span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 pl-4 font-mono font-bold">
+                    153 (12.3%)
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(34,197,94,0.12)', borderRadius: '10px', border: '1px solid rgba(34,197,94,0.2)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '13px', fontWeight: 700, color: '#86EFAC' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
-                Helmeted
-              </span>
-              <span style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 900, color: '#4ADE80' }}>1,186</span>
+          {/* Bottom Banner matching mockup */}
+          <div className="mt-3 p-2.5 rounded-xl bg-emerald-50/90 border border-emerald-200/80 flex items-center gap-2 text-emerald-800 text-xs">
+            <div className="w-5 h-5 rounded-full bg-emerald-200 flex items-center justify-center shrink-0">
+              <TrendingUp size={12} className="text-emerald-700" />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(239,68,68,0.12)', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.2)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '13px', fontWeight: 700, color: '#FCA5A5' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#EF4444', display: 'inline-block' }} />
-                No Helmet
-              </span>
-              <span style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 900, color: '#F87171' }}>98</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          DETECTION FEED — Feels like a real event log, not a card grid
-      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div style={{
-        background: '#FFFBF0',
-        border: '2px solid #FDE68A',
-        borderRadius: '24px',
-        overflow: 'hidden'
-      }}>
-        {/* Feed header */}
-        <div style={{
-          background: '#FBBF24',
-          padding: '16px 28px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Activity size={18} color="#78350F" />
-            <span style={{ fontSize: '15px', fontWeight: 900, color: '#78350F', letterSpacing: '-0.01em' }}>Live Detection Feed</span>
-            <span style={{ background: '#78350F', color: '#FDE68A', fontSize: '11px', fontWeight: 800, padding: '2px 9px', borderRadius: '12px' }}>
-              {activityEvents.length} events
+            <span className="text-[11px] font-medium leading-tight">
+              <strong>Compliance increased by 6.2%</strong> compared to previous period
             </span>
           </div>
-          <button
-            onClick={onNavigateToViolations}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              background: '#78350F', color: '#FDE68A', border: 'none',
-              padding: '8px 16px', borderRadius: '10px',
-              fontSize: '12px', fontWeight: 800, cursor: 'pointer'
-            }}
+        </div>
+
+        {/* Sample Detection Preview (3.5 cols) */}
+        <div className="lg:col-span-3.5 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <ImageIcon size={18} className="text-blue-600" />
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">Sample Detection</h2>
+            </div>
+            <button
+              onClick={onNavigateToDetection}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              <span>View All</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+
+          {/* High Fidelity Detection Graphic with 3 Riders & Bounding Boxes */}
+          <div className="relative w-full h-52 rounded-xl overflow-hidden bg-slate-900 border border-slate-200 shadow-inner group cursor-pointer"
+            onClick={onNavigateToDetection}
           >
-            <FileText size={13} /> Full Log
-          </button>
-        </div>
+            {/* Background traffic photo */}
+            <img
+              src="/sample_traffic.jpg"
+              alt="Sample Detection Feed"
+              className="w-full h-full object-cover brightness-95 contrast-105"
+            />
 
-        {/* Column labels */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: '70px 1fr 1fr auto',
-          padding: '10px 28px', gap: '12px',
-          background: '#FEF3C7', borderBottom: '1px solid #FDE68A'
-        }}>
-          {['Time', 'Vehicle', 'Camera', 'Status'].map((col) => (
-            <span key={col} style={{ fontSize: '11px', fontWeight: 800, color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{col}</span>
-          ))}
-        </div>
+            {/* Bounding Box 1: Left Rider (Compliant - Green) */}
+            <div className="absolute top-[18%] left-[8%] w-[26%] h-[72%] border-2 border-emerald-500 bg-emerald-500/15 rounded-xs transition-transform group-hover:scale-[1.02]">
+              <span className="absolute -top-6 left-0 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm">
+                Helmet
+              </span>
+            </div>
 
-        {/* Event rows */}
-        {activityEvents.map((evt, idx) => (
-          <div key={idx} style={{
-            display: 'grid', gridTemplateColumns: '70px 1fr 1fr auto',
-            padding: '14px 28px', gap: '12px', alignItems: 'center',
-            borderBottom: idx < activityEvents.length - 1 ? '1px solid #FDE68A' : 'none',
-            background: evt.isViolation ? 'rgba(254,226,226,0.5)' : 'transparent',
-            transition: 'background 0.15s'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{
-                width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                background: evt.isViolation ? '#EF4444' : '#22C55E'
-              }} />
-              <span style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: 700, color: '#374151' }}>{evt.time}</span>
+            {/* Bounding Box 2: Center Rider (Violation - Red) */}
+            <div className="absolute top-[14%] left-[37%] w-[28%] h-[76%] border-2 border-rose-500 bg-rose-500/20 rounded-xs transition-transform group-hover:scale-[1.02]">
+              <span className="absolute -top-6 left-0 bg-rose-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm animate-pulse">
+                No Helmet
+              </span>
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '13px', fontWeight: 800, color: '#111827' }}>{evt.vehicle}</span>
-                <span style={{ fontFamily: 'monospace', fontSize: '11px', background: '#EEF2FF', color: '#3730A3', padding: '2px 7px', borderRadius: '6px', fontWeight: 700, border: '1px solid #C7D2FE' }}>
-                  {evt.plate}
-                </span>
-              </div>
-              <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: 600, marginTop: '2px' }}>{evt.role} · {evt.confidence}% conf.</div>
-            </div>
-            <div style={{ fontSize: '12px', color: '#374151', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Camera size={13} color="#9CA3AF" />
-              {evt.camera}
-            </div>
-            <div>
-              {evt.isViolation ? (
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '5px',
-                  background: '#DC2626', color: '#fff',
-                  padding: '5px 12px', borderRadius: '20px',
-                  fontSize: '11px', fontWeight: 900,
-                  boxShadow: '0 2px 8px rgba(220,38,38,0.3)'
-                }}>
-                  <AlertTriangle size={11} /> VIOLATION
-                </span>
-              ) : (
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '5px',
-                  background: '#16A34A', color: '#fff',
-                  padding: '5px 12px', borderRadius: '20px',
-                  fontSize: '11px', fontWeight: 900,
-                  boxShadow: '0 2px 8px rgba(22,163,74,0.3)'
-                }}>
-                  <CheckCircle2 size={11} /> COMPLIANT
-                </span>
-              )}
+
+            {/* Bounding Box 3: Right Rider (Compliant - Green) */}
+            <div className="absolute top-[18%] right-[8%] w-[26%] h-[72%] border-2 border-emerald-500 bg-emerald-500/15 rounded-xs transition-transform group-hover:scale-[1.02]">
+              <span className="absolute -top-6 left-0 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm">
+                Helmet
+              </span>
             </div>
           </div>
-        ))}
+        </div>
       </div>
 
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          ROW 3: BOTTOM SECTION (Recent Detections & Model Performance)
+      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+        {/* Recent Detections Table (7 cols) */}
+        <div className="lg:col-span-7 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <Clock size={18} className="text-blue-600" />
+                <h2 className="text-sm font-bold text-slate-900 tracking-tight">Recent Detections</h2>
+              </div>
+              <button
+                onClick={onNavigateToViolations}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <span>View All</span>
+                <ArrowRight size={13} />
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-3">Latest detection results from the system</p>
 
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400 font-semibold">
+                    <th className="pb-2.5 font-semibold">#</th>
+                    <th className="pb-2.5 font-semibold">Vehicle Type</th>
+                    <th className="pb-2.5 font-semibold">License Plate</th>
+                    <th className="pb-2.5 font-semibold">Detection</th>
+                    <th className="pb-2.5 font-semibold">Camera</th>
+                    <th className="pb-2.5 font-semibold">Status</th>
+                    <th className="pb-2.5 font-semibold text-right pr-1">Image</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {recentDetections.map((row) => (
+                    <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-2.5 font-mono text-slate-500">{row.id}</td>
+                      <td className="py-2.5 font-medium text-slate-800">{row.type}</td>
+                      <td className="py-2.5 font-mono font-bold text-slate-900">{row.plate}</td>
+                      <td className="py-2.5">
+                        <span className={`inline-flex items-center gap-1 font-semibold ${row.hasHelmet ? 'text-emerald-700' : 'text-rose-600'}`}>
+                          {row.hasHelmet ? (
+                            <ShieldCheck size={13} className="text-emerald-600" />
+                          ) : (
+                            <AlertTriangle size={13} className="text-rose-600" />
+                          )}
+                          <span>{row.detection}</span>
+                        </span>
+                      </td>
+                      <td className="py-2.5 text-slate-600 text-[11px]">{row.camera}</td>
+                      <td className="py-2.5">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
+                          row.status === 'Violation'
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        }`}>
+                          {row.status}
+                        </span>
+                      </td>
+                      <td className="py-2.5 text-right pr-1">
+                        <div className="w-10 h-6 rounded-md overflow-hidden inline-block border border-slate-200 shadow-2xs">
+                          <img
+                            src="/sample_traffic.jpg"
+                            alt="Capture"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Model Performance (5 cols) */}
+        <div className="lg:col-span-5 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <BarChart3 size={18} className="text-blue-600" />
+                <h2 className="text-sm font-bold text-slate-900 tracking-tight">Model Performance</h2>
+              </div>
+              <button
+                onClick={onNavigateToAnalytics}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <span>View Details</span>
+                <ArrowRight size={13} />
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-4">Co-DETR ResNet-18 Benchmark on Real Traffic</p>
+
+            {/* 4 Metric Tiles in 2x2 Grid */}
+            <div className="grid grid-cols-2 gap-3.5">
+              {/* Tile 1: mAP (Purple) */}
+              <div className="p-4 rounded-xl bg-purple-50/60 border border-purple-100/90 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shrink-0">
+                  <Target size={18} />
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 font-medium">mAP</div>
+                  <div className="text-2xl font-black text-slate-900 tracking-tight">22.4%</div>
+                </div>
+              </div>
+
+              {/* Tile 2: Precision (Blue) */}
+              <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-100/90 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                  <Crosshair size={18} />
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 font-medium">Precision</div>
+                  <div className="text-2xl font-black text-slate-900 tracking-tight">54.3%</div>
+                </div>
+              </div>
+
+              {/* Tile 3: Recall (Green) */}
+              <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-100/90 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                  <RotateCw size={18} />
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 font-medium">Recall</div>
+                  <div className="text-2xl font-black text-slate-900 tracking-tight">95.8%</div>
+                </div>
+              </div>
+
+              {/* Tile 4: FPS / Latency (Orange) */}
+              <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-100/90 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                  <Zap size={18} />
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 font-medium">FPS (Inference)</div>
+                  <div className="text-2xl font-black text-slate-900 tracking-tight">12.2</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+            <span>Architecture: Co-DETR (ResNet-18)</span>
+            <span>Latency: ~82ms (Tesla T4)</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

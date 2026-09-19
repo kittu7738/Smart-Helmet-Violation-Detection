@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Header } from './components/Header';
-import { Navigation, NavTab } from './components/Navigation';
+import { Sidebar } from './components/Sidebar';
+import { TopBar } from './components/TopBar';
+import { NavTab } from './components/Navigation';
 import { DashboardPage } from './pages/DashboardPage';
 import { DetectionPage } from './pages/DetectionPage';
 import { VideoAnalysisPage } from './pages/VideoAnalysisPage';
@@ -20,6 +21,8 @@ export const App: React.FC = () => {
   };
 
   const [activeTab, setActiveTabState] = useState<NavTab | 'violations'>(getInitialTab);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const setActiveTab = (tab: NavTab | 'violations') => {
     setActiveTabState(tab);
@@ -62,53 +65,70 @@ export const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-transparent text-slate-900 selection:bg-blue-200 selection:text-blue-900">
-      {/* Clean White SaaS Header */}
-      <Header backendConnected={backendConnected} />
-
-      {/* Clean Navigation Bar */}
-      <Navigation
+    <div className="min-h-screen flex bg-[#EEF2F8] text-slate-900 selection:bg-blue-200 selection:text-blue-900">
+      {/* Dark Sidebar matching the reference mockup (media_1789845147108.jpg) */}
+      <Sidebar
         activeTab={activeTab === 'violations' ? 'dashboard' : activeTab}
         onTabChange={(tab) => setActiveTab(tab)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        mobileOpen={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-12">
-        {activeTab === 'dashboard' && (
-          <DashboardPage
-            stats={stats}
-            live={live}
-            violations={violations}
-            onNavigateToViolations={() => setActiveTab('violations')}
-            onNavigateToDetection={() => setActiveTab('detection')}
-            onNavigateToVideo={() => setActiveTab('video')}
-          />
-        )}
+      {/* Main Workspace Area to the right of the sidebar */}
+      <div className="flex-1 lg:pl-64 flex flex-col min-h-screen min-w-0">
+        {/* Minimalist SaaS Top Header */}
+        <TopBar
+          backendConnected={backendConnected}
+          onOpenMobileMenu={() => setMobileMenuOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          isSettingsOpen={isSettingsOpen}
+          setIsSettingsOpen={setIsSettingsOpen}
+        />
 
-        {activeTab === 'detection' && <DetectionPage />}
+        {/* Dynamic Page Content */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-7">
+          {activeTab === 'dashboard' && (
+            <DashboardPage
+              stats={stats}
+              live={live}
+              violations={violations}
+              onNavigateToViolations={() => setActiveTab('violations')}
+              onNavigateToDetection={() => setActiveTab('detection')}
+              onNavigateToVideo={() => setActiveTab('video')}
+              onNavigateToAnalytics={() => setActiveTab('analytics')}
+            />
+          )}
 
-        {activeTab === 'video' && <VideoAnalysisPage />}
+          {activeTab === 'detection' && <DetectionPage />}
 
-        {activeTab === 'camera' && <LiveCameraPage />}
+          {activeTab === 'video' && <VideoAnalysisPage />}
 
-        {activeTab === 'analytics' && <AnalyticsPage />}
+          {activeTab === 'camera' && <LiveCameraPage />}
 
-        {activeTab === 'about' && <AboutPage />}
+          {activeTab === 'analytics' && <AnalyticsPage />}
 
-        {activeTab === 'violations' && <ViolationsPage />}
-      </main>
+          {activeTab === 'about' && <AboutPage />}
 
-      {/* Clean Modern Footer */}
-      <footer className="border-t border-gray-200 bg-white py-4 text-xs text-gray-500">
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="font-semibold text-gray-800">Smart Helmet AI Violation Detection System</span>
-            <span className="text-gray-300">|</span>
-            <span className="text-blue-600 font-medium">Co-DETR ResNet-18 FP16</span>
+          {activeTab === 'violations' && <ViolationsPage />}
+        </main>
+
+        {/* Footer exactly matching mockup */}
+        <footer className="border-t border-slate-200/80 bg-white/60 py-4 px-6 text-xs text-slate-500">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 max-w-[1400px] mx-auto">
+            <div className="flex items-center gap-2 text-slate-600">
+              <span className="font-semibold text-slate-700">Smart Helmet Violation Detection System</span>
+              <span className="text-slate-300">|</span>
+              <span>Safer Roads, Brighter Futures</span>
+            </div>
+            <div className="flex items-center gap-4 text-slate-500 font-medium">
+              <span className="hover:text-slate-800 cursor-pointer">Privacy</span>
+              <span className="hover:text-slate-800 cursor-pointer">Terms</span>
+              <span className="hover:text-slate-800 cursor-pointer">Contact</span>
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      </div>
     </div>
   );
 };
