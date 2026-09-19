@@ -13,7 +13,7 @@ export const AboutPage: React.FC = () => {
       <section className="text-center pt-4 pb-2 space-y-3">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold">
           <Award className="w-3.5 h-3.5" />
-          <span>IIITVICD AI City Challenge Research Project</span>
+          <span>AI Traffic Safety Computer Vision Project</span>
         </div>
 
         <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-gray-900">

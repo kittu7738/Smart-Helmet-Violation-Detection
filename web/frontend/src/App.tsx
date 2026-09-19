@@ -108,7 +108,7 @@ export const App: React.FC = () => {
             <span className="text-blue-600 font-medium">Co-DETR ResNet-18 FP16</span>
           </div>
           <div className="text-gray-500 text-[11px]">
-            IIITVICD AI City Challenge Research Project
+            Traffic Safety Computer Vision Platform
           </div>
         </div>
       </footer>

@@ -70,7 +70,7 @@ export const AnalyticsPage: React.FC = () => {
             Model Evaluation & Analytics Telemetry
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Verified benchmark metrics on IIITVICD AI City Challenge validation split (Co-DETR ResNet-18 FP16).
+            Verified benchmark metrics on traffic surveillance validation split (Co-DETR ResNet-18 FP16).
           </p>
         </div>
 

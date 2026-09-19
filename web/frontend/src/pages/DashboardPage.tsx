@@ -7,10 +7,8 @@ import {
   AlertTriangle,
   FileText,
   Clock,
-  Camera,
   Cpu,
   Bike,
-  User,
   CheckCircle2,
   TrendingUp,
   Activity
@@ -108,76 +106,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       role: 'Driver — No Helmet',
       confidence: 89.5,
       isViolation: true
-    }
-  ];
-
-  // AI Pipeline Stages with bright, distinct color identities
-  const pipelineStages = [
-    {
-      step: '01',
-      title: 'IMAGE CAPTURE',
-      desc: 'High-res CCTV surveillance video frame extraction',
-      icon: Camera,
-      cardBg: 'bg-gradient-to-br from-cyan-100 via-cyan-50 to-white',
-      borderColor: 'border-cyan-300 hover:border-cyan-500',
-      iconBg: 'bg-cyan-600 text-white shadow-cyan-500/30',
-      textColor: 'text-cyan-950',
-      badgeBg: 'bg-cyan-200 text-cyan-900'
-    },
-    {
-      step: '02',
-      title: 'CO-DETR BACKBONE',
-      desc: 'ResNet-18 FP16 feature extraction with query attention',
-      icon: Cpu,
-      cardBg: 'bg-gradient-to-br from-indigo-100 via-indigo-50 to-white',
-      borderColor: 'border-indigo-300 hover:border-indigo-500',
-      iconBg: 'bg-indigo-600 text-white shadow-indigo-500/30',
-      textColor: 'text-indigo-950',
-      badgeBg: 'bg-indigo-200 text-indigo-900'
-    },
-    {
-      step: '03',
-      title: 'MOTORCYCLE',
-      desc: 'Vehicle bounding box proposal & spatial localization',
-      icon: Bike,
-      cardBg: 'bg-gradient-to-br from-blue-100 via-blue-50 to-white',
-      borderColor: 'border-blue-300 hover:border-blue-500',
-      iconBg: 'bg-blue-600 text-white shadow-blue-500/30',
-      textColor: 'text-blue-950',
-      badgeBg: 'bg-blue-200 text-blue-900'
-    },
-    {
-      step: '04',
-      title: 'RIDER PARSING',
-      desc: 'Driver and passenger spatial role segmentation',
-      icon: User,
-      cardBg: 'bg-gradient-to-br from-purple-100 via-violet-50 to-white',
-      borderColor: 'border-purple-300 hover:border-purple-500',
-      iconBg: 'bg-purple-600 text-white shadow-purple-500/30',
-      textColor: 'text-purple-950',
-      badgeBg: 'bg-purple-200 text-purple-900'
-    },
-    {
-      step: '05',
-      title: 'HELMET STATUS',
-      desc: 'Head ROI crop inspection & protective compliance verification',
-      icon: ShieldCheck,
-      cardBg: 'bg-gradient-to-br from-emerald-100 via-emerald-50 to-white',
-      borderColor: 'border-emerald-300 hover:border-emerald-500',
-      iconBg: 'bg-emerald-600 text-white shadow-emerald-500/30',
-      textColor: 'text-emerald-950',
-      badgeBg: 'bg-emerald-200 text-emerald-900'
-    },
-    {
-      step: '06',
-      title: 'VIOLATION TRIAGE',
-      desc: 'Instant infraction flagging & automated citation queue',
-      icon: AlertTriangle,
-      cardBg: 'bg-gradient-to-br from-rose-100 via-rose-50 to-white',
-      borderColor: 'border-rose-300 hover:border-rose-500',
-      iconBg: 'bg-rose-600 text-white shadow-rose-500/30',
-      textColor: 'text-rose-950',
-      badgeBg: 'bg-rose-200 text-rose-900'
     }
   ];
 
@@ -826,46 +754,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               </div>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* ============================================================ */}
-      {/* 6. AI PIPELINE: PROCESS VISUALIZATION (Vibrant 6 Stages) */}
-      {/* ============================================================ */}
-      <section className="rounded-3xl border-2 border-indigo-300/90 bg-gradient-to-br from-indigo-50/90 via-blue-50/60 to-purple-50/80 p-6 sm:p-8 shadow-xl shadow-indigo-100/40 space-y-6">
-        <div>
-          <div className="text-xs font-extrabold text-indigo-800 uppercase tracking-wider">END-TO-END PIPELINE</div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-950 tracking-tight mt-0.5">
-            How Co-DETR Analyzes Helmet Compliance
-          </h2>
-          <p className="text-xs text-slate-600 font-medium mt-1">
-            Six-stage vision pipeline running from raw surveillance frame to automated violation citation.
-          </p>
-        </div>
-
-        {/* 6 Distinctly Colored Process Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-          {pipelineStages.map((stage, idx) => {
-            const Icon = stage.icon;
-            return (
-              <div
-                key={idx}
-                className={`rounded-2xl p-4 border-2 transition-all ${stage.cardBg} ${stage.borderColor} flex flex-col justify-between space-y-3 shadow-md hover:scale-[1.02]`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className={`text-[11px] font-mono font-black px-2 py-0.5 rounded ${stage.badgeBg}`}>{stage.step}</span>
-                  <div className={`p-2 rounded-xl shadow-md ${stage.iconBg}`}>
-                    <Icon className="w-4 h-4" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className={`text-xs font-black tracking-wide ${stage.textColor}`}>{stage.title}</div>
-                  <p className="text-[11px] text-slate-600 font-medium leading-snug mt-1">{stage.desc}</p>
-                </div>
-              </div>
-            );
-          })}
         </div>
       </section>
     </div>
