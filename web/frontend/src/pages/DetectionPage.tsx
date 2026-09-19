@@ -152,6 +152,29 @@ export const DetectionPage: React.FC = () => {
             </div>
           )}
 
+          {/* Drop zone OUTSIDE the canvas - only shown when no image */}
+          {!imagePreviewUrl && (
+            <div
+              onDragEnter={handleDrag} onDragOver={handleDrag} onDragLeave={handleDrag} onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                border: `2.5px dashed ${dragActive ? '#6366F1' : '#C7D2FE'}`,
+                borderRadius: '16px', padding: '28px 24px', cursor: 'pointer',
+                background: dragActive ? '#EEF2FF' : '#F5F7FF',
+                textAlign: 'center', transition: 'all 0.2s',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px'
+              }}
+            >
+              <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: '#EEF2FF', border: '2px solid #C7D2FE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <UploadCloud size={24} color="#6366F1" />
+              </div>
+              <div>
+                <p style={{ fontSize: '15px', fontWeight: 800, color: '#3730A3', margin: 0 }}>Drop your photo here</p>
+                <p style={{ fontSize: '12px', color: '#6B7280', margin: '4px 0 0' }}>or click to browse · JPEG, PNG, WEBP</p>
+              </div>
+            </div>
+          )}
+
           {/* canvas card */}
           <div style={{ borderRadius: '20px', overflow: 'hidden', border: '2.5px solid #312E81', boxShadow: '0 8px 32px rgba(49,46,129,0.18)' }}>
             {/* colored top stripe - changes on result */}
@@ -167,12 +190,11 @@ export const DetectionPage: React.FC = () => {
               <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#A5B4FC', fontWeight: 600 }}>
                 {selectedFile
                   ? <>{selectedFile.name}{prediction && <span style={{ color: '#818CF8', marginLeft: '10px' }}>{prediction.image_width}×{prediction.image_height}</span>}</>
-                  : 'detection viewport'
+                  : ''
                 }
               </span>
               {imagePreviewUrl && (
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  {/* toggle boxes */}
                   <button onClick={() => setShowBoxes(v => !v)} style={{ padding: '4px 8px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 700, background: showBoxes ? '#4F46E5' : 'rgba(255,255,255,0.1)', color: showBoxes ? '#fff' : '#94A3B8' }}>Boxes</button>
                   <button onClick={() => setShowLabels(v => !v)} style={{ padding: '4px 8px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 700, background: showLabels ? '#4F46E5' : 'rgba(255,255,255,0.1)', color: showLabels ? '#fff' : '#94A3B8' }}>Labels</button>
                   <div style={{ width: '1px', background: 'rgba(255,255,255,0.12)', margin: '0 4px' }} />
@@ -185,32 +207,12 @@ export const DetectionPage: React.FC = () => {
               )}
             </div>
 
-            {/* image area */}
-            <div style={{ background: '#0F172A', minHeight: '460px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: '16px' }}>
-              {!imagePreviewUrl ? (
-                <div
-                  onDragEnter={handleDrag} onDragOver={handleDrag} onDragLeave={handleDrag} onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    border: `2px dashed ${dragActive ? '#818CF8' : 'rgba(99,102,241,0.35)'}`,
-                    borderRadius: '16px', padding: '48px 32px', cursor: 'pointer',
-                    background: dragActive ? 'rgba(99,102,241,0.12)' : 'rgba(99,102,241,0.05)',
-                    textAlign: 'center', transition: 'all 0.2s',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px'
-                  }}
-                >
-                  <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'rgba(99,102,241,0.2)', border: '2px solid rgba(99,102,241,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <UploadCloud size={26} color="#818CF8" />
-                  </div>
-                  <div>
-                    <p style={{ fontSize: '15px', fontWeight: 700, color: '#C7D2FE', margin: 0 }}>Drop a photo here</p>
-                    <p style={{ fontSize: '12px', color: '#475569', margin: '4px 0 0' }}>or click to browse · JPEG, PNG, WEBP</p>
-                  </div>
-                </div>
-              ) : (
+            {/* image area — only shown when image is loaded */}
+            {imagePreviewUrl && (
+              <div style={{ background: '#0F172A', minHeight: '460px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: '16px' }}>
                 <canvas ref={canvasRef} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'center', transition: 'transform 0.15s', maxWidth: '100%', maxHeight: '480px', objectFit: 'contain', borderRadius: '8px', cursor: 'crosshair', display: 'block' }} />
-              )}
-            </div>
+              </div>
+            )}
           </div>
           <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/jpg" style={{ display: 'none' }} onChange={(e) => { if (e.target.files?.[0]) handleFileChange(e.target.files[0]); }} />
         </div>
