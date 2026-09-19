@@ -15,7 +15,8 @@ import {
   Clock,
   Download,
   Check,
-  Info
+  Info,
+  ImagePlus
 } from 'lucide-react';
 import { api, ImagePredictionResponse, DetectionItem, ModelStatusResponse } from '../services/api';
 
@@ -134,13 +135,12 @@ export const DetectionPage: React.FC = () => {
     try {
       const resp = await api.detectImage(selectedFile, confidenceThreshold);
       setPrediction(resp);
-      setNoticeMsg(null);
     } catch {
       const imgW = imageRef.current?.naturalWidth || 1280;
       const imgH = imageRef.current?.naturalHeight || 720;
       const fallbackResp = api.getSimulatedDetection(imgW, imgH);
       setPrediction(fallbackResp);
-      setNoticeMsg('GPU backend is currently offline. Loaded baseline detection result. Configure your Colab Tunnel URL in header settings to run live inference.');
+      setNoticeMsg('GPU backend offline. Showing simulated results. Add your Colab Tunnel URL in settings to run live.');
     } finally {
       setIsProcessing(false);
       setTimeout(() => renderCanvas(), 50);
@@ -168,190 +168,159 @@ export const DetectionPage: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '60px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div className="max-w-7xl mx-auto pb-16" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
-      {/* ── PAGE HEADER ──────────────────────────────────────────── */}
-      <div style={{
-        background: 'linear-gradient(135deg, #1E3A8A 0%, #4F46E5 50%, #7C3AED 100%)',
-        borderRadius: '20px',
-        padding: '24px 28px',
-        marginBottom: '24px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '16px',
-        boxShadow: '0 8px 32px rgba(79,70,229,0.3)'
-      }}>
+      {/* ── SIMPLE TITLE ROW ─────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.03em' }}>
+          <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#111827', margin: 0, letterSpacing: '-0.02em' }}>
             Image Detection
           </h1>
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.65)', margin: '5px 0 0', fontWeight: 500 }}>
-            Upload a photo — Co-DETR runs multi-rider detection &amp; helmet classification
+          <p style={{ fontSize: '13px', color: '#6B7280', margin: '3px 0 0', fontWeight: 500 }}>
+            Upload a traffic photo · Co-DETR detects riders &amp; helmet violations
           </p>
         </div>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          background: 'rgba(255,255,255,0.12)', borderRadius: '12px', padding: '10px 16px',
-          border: '1px solid rgba(255,255,255,0.2)'
-        }}>
-          <Cpu size={16} color="#A5B4FC" />
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{modelStatus?.gpu_name || 'Tesla T4 (Cloud GPU)'}</div>
-            <div style={{ fontSize: '11px', color: '#A5B4FC', fontFamily: 'monospace' }}>Co-DETR · ResNet-18 · 7 Classes</div>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#6B7280', fontFamily: 'monospace', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '10px', padding: '7px 12px' }}>
+          <Cpu size={14} color="#6366F1" />
+          <span style={{ fontWeight: 700, color: '#374151' }}>{modelStatus?.gpu_name || 'Tesla T4'}</span>
+          <span style={{ color: '#D1D5DB' }}>·</span>
+          <span>Co-DETR ResNet-18</span>
         </div>
       </div>
 
-      {/* ── MAIN WORKSPACE ───────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr 240px', gap: '16px', alignItems: 'start' }}>
+      {/* ── MAIN 3-COLUMN WORKSPACE ───────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr 230px', gap: '14px', alignItems: 'start' }}>
 
-        {/* ── LEFT PANEL: Upload + Controls ─────────────────────── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {/* ── LEFT: Controls ─────────────────────────────────────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-          {/* Upload Card */}
-          <div style={{
-            background: '#fff',
-            border: '2px solid #E0E7FF',
-            borderRadius: '18px',
-            padding: '18px',
-            boxShadow: '0 4px 16px rgba(79,70,229,0.08)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid #EEF2FF' }}>
-              <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4F46E5' }}>Input Source</span>
-              <FileImage size={15} color="#6366F1" />
-            </div>
-
-            {/* Drop zone */}
-            <div
-              onDragEnter={handleDrag} onDragOver={handleDrag} onDragLeave={handleDrag} onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                border: `2px dashed ${dragActive ? '#6366F1' : '#C7D2FE'}`,
-                borderRadius: '14px',
-                padding: '20px 12px',
-                textAlign: 'center',
-                cursor: 'pointer',
-                background: dragActive ? '#EEF2FF' : '#F5F7FF',
-                transition: 'all 0.2s',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px'
-              }}
-            >
-              <div style={{
-                width: '42px', height: '42px', borderRadius: '12px',
-                background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(99,102,241,0.35)'
-              }}>
-                <UploadCloud size={20} color="#fff" />
-              </div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#1E1B4B' }}>Select Traffic Photo</div>
-              <div style={{ fontSize: '11px', color: '#9CA3AF' }}>JPEG, PNG, WEBP</div>
-              <button type="button" style={{
-                marginTop: '4px', padding: '6px 14px',
-                background: '#fff', border: '1.5px solid #C7D2FE',
-                borderRadius: '8px', fontSize: '12px', fontWeight: 600, color: '#4F46E5', cursor: 'pointer'
-              }}>Browse Files</button>
-            </div>
-
-            <button type="button" onClick={loadSampleImage} style={{
-              width: '100%', marginTop: '10px', padding: '9px',
-              background: 'linear-gradient(90deg, #EEF2FF, #F5F3FF)',
-              border: '1.5px solid #C7D2FE', borderRadius: '10px',
-              fontSize: '12px', fontWeight: 700, color: '#4F46E5', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+          {/* Drop zone */}
+          <div
+            onDragEnter={handleDrag} onDragOver={handleDrag}
+            onDragLeave={handleDrag} onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              border: `2.5px dashed ${dragActive ? '#6366F1' : '#D1D5DB'}`,
+              borderRadius: '16px',
+              padding: '24px 16px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              background: dragActive ? '#EEF2FF' : '#FAFAFA',
+              transition: 'all 0.18s',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px'
+            }}
+          >
+            <div style={{
+              width: '48px', height: '48px', borderRadius: '14px',
+              background: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: '2px solid #C7D2FE'
             }}>
-              Load Sample Photo
-            </button>
-
-            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/jpg" style={{ display: 'none' }}
-              onChange={(e) => { if (e.target.files && e.target.files[0]) handleFileChange(e.target.files[0]); }} />
+              <ImagePlus size={22} color="#6366F1" />
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#1F2937' }}>Drop photo here</div>
+              <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>or click to browse · JPEG, PNG, WEBP</div>
+            </div>
           </div>
+          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/jpg" style={{ display: 'none' }}
+            onChange={(e) => { if (e.target.files && e.target.files[0]) handleFileChange(e.target.files[0]); }} />
 
-          {/* Confidence Slider Card */}
-          <div style={{
-            background: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)',
-            border: '2px solid #FDE68A',
-            borderRadius: '18px',
-            padding: '16px 18px',
-            boxShadow: '0 4px 16px rgba(245,158,11,0.12)'
+          {/* Load sample */}
+          <button type="button" onClick={loadSampleImage} style={{
+            padding: '9px', border: '1.5px solid #E5E7EB', borderRadius: '10px',
+            background: '#fff', fontSize: '12px', fontWeight: 700, color: '#4B5563',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
           }}>
+            <FileImage size={14} color="#9CA3AF" />
+            Load Sample Photo
+          </button>
+
+          {/* Confidence */}
+          <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: '14px', padding: '14px 16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#78350F' }}>
-                <Sliders size={13} color="#D97706" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 700, color: '#374151' }}>
+                <Sliders size={13} color="#6B7280" />
                 Confidence
               </span>
-              <span style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 900, color: '#D97706' }}>
+              <span style={{
+                fontFamily: 'monospace', fontSize: '13px', fontWeight: 900,
+                color: '#fff', background: '#6366F1',
+                padding: '2px 8px', borderRadius: '6px'
+              }}>
                 {(confidenceThreshold * 100).toFixed(0)}%
               </span>
             </div>
             <input type="range" min="0.10" max="0.80" step="0.05"
               value={confidenceThreshold}
               onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
-              style={{ width: '100%', accentColor: '#D97706', cursor: 'pointer' }}
+              style={{ width: '100%', accentColor: '#6366F1', cursor: 'pointer' }}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#92400E', fontWeight: 600, marginTop: '4px', fontFamily: 'monospace' }}>
-              <span>10% Recall</span>
-              <span>80% Precision</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#9CA3AF', marginTop: '4px', fontFamily: 'monospace' }}>
+              <span>10% Recall</span><span>80% Precision</span>
             </div>
           </div>
 
-          {/* Run Button */}
+          {/* Run button */}
           {imagePreviewUrl && (
             <button disabled={isProcessing} onClick={runDetection} style={{
-              width: '100%', padding: '13px',
-              background: isProcessing
-                ? 'linear-gradient(135deg, #9CA3AF, #6B7280)'
-                : 'linear-gradient(135deg, #059669, #0D9488)',
-              border: 'none', borderRadius: '14px',
-              fontSize: '14px', fontWeight: 800, color: '#fff', cursor: isProcessing ? 'not-allowed' : 'pointer',
+              padding: '12px', border: 'none', borderRadius: '12px',
+              background: isProcessing ? '#9CA3AF' : '#6366F1',
+              color: '#fff', fontSize: '14px', fontWeight: 800, cursor: isProcessing ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              boxShadow: isProcessing ? 'none' : '0 4px 16px rgba(5,150,105,0.4)',
+              boxShadow: isProcessing ? 'none' : '0 4px 14px rgba(99,102,241,0.4)',
               transition: 'all 0.2s'
             }}>
-              <Play size={16} fill="currentColor" />
-              {isProcessing ? 'Running...' : 'Run Detection'}
+              <Play size={15} fill="currentColor" />
+              {isProcessing ? 'Detecting...' : 'Run Detection'}
             </button>
+          )}
+
+          {/* Clear */}
+          {imagePreviewUrl && (
+            <button onClick={clearImage} style={{
+              padding: '8px', border: '1.5px solid #FEE2E2', borderRadius: '10px',
+              background: '#FFF5F5', color: '#EF4444', fontSize: '12px', fontWeight: 700,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+            }}>
+              <RotateCcw size={13} /> Clear Image
+            </button>
+          )}
+
+          {/* Bounding box toggles */}
+          {imagePreviewUrl && (
+            <div style={{ background: '#fff', border: '1.5px solid #E5E7EB', borderRadius: '12px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Overlays</span>
+              {[
+                { label: 'Bounding Boxes', state: showBoxes, toggle: () => setShowBoxes(v => !v) },
+                { label: 'Labels', state: showLabels, toggle: () => setShowLabels(v => !v) }
+              ].map((item) => (
+                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>{item.label}</span>
+                  <button onClick={item.toggle} style={{
+                    width: '36px', height: '20px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                    background: item.state ? '#6366F1' : '#D1D5DB',
+                    position: 'relative', transition: 'background 0.2s'
+                  }}>
+                    <span style={{
+                      position: 'absolute', top: '3px',
+                      left: item.state ? '18px' : '3px',
+                      width: '14px', height: '14px', borderRadius: '50%',
+                      background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                    }} />
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* ── CENTER: Canvas Viewport ────────────────────────────── */}
-        <div style={{
-          background: '#fff',
-          border: '2px solid #E5E7EB',
-          borderRadius: '20px',
-          overflow: 'hidden',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.07)'
-        }}>
-          {/* Viewport header bar */}
-          <div style={{
-            background: 'linear-gradient(90deg, #0F172A, #1E293B)',
-            padding: '12px 18px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-          }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#94A3B8', fontFamily: 'monospace' }}>
-              {selectedFile ? selectedFile.name : 'No image loaded'}
-              {prediction && <span style={{ color: '#60A5FA', marginLeft: '8px' }}>{prediction.image_width}×{prediction.image_height}</span>}
-            </span>
-            {imagePreviewUrl && (
-              <button onClick={clearImage} style={{
-                display: 'flex', alignItems: 'center', gap: '5px',
-                background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
-                borderRadius: '8px', padding: '4px 10px',
-                fontSize: '11px', fontWeight: 700, color: '#F87171', cursor: 'pointer'
-              }}>
-                <RotateCcw size={11} /> Reset
-              </button>
-            )}
-          </div>
+        {/* ── CENTER: Canvas ─────────────────────────────────────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-          {/* Notice */}
+          {/* Notice banner */}
           {noticeMsg && (
             <div style={{
-              margin: '12px 16px 0',
-              padding: '10px 14px',
-              background: '#FFFBEB', border: '1.5px solid #FDE68A',
+              padding: '10px 14px', background: '#FFFBEB', border: '1.5px solid #FDE68A',
               borderRadius: '10px', fontSize: '12px', color: '#78350F',
               display: 'flex', gap: '8px', alignItems: 'flex-start'
             }}>
@@ -360,141 +329,162 @@ export const DetectionPage: React.FC = () => {
             </div>
           )}
 
-          {/* Canvas area */}
+          {/* Canvas card */}
           <div style={{
-            background: '#0F172A',
-            minHeight: '460px', maxHeight: '520px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            position: 'relative'
+            background: '#111827', borderRadius: '18px',
+            overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+            border: '2px solid #1F2937'
           }}>
-            {!imagePreviewUrl ? (
-              <div style={{ textAlign: 'center', color: '#475569', padding: '40px' }}>
-                <div style={{
-                  width: '60px', height: '60px', borderRadius: '16px',
-                  background: 'rgba(99,102,241,0.15)', border: '2px dashed rgba(99,102,241,0.3)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  margin: '0 auto 12px'
-                }}>
-                  <UploadCloud size={26} color="#6366F1" />
-                </div>
-                <p style={{ fontSize: '13px', fontWeight: 600, color: '#64748B', margin: 0 }}>
-                  Upload an image to start detection
-                </p>
-              </div>
-            ) : (
-              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: '10px' }}>
-                <canvas
-                  ref={canvasRef}
-                  style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'center', transition: 'transform 0.15s', maxWidth: '100%', maxHeight: '480px', objectFit: 'contain', borderRadius: '8px', cursor: 'crosshair' }}
-                />
-              </div>
-            )}
+            {/* Thin colored top bar based on result */}
+            <div style={{
+              height: '4px',
+              background: prediction
+                ? prediction.summary.violations > 0
+                  ? 'linear-gradient(90deg, #DC2626, #F97316)'
+                  : 'linear-gradient(90deg, #16A34A, #0D9488)'
+                : 'linear-gradient(90deg, #6366F1, #8B5CF6)'
+            }} />
 
-            {/* Floating controls */}
-            {imagePreviewUrl && (
-              <div style={{ position: 'absolute', bottom: '12px', left: '12px', right: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', pointerEvents: 'none' }}>
-                <div style={{
-                  display: 'flex', gap: '4px',
-                  background: 'rgba(255,255,255,0.92)', borderRadius: '10px',
-                  padding: '4px 8px', border: '1px solid #E5E7EB',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)', pointerEvents: 'auto'
-                }}>
+            {/* Canvas toolbar */}
+            <div style={{
+              padding: '10px 16px', display: 'flex',
+              alignItems: 'center', justifyContent: 'space-between',
+              borderBottom: '1px solid rgba(255,255,255,0.06)'
+            }}>
+              <span style={{ fontSize: '12px', fontFamily: 'monospace', color: '#64748B' }}>
+                {selectedFile
+                  ? <><span style={{ color: '#CBD5E1', fontWeight: 600 }}>{selectedFile.name}</span>{prediction && <span style={{ color: '#6366F1', marginLeft: '8px' }}>{prediction.image_width}×{prediction.image_height}px</span>}</>
+                  : <span style={{ color: '#475569' }}>viewport · no image</span>
+                }
+              </span>
+              {imagePreviewUrl && (
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                   {[
-                    { label: `Boxes ${showBoxes ? 'On' : 'Off'}`, active: showBoxes, onClick: () => setShowBoxes(!showBoxes) },
-                    { label: `Labels ${showLabels ? 'On' : 'Off'}`, active: showLabels, onClick: () => setShowLabels(!showLabels) }
-                  ].map((btn) => (
-                    <button key={btn.label} onClick={btn.onClick} style={{
-                      padding: '3px 8px', borderRadius: '6px', border: 'none',
-                      fontSize: '11px', fontWeight: 700, cursor: 'pointer',
-                      background: btn.active ? '#4F46E5' : 'transparent',
-                      color: btn.active ? '#fff' : '#6B7280'
-                    }}>{btn.label}</button>
-                  ))}
-                </div>
-                <div style={{
-                  display: 'flex', gap: '2px', alignItems: 'center',
-                  background: 'rgba(255,255,255,0.92)', borderRadius: '10px',
-                  padding: '4px', border: '1px solid #E5E7EB',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)', pointerEvents: 'auto'
-                }}>
-                  {[
-                    { icon: <ZoomIn size={13} />, onClick: () => setZoomLevel(z => Math.min(2.5, z + 0.25)) },
-                    { icon: <ZoomOut size={13} />, onClick: () => setZoomLevel(z => Math.max(0.5, z - 0.25)) },
-                    { icon: <span style={{ fontSize: '10px', fontFamily: 'monospace', fontWeight: 700 }}>1:1</span>, onClick: () => setZoomLevel(1) },
-                    { icon: <Download size={13} />, onClick: downloadAnnotatedImage }
+                    { icon: <ZoomIn size={13} />, action: () => setZoomLevel(z => Math.min(2.5, z + 0.25)), title: 'Zoom In' },
+                    { icon: <ZoomOut size={13} />, action: () => setZoomLevel(z => Math.max(0.5, z - 0.25)), title: 'Zoom Out' },
+                    { icon: <span style={{ fontSize: '10px', fontFamily: 'monospace', fontWeight: 700 }}>1:1</span>, action: () => setZoomLevel(1), title: 'Reset Zoom' },
+                    { icon: <Download size={13} />, action: downloadAnnotatedImage, title: 'Download' }
                   ].map((btn, i) => (
-                    <button key={i} onClick={btn.onClick} style={{
-                      padding: '4px 6px', borderRadius: '6px', border: 'none',
-                      background: 'transparent', color: '#374151', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center'
+                    <button key={i} onClick={btn.action} title={btn.title} style={{
+                      width: '28px', height: '28px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)',
+                      background: 'rgba(255,255,255,0.05)', color: '#94A3B8', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
                     }}>{btn.icon}</button>
                   ))}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+
+            {/* Image/canvas area */}
+            <div style={{ minHeight: '440px', maxHeight: '520px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: '16px' }}>
+              {!imagePreviewUrl ? (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{
+                    width: '56px', height: '56px', borderRadius: '14px',
+                    border: '2px dashed rgba(99,102,241,0.4)',
+                    background: 'rgba(99,102,241,0.08)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    margin: '0 auto 12px'
+                  }}>
+                    <UploadCloud size={24} color="#6366F1" />
+                  </div>
+                  <p style={{ color: '#475569', fontSize: '13px', fontWeight: 600, margin: 0 }}>No image loaded</p>
+                  <p style={{ color: '#334155', fontSize: '11px', margin: '4px 0 0' }}>Upload a photo from the panel on the left</p>
+                </div>
+              ) : (
+                <canvas
+                  ref={canvasRef}
+                  style={{
+                    transform: `scale(${zoomLevel})`, transformOrigin: 'center',
+                    transition: 'transform 0.15s',
+                    maxWidth: '100%', maxHeight: '480px',
+                    objectFit: 'contain', borderRadius: '8px',
+                    cursor: 'crosshair', display: 'block'
+                  }}
+                />
+              )}
+            </div>
           </div>
         </div>
 
-        {/* ── RIGHT PANEL: Stats + Detections ───────────────────── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {/* ── RIGHT: Results ─────────────────────────────────────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-          {/* 4 metric tiles */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          {/* 4 metric tiles — 2x2 with different colors */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             {[
-              { icon: <Bike size={16} color="#3B82F6" />, label: 'Motorcycles', value: prediction?.summary.vehicles ?? '—', bg: '#EFF6FF', border: '#BFDBFE', valColor: '#1D4ED8' },
-              { icon: <ShieldCheck size={16} color="#16A34A" />, label: 'Compliant', value: prediction?.summary.helmet_detected ?? '—', bg: '#F0FDF4', border: '#BBF7D0', valColor: '#15803D' },
-              { icon: <ShieldAlert size={16} color="#DC2626" />, label: 'Violations', value: prediction?.summary.violations ?? '—', bg: '#FFF1F2', border: '#FECDD3', valColor: '#B91C1C' },
-              { icon: <Clock size={16} color="#7C3AED" />, label: 'Latency', value: prediction ? `${prediction.inference_time_ms}ms` : '—', bg: '#FAF5FF', border: '#E9D5FF', valColor: '#6D28D9' }
+              {
+                icon: <Bike size={15} color="#2563EB" />,
+                label: 'Bikes',
+                value: prediction?.summary.vehicles ?? '—',
+                bg: '#EFF6FF', border: '#BFDBFE', numColor: '#1E40AF'
+              },
+              {
+                icon: <ShieldCheck size={15} color="#16A34A" />,
+                label: 'Safe',
+                value: prediction?.summary.helmet_detected ?? '—',
+                bg: '#F0FDF4', border: '#BBF7D0', numColor: '#15803D'
+              },
+              {
+                icon: <ShieldAlert size={15} color="#DC2626" />,
+                label: 'Violations',
+                value: prediction?.summary.violations ?? '—',
+                bg: '#FFF1F2', border: '#FECDD3', numColor: '#B91C1C'
+              },
+              {
+                icon: <Clock size={15} color="#7C3AED" />,
+                label: 'ms',
+                value: prediction ? `${prediction.inference_time_ms}` : '—',
+                bg: '#FAF5FF', border: '#E9D5FF', numColor: '#6D28D9'
+              }
             ].map((tile) => (
               <div key={tile.label} style={{
                 background: tile.bg, border: `2px solid ${tile.border}`,
-                borderRadius: '14px', padding: '12px 14px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                borderRadius: '12px', padding: '12px 10px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '5px' }}>
                   {tile.icon}
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#6B7280' }}>{tile.label}</span>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#6B7280' }}>{tile.label}</span>
                 </div>
-                <div style={{ fontSize: '22px', fontWeight: 900, color: tile.valColor, fontFamily: 'monospace', lineHeight: 1 }}>
+                <div style={{ fontSize: '26px', fontWeight: 900, fontFamily: 'monospace', color: tile.numColor, lineHeight: 1 }}>
                   {tile.value}
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Detections list */}
+          {/* Detection list */}
           <div style={{
-            background: '#fff',
-            border: '2px solid #E5E7EB',
-            borderRadius: '18px',
-            overflow: 'hidden',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.05)',
-            flex: 1
+            background: '#fff', border: '1.5px solid #E5E7EB',
+            borderRadius: '16px', overflow: 'hidden', flex: 1
           }}>
             <div style={{
-              background: 'linear-gradient(90deg, #1E293B, #334155)',
-              padding: '12px 16px',
+              padding: '12px 14px', borderBottom: '1px solid #F3F4F6',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
-              <span style={{ fontSize: '12px', fontWeight: 800, color: '#F1F5F9', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                Detected Objects {prediction && `(${prediction.detections.length})`}
+              <span style={{ fontSize: '12px', fontWeight: 800, color: '#111827' }}>
+                Detected Objects
+                {prediction && (
+                  <span style={{ fontWeight: 600, color: '#9CA3AF', marginLeft: '6px' }}>({prediction.detections.length})</span>
+                )}
               </span>
               {prediction && (
-                <span style={{ fontSize: '10px', fontFamily: 'monospace', color: '#94A3B8' }}>{prediction.device}</span>
+                <span style={{ fontSize: '10px', fontFamily: 'monospace', color: '#9CA3AF' }}>{prediction.device}</span>
               )}
             </div>
 
-            <div style={{ padding: '12px' }}>
+            <div style={{ padding: '10px' }}>
               {!prediction ? (
-                <div style={{ padding: '30px 12px', textAlign: 'center', color: '#9CA3AF', fontSize: '12px', fontWeight: 500 }}>
-                  Upload a photo to inspect detected riders, helmets, and motorcycles.
+                <div style={{ padding: '24px 8px', textAlign: 'center', color: '#9CA3AF', fontSize: '12px', lineHeight: 1.6 }}>
+                  Upload &amp; run detection to see objects here
                 </div>
               ) : prediction.detections.length === 0 ? (
-                <div style={{ padding: '24px 12px', textAlign: 'center', color: '#6B7280', fontSize: '12px' }}>
-                  No objects at {(confidenceThreshold * 100).toFixed(0)}% threshold. Try lowering it.
+                <div style={{ padding: '20px 8px', textAlign: 'center', color: '#6B7280', fontSize: '12px' }}>
+                  No detections at {(confidenceThreshold * 100).toFixed(0)}% threshold.
+                  <br />Try lowering the slider.
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '360px', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '380px', overflowY: 'auto' }}>
                   {prediction.detections.map((det: DetectionItem, idx: number) => {
                     const isSelected = selectedDetectionIdx === idx;
                     return (
@@ -502,30 +492,28 @@ export const DetectionPage: React.FC = () => {
                         key={idx}
                         onClick={() => setSelectedDetectionIdx(isSelected ? null : idx)}
                         style={{
-                          padding: '10px 12px',
-                          borderRadius: '12px',
-                          border: isSelected ? '2px solid #F59E0B' : '1.5px solid #F3F4F6',
-                          background: isSelected ? '#FFFBEB' : det.violation ? '#FFF1F2' : '#F0FDF4',
-                          cursor: 'pointer',
+                          padding: '9px 11px', borderRadius: '10px', cursor: 'pointer',
+                          border: isSelected ? '2px solid #F59E0B' : `1.5px solid ${det.violation ? '#FECDD3' : '#BBF7D0'}`,
+                          background: isSelected ? '#FFFBEB' : det.violation ? '#FFF5F5' : '#F7FFF7',
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-                          transition: 'all 0.15s'
+                          transition: 'all 0.12s'
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <div style={{
-                            width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0,
+                            width: '26px', height: '26px', borderRadius: '7px', flexShrink: 0,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             background: det.violation ? '#FEE2E2' : det.class_name === 'bike' ? '#DBEAFE' : '#DCFCE7'
                           }}>
                             {det.violation
-                              ? <AlertTriangle size={14} color="#DC2626" />
-                              : <Check size={14} color={det.class_name === 'bike' ? '#2563EB' : '#16A34A'} />
+                              ? <AlertTriangle size={13} color="#DC2626" />
+                              : <Check size={13} color={det.class_name === 'bike' ? '#2563EB' : '#16A34A'} />
                             }
                           </div>
                           <div>
                             <div style={{ fontSize: '12px', fontWeight: 700, color: '#111827' }}>{det.display_name}</div>
-                            <div style={{ fontSize: '10px', fontFamily: 'monospace', color: '#9CA3AF' }}>
-                              [{det.bbox.map((v) => Math.round(v)).join(', ')}]
+                            <div style={{ fontSize: '10px', fontFamily: 'monospace', color: '#9CA3AF', marginTop: '1px' }}>
+                              {det.bbox.map((v) => Math.round(v)).join(', ')}
                             </div>
                           </div>
                         </div>
@@ -534,12 +522,12 @@ export const DetectionPage: React.FC = () => {
                             {(det.confidence * 100).toFixed(1)}%
                           </div>
                           <span style={{
-                            fontSize: '9px', fontWeight: 800, padding: '2px 6px', borderRadius: '6px',
+                            fontSize: '9px', fontWeight: 800, textTransform: 'uppercase',
+                            padding: '2px 5px', borderRadius: '4px',
                             background: det.violation ? '#FEE2E2' : '#DCFCE7',
-                            color: det.violation ? '#B91C1C' : '#15803D',
-                            textTransform: 'uppercase'
+                            color: det.violation ? '#B91C1C' : '#15803D'
                           }}>
-                            {det.violation ? 'VIOLATION' : 'OK'}
+                            {det.violation ? 'Violation' : 'OK'}
                           </span>
                         </div>
                       </div>
