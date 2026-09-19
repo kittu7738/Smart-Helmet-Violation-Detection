@@ -115,19 +115,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </nav>
         </div>
 
-        {/* Lower Sidebar: Natural Rider View through background + Motto */}
-        <div className="p-5 mt-auto">
-          <p
-            className="text-[14px] font-bold text-white leading-snug tracking-wide"
-            style={{
-              fontFamily: '"Caveat", "Brush Script MT", "Segoe Script", cursive',
-              textShadow: '0 2px 8px rgba(0, 0, 0, 0.9)'
-            }}
-          >
-            Safer Roads<br />
-            <span className="text-sky-200">Stronger Tomorrow</span>
-          </p>
-        </div>
+        {/* Lower Sidebar: Empty to naturally reveal background */}
+        <div className="p-4 mt-auto" />
       </aside>
     </>
   );

@@ -118,8 +118,6 @@ export const App: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 max-w-[1400px] mx-auto">
             <div className="flex items-center gap-2 text-slate-600">
               <span className="font-semibold text-slate-700">Smart Helmet Violation Detection System</span>
-              <span className="text-slate-300">|</span>
-              <span>Safer Roads, Brighter Futures</span>
             </div>
             <div className="flex items-center gap-4 text-slate-500 font-medium">
               <span className="hover:text-slate-800 cursor-pointer">Privacy</span>
