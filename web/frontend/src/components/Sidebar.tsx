@@ -57,17 +57,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <aside
-        className={`fixed top-0 left-0 bottom-0 z-50 w-64 bg-[#070D1E] text-slate-300 flex flex-col justify-between border-r border-slate-800/80 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`fixed top-0 left-0 bottom-0 z-50 w-64 bg-[#070D1E] text-slate-300 flex flex-col justify-between border-r border-slate-800/80 transition-transform duration-300 ease-in-out lg:translate-x-0 overflow-y-auto ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
-          background: 'linear-gradient(180deg, #070D1E 0%, #0A142F 50%, #060B1A 100%)'
+          background: "linear-gradient(180deg, rgba(7, 13, 30, 0.90) 0%, rgba(10, 20, 47, 0.88) 55%, rgba(6, 11, 26, 0.96) 100%), url('/sidebar_rider.jpg') center/cover no-repeat"
         }}
       >
         {/* Top: Logo & Branding */}
         <div>
-          <div className="px-5 py-5 border-b border-slate-800/60 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl overflow-hidden bg-black border border-blue-500/30 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
+          <div className="px-5 py-5 border-b border-slate-800/60 flex items-center gap-3 backdrop-blur-xs bg-slate-950/40">
+            <div className="w-12 h-12 rounded-xl overflow-hidden bg-black border border-blue-500/40 flex items-center justify-center shadow-lg shadow-blue-500/25 shrink-0">
               <img
                 src="/logo_helmet.jpg"
                 alt="Smart Helmet Logo"
@@ -94,10 +94,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   key={item.id}
                   onClick={() => handleItemClick(item)}
-                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 text-left cursor-pointer group ${
+                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 text-left cursor-pointer group backdrop-blur-xs ${
                     isSelected
                       ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold shadow-md shadow-blue-600/30'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                   }`}
                 >
                   <Icon
@@ -113,64 +113,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </nav>
         </div>
 
-        {/* Bottom Section: Futuristic Rider Graphic & Slogan */}
+        {/* Bottom Section: Real Rider Photo Card & Slogan */}
         <div className="p-4 mt-auto">
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-slate-900/80 to-blue-950/40 border border-blue-500/20 p-4 text-center">
-            {/* Glowing neon vector profile of helmet rider */}
-            <div className="flex justify-center mb-2">
-              <svg width="100" height="90" viewBox="0 0 100 90" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-[0_0_12px_rgba(56,189,248,0.45)]">
-                {/* Outer glowing helmet visor profile */}
-                <circle cx="48" cy="40" r="32" stroke="#38BDF8" strokeWidth="2" strokeDasharray="3 3" opacity="0.4" />
-                <path
-                  d="M24 48C22 35 28 22 42 16C58 10 74 16 80 30C84 38 82 48 76 54C70 60 56 64 44 64C36 64 28 58 24 48Z"
-                  stroke="#38BDF8"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-                {/* Visor shield */}
-                <path
-                  d="M48 26C58 24 70 28 74 36C76 40 74 46 68 50C62 53 52 52 46 48C42 45 42 32 48 26Z"
-                  fill="url(#visorGrad)"
-                  stroke="#00E5FF"
-                  strokeWidth="2"
-                />
-                {/* Chin strap & neck guard */}
-                <path
-                  d="M34 52L30 68C30 72 34 76 42 78L58 78C64 78 68 74 66 68L64 56"
-                  stroke="#38BDF8"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                {/* Shoulder armor lines */}
-                <path
-                  d="M16 86C20 78 30 74 40 76L60 76C70 74 80 78 84 86"
-                  stroke="#0284C7"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                {/* Glowing neon accents */}
-                <circle cx="66" cy="38" r="2.5" fill="#38BDF8" />
-                <path d="M50 34L64 36" stroke="#E0F2FE" strokeWidth="1.5" strokeLinecap="round" />
-                <defs>
-                  <linearGradient id="visorGrad" x1="42" y1="26" x2="74" y2="52" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#0284C7" stopOpacity="0.8" />
-                    <stop offset="1" stopColor="#06B6D4" stopOpacity="0.3" />
-                  </linearGradient>
-                </defs>
-              </svg>
+          <div className="relative overflow-hidden rounded-2xl border border-blue-400/30 shadow-xl group">
+            {/* Real rider photo at sunset */}
+            <div className="h-36 w-full relative">
+              <img
+                src="/sidebar_rider.jpg"
+                alt="Rider Safety"
+                className="w-full h-full object-cover object-center brightness-90 contrast-105 transition-transform duration-500 group-hover:scale-105"
+              />
+              {/* Gradient overlay for text legibility */}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
+              
+              {/* Motto text on the photo */}
+              <div className="absolute bottom-2.5 inset-x-0 text-center px-3">
+                <p
+                  className="text-[14px] font-bold text-amber-300 leading-snug tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
+                  style={{
+                    fontFamily: '"Caveat", "Brush Script MT", "Segoe Script", cursive',
+                    textShadow: '0 0 12px rgba(251, 191, 36, 0.6)'
+                  }}
+                >
+                  Safer Roads<br />
+                  <span className="text-sky-200">Stronger Tomorrow</span>
+                </p>
+              </div>
             </div>
-
-            {/* Stylized Motto text matching mockup */}
-            <p
-              className="text-[13px] font-semibold text-cyan-300 leading-snug tracking-wide"
-              style={{
-                fontFamily: '"Caveat", "Brush Script MT", "Segoe Script", cursive',
-                textShadow: '0 0 10px rgba(56, 189, 248, 0.4)'
-              }}
-            >
-              Safer Roads<br />
-              <span className="text-sky-200">Stronger Tomorrow</span>
-            </p>
           </div>
         </div>
       </aside>
