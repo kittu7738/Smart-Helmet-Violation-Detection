@@ -66,15 +66,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       >
         {/* Top: Logo & Branding */}
         <div>
-          <div className="px-6 py-6 border-b border-slate-800/60 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 shrink-0">
-              {/* Minimalist Helmet Icon */}
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2a9 9 0 0 0-9 9c0 3.5 1.5 6.5 4 8v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1c2.5-1.5 4-4.5 4-8a9 9 0 0 0-9-9z" />
-                <path d="M4 11h16" />
-                <path d="M12 2v9" />
-                <path d="M7 16a3 3 0 0 0 5 0" />
-              </svg>
+          <div className="px-5 py-5 border-b border-slate-800/60 flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl overflow-hidden bg-black border border-blue-500/30 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
+              <img
+                src="/logo_helmet.jpg"
+                alt="Smart Helmet Logo"
+                className="w-full h-full object-cover"
+              />
             </div>
             <div className="min-w-0">
               <h1 className="text-[15px] font-bold text-white tracking-tight leading-tight truncate">

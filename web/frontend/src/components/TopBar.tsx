@@ -75,7 +75,12 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             <Menu size={18} />
           </button>
-          <span className="font-bold text-slate-900 text-sm">Smart Helmet AI</span>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg overflow-hidden bg-black border border-blue-500/30 flex items-center justify-center shrink-0">
+              <img src="/logo_helmet.jpg" alt="Logo" className="w-full h-full object-cover" />
+            </div>
+            <span className="font-bold text-slate-900 text-sm">Smart Helmet</span>
+          </div>
         </div>
 
         {/* Empty left spacer on desktop to keep items aligned right */}
