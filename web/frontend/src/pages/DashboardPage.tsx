@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import {
   ArrowRight,
   ScanLine,
@@ -252,67 +251,59 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             </div>
           </div>
 
-          {/* Right Hero Column: 2D AI Vision Graphic (~42%) */}
-          <div className="lg:col-span-5 relative">
-            <div className="relative rounded-2xl overflow-hidden border-2 border-indigo-400/50 shadow-2xl shadow-indigo-500/20 bg-slate-950 aspect-[4/3] group">
-              {/* Central Motorcycle Surveillance Image */}
-              <img
-                src="/sample_traffic.jpg"
-                alt="Motorcycle AI Vision"
-                className="w-full h-full object-cover opacity-90 transition-transform duration-500 group-hover:scale-105"
-              />
-
-              {/* Animated Laser Scanning Line */}
-              <div className="absolute inset-0 pointer-events-none">
-                <motion.div
-                  animate={{ top: ['4%', '92%', '4%'] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                  className="absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_16px_#22d3ee] z-20"
-                />
-              </div>
-
-              {/* Real 2D Computer Vision HUD Overlays */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 100 100" preserveAspectRatio="none">
-                {/* Viewfinder Corner Brackets */}
-                <path d="M 4,10 L 4,4 L 10,4" stroke="#38BDF8" strokeWidth="1.2" fill="none" />
-                <path d="M 96,10 L 96,4 L 90,4" stroke="#38BDF8" strokeWidth="1.2" fill="none" />
-                <path d="M 4,90 L 4,96 L 10,96" stroke="#38BDF8" strokeWidth="1.2" fill="none" />
-                <path d="M 96,90 L 96,96 L 90,96" stroke="#38BDF8" strokeWidth="1.2" fill="none" />
-
-                {/* Bounding Box 1: Motorcycle (Blue) */}
-                <rect x="24" y="36" width="52" height="52" fill="rgba(37, 99, 235, 0.18)" stroke="#3B82F6" strokeWidth="1" strokeDasharray="3 2" />
-
-                {/* Bounding Box 2: Rider (Emerald) */}
-                <rect x="42" y="14" width="16" height="36" fill="rgba(16, 185, 129, 0.22)" stroke="#10B981" strokeWidth="1.2" />
-              </svg>
-
-              {/* HUD Telemetry Tags */}
-              <div className="absolute top-2.5 left-2.5 z-20 flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-xs px-2.5 py-1 rounded-md text-[10px] font-mono text-cyan-300 border border-cyan-400/40">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
-                <span>CAM_01 • 30 FPS</span>
-              </div>
-
-              <div className="absolute top-2.5 right-2.5 z-20 bg-slate-900/90 backdrop-blur-xs px-2.5 py-1 rounded-md text-[10px] font-mono text-cyan-200 border border-slate-700">
-                RES: 1080p
-              </div>
-
-              {/* Bounding Box Floating Labels */}
-              <div className="absolute top-12 left-10 z-20 bg-emerald-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-md shadow-md flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" />
-                <span>DRIVER: HELMET COMPLIANT (94.2%)</span>
-              </div>
-
-              <div className="absolute bottom-10 right-8 z-20 bg-blue-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-md shadow-md">
-                MOTORCYCLE (96.3%)
-              </div>
-
-              {/* Bottom Result Pill */}
-              <div className="absolute bottom-2.5 left-2.5 right-2.5 z-20 bg-slate-900/90 backdrop-blur-xs px-3.5 py-2 rounded-xl text-[10px] text-emerald-400 font-mono flex items-center justify-between border border-emerald-500/40">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <span>PIPELINE: ACTIVE DETECTIONS OK</span>
+          {/* Right Hero Column: Clean Architecture & Telemetry Card (~42%) */}
+          <div className="lg:col-span-5">
+            <div className="rounded-2xl border-2 border-indigo-200/90 bg-white/90 backdrop-blur-sm p-6 sm:p-7 shadow-lg shadow-indigo-100/60 space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-indigo-100">
+                <div className="flex items-center gap-2">
+                  <Cpu className="w-5 h-5 text-indigo-600" />
+                  <h3 className="font-extrabold text-slate-900 text-sm tracking-wide uppercase">
+                    Model Architecture & Specs
+                  </h3>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-mono font-bold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                  ONLINE
                 </span>
-                <span className="text-cyan-300 font-bold">112ms</span>
+              </div>
+
+              {/* Specs Rows */}
+              <div className="space-y-3 text-xs">
+                <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-indigo-50/80 border border-indigo-100">
+                  <span className="text-slate-600 font-medium">Detector Architecture</span>
+                  <span className="font-bold text-indigo-950 font-mono">Co-DETR (Deformable)</span>
+                </div>
+
+                <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-blue-50/80 border border-blue-100">
+                  <span className="text-slate-600 font-medium">Feature Backbone</span>
+                  <span className="font-bold text-blue-950 font-mono">ResNet-18 (FP16)</span>
+                </div>
+
+                <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-emerald-50/80 border border-emerald-100">
+                  <span className="text-slate-600 font-medium">Validation AP50</span>
+                  <span className="font-bold text-emerald-700 font-mono text-sm">54.30%</span>
+                </div>
+
+                <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-violet-50/80 border border-violet-100">
+                  <span className="text-slate-600 font-medium">Candidate RoI Accuracy</span>
+                  <span className="font-bold text-violet-700 font-mono text-sm">95.75%</span>
+                </div>
+
+                <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-amber-50/80 border border-amber-100">
+                  <span className="text-slate-600 font-medium">Target Taxonomy</span>
+                  <span className="font-bold text-amber-900 font-mono">7 Custom Classes</span>
+                </div>
+
+                <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-slate-600 font-medium">Inference Latency</span>
+                  <span className="font-bold text-slate-900 font-mono">~112 ms (Tesla T4)</span>
+                </div>
+              </div>
+
+              {/* Bottom Verification Footer */}
+              <div className="pt-2 flex items-center justify-between text-[11px] text-slate-500 font-medium border-t border-indigo-100">
+                <span>Verified Checkpoint: epoch_12.pth</span>
+                <span className="text-indigo-600 font-semibold font-mono">PyTorch 2.0+</span>
               </div>
             </div>
           </div>
