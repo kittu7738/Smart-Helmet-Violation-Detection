@@ -162,6 +162,8 @@ export const VideoAnalysisPage: React.FC = () => {
                 <video
                   ref={videoRef}
                   src={videoUrl}
+                  disablePictureInPicture
+                  controlsList="nodownload noplaybackrate"
                   className="w-full max-h-[460px] object-contain"
                   onTimeUpdate={() => {
                     if (videoRef.current) setCurrentTime(videoRef.current.currentTime);

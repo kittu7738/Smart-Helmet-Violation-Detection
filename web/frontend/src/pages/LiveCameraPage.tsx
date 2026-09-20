@@ -110,6 +110,8 @@ export const LiveCameraPage: React.FC = () => {
                 autoPlay
                 playsInline
                 muted
+                disablePictureInPicture
+                controlsList="nodownload noplaybackrate"
                 className={`w-full max-h-[480px] object-cover ${isWebcamActive ? 'block' : 'hidden'}`}
               />
 

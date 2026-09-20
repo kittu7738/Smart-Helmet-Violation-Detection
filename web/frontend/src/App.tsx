@@ -41,6 +41,13 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  useEffect(() => {
+    // Ensure any stray Picture-in-Picture window is closed when switching tabs
+    if (typeof document !== 'undefined' && (document as any).pictureInPictureElement) {
+      (document as any).exitPictureInPicture().catch(() => {});
+    }
+  }, [activeTab]);
+
   const [stats, setStats] = useState<DashboardStats>(mockDashboardStats);
   const [live, setLive] = useState<LiveDetectionSummary>(mockLiveDetection);
   const [violations, setViolations] = useState<RecentViolation[]>(mockRecentViolations);

@@ -13,7 +13,8 @@ import {
   RotateCcw,
   Sliders,
   Loader2,
-  X
+  X,
+  Film
 } from 'lucide-react';
 import { api, ImagePredictionResponse } from '../services/api';
 
@@ -77,23 +78,16 @@ const EmptyImageIcon: React.FC<{ size?: number; className?: string }> = ({ size 
   </svg>
 );
 
-// Custom Empty Inbox / Tray Icon matching reference
-const EmptyTrayIcon: React.FC<{ size?: number; className?: string }> = ({ size = 48, className = 'text-slate-300' }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.6"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M21 8v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8" />
-    <path d="M3 8l3-5h12l3 5" />
-    <path d="M3 8h4.5a2.5 2.5 0 0 0 2.5 2.5h4a2.5 2.5 0 0 0 2.5-2.5H21" />
-  </svg>
+// On-Brand Empty State Icon for Recent Detections matching helmet & traffic surveillance theme
+const OnBrandEmptyIcon: React.FC<{ size?: number; className?: string }> = ({ size = 48, className = 'text-slate-400' }) => (
+  <div className="relative inline-flex items-center justify-center">
+    <div className="w-14 h-14 rounded-2xl bg-blue-50/80 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
+      <HelmetSvg size={Math.round(size * 0.5)} className={className} />
+    </div>
+    <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-xs">
+      <Clock size={11} className="stroke-[2.5]" />
+    </div>
+  </div>
 );
 
 interface DetectionHistoryItem {
@@ -285,15 +279,36 @@ export const DetectionPage: React.FC = () => {
     }
   };
 
-  const handleDrag = (e: React.DragEvent) => {
+  const dragCounterRef = useRef<number>(0);
+
+  const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragActive(e.type === 'dragenter' || e.type === 'dragover');
+    dragCounterRef.current += 1;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setDragActive(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setDragActive(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    dragCounterRef.current = 0;
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
@@ -364,17 +379,17 @@ export const DetectionPage: React.FC = () => {
             </h2>
           </div>
 
-          {/* Dashed Dropzone */}
+          {/* Dashed Dropzone with enhanced responsive drag & hover states */}
           <div
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl flex-1 min-h-[310px] flex flex-col items-center justify-center p-6 text-center cursor-pointer transition-all duration-200 ${
+            className={`border-2 border-dashed rounded-2xl flex-1 min-h-[310px] flex flex-col items-center justify-center p-6 text-center cursor-pointer transition-all duration-200 select-none group ${
               dragActive
-                ? 'border-blue-500 bg-blue-50/60'
-                : 'border-blue-200/90 bg-white hover:bg-slate-50/70'
+                ? 'border-blue-500 bg-blue-50/80 ring-4 ring-blue-500/15 scale-[1.01]'
+                : 'border-blue-200/90 hover:border-blue-400 bg-white hover:bg-blue-50/25 hover:shadow-2xs'
             }`}
           >
             <input
@@ -385,15 +400,19 @@ export const DetectionPage: React.FC = () => {
               className="hidden"
             />
 
-            {/* Big Blue Cloud Upload Icon matching mockup */}
-            <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/25 mb-4 group-hover:scale-105 transition-transform">
+            {/* Big Blue Cloud Upload Icon */}
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-md mb-3.5 transition-all duration-200 ${
+              dragActive
+                ? 'bg-blue-700 text-white shadow-blue-500/40 scale-110'
+                : 'bg-blue-600 text-white shadow-blue-500/25 group-hover:scale-105 group-hover:shadow-blue-500/35'
+            }`}>
               <UploadCloud size={30} className="stroke-[2.2]" />
             </div>
 
             <p className="text-[14px] font-semibold text-slate-800 mb-1">
               Drag &amp; drop an image or video here
             </p>
-            <p className="text-xs text-slate-400 font-medium my-1.5">or</p>
+            <p className="text-xs text-slate-400 font-medium my-1">or</p>
 
             {/* Blue "Choose File" button */}
             <button
@@ -402,15 +421,26 @@ export const DetectionPage: React.FC = () => {
                 e.stopPropagation();
                 fileInputRef.current?.click();
               }}
-              className="mt-1.5 inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="mt-1 inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
             >
               <FileText size={14} />
               <span>Choose File</span>
             </button>
 
-            <p className="text-[11px] text-slate-400 font-medium mt-6">
-              Supports: JPG, PNG, WEBP, MP4, AVI, MOV (Max 100MB)
-            </p>
+            {/* Small file-type icon badges for quicker visual scanning */}
+            <div className="flex flex-wrap items-center justify-center gap-1.5 mt-5 pt-3 border-t border-slate-100/90 w-full max-w-xs">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-semibold border border-slate-200/80">
+                <ImageIcon size={12} className="text-blue-600 shrink-0" />
+                <span>JPG, PNG, WEBP</span>
+              </span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-semibold border border-slate-200/80">
+                <Film size={12} className="text-indigo-600 shrink-0" />
+                <span>MP4, AVI, MOV</span>
+              </span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-50 text-slate-400 text-[10px] font-medium border border-slate-200/60">
+                Max 100MB
+              </span>
+            </div>
 
             {/* Subtle Upload / Processing Progress Indicator */}
             {isProcessing && (
@@ -503,16 +533,59 @@ export const DetectionPage: React.FC = () => {
 
           {/* Center Result Area */}
           <div className="relative flex-1 min-h-[310px] rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-center overflow-hidden">
-            {/* 1. Empty State: No detection available */}
+            {/* 1. Empty State: Faint illustrative sample with bounding boxes */}
             {!selectedFile && !prediction && !isProcessing && (
-              <div className="flex flex-col items-center justify-center p-8 text-center select-none">
-                <EmptyImageIcon size={68} className="text-slate-300 stroke-[1.4]" />
-                <h3 className="text-base font-bold text-slate-900 mt-4 tracking-tight">
-                  No detection available
-                </h3>
-                <p className="text-xs text-slate-400 font-medium mt-1.5">
-                  Upload an image or video to begin AI analysis.
-                </p>
+              <div className="relative w-full h-full min-h-[310px] flex items-center justify-center p-4 select-none overflow-hidden">
+                {/* Faint illustrative backdrop simulating AI detection output */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none filter blur-[0.3px]">
+                  <div className="relative w-full max-w-[420px] h-[240px] rounded-xl bg-gradient-to-b from-slate-100 to-slate-200/60 border border-slate-200/80 overflow-hidden flex items-center justify-center">
+                    {/* Background traffic road lines */}
+                    <div className="absolute inset-0 opacity-40">
+                      <div className="w-full h-1/2 bg-sky-100/40" />
+                      <div className="w-full h-1/2 bg-slate-200/50 border-t border-slate-200" />
+                      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-8 h-1 bg-white rounded-full" />
+                      <div className="absolute bottom-14 left-1/2 -translate-x-1/2 w-6 h-1 bg-white/70 rounded-full" />
+                    </div>
+
+                    {/* Faint Sample Bounding Box: Helmet (Green) */}
+                    <div className="absolute top-10 left-[42%] w-16 h-16 border-2 border-emerald-500 bg-emerald-500/15 rounded-md flex flex-col justify-start">
+                      <div className="inline-flex items-center gap-1 bg-emerald-600 text-white text-[8px] font-semibold px-1 py-0.2 rounded-xs w-fit -mt-2 ml-1 shadow-2xs">
+                        Helmet 96.2%
+                      </div>
+                    </div>
+
+                    {/* Faint Sample Bounding Box: Rider (Blue) */}
+                    <div className="absolute top-8 left-[35%] w-34 h-42 border-2 border-blue-500/80 bg-blue-500/10 rounded-md">
+                      <div className="inline-flex items-center gap-1 bg-blue-600 text-white text-[8px] font-semibold px-1 py-0.2 rounded-xs w-fit -mt-2 ml-1 shadow-2xs">
+                        Rider
+                      </div>
+                    </div>
+
+                    {/* Faint Sample Bounding Box: Motorcycle (Blue) */}
+                    <div className="absolute bottom-3 left-[28%] w-46 h-26 border border-dashed border-blue-400/80 bg-blue-400/5 rounded-md">
+                      <div className="inline-flex items-center gap-1 bg-blue-500 text-white text-[8px] font-medium px-1 py-0.2 rounded-xs w-fit -mt-2 ml-1">
+                        Motorcycle
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Central Overlay Guidance Card */}
+                <div className="relative z-10 flex flex-col items-center justify-center p-6 text-center max-w-sm rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-xs">
+                  <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-2.5 shadow-2xs border border-blue-100">
+                    <EmptyImageIcon size={26} className="text-blue-600 stroke-[2]" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                    No detection available
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-1">
+                    Upload an image or video to begin AI analysis.
+                  </p>
+                  <div className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200/70">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>AI auto-detects helmets &amp; riders with bounding boxes</span>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -628,6 +701,9 @@ export const DetectionPage: React.FC = () => {
               </span>
             </div>
 
+            {/* Subtle category divider between Vehicle/Occupant counts and Compliance results */}
+            <div className="my-1 border-t border-slate-100" />
+
             {/* 4. With Helmet (Green) */}
             <div className="flex items-center justify-between py-1.5 px-1">
               <div className="flex items-center gap-3">
@@ -672,6 +748,9 @@ export const DetectionPage: React.FC = () => {
                 {violations}
               </span>
             </div>
+
+            {/* Subtle category divider between Compliance results and Inference performance */}
+            <div className="my-1 border-t border-slate-100" />
 
             {/* 7. Inference Time (Blue) */}
             <div className="flex items-center justify-between py-1.5 px-1">
@@ -726,9 +805,9 @@ export const DetectionPage: React.FC = () => {
 
         {/* Table Body */}
         {recentDetections.length === 0 ? (
-          /* Empty State: exactly matching mockup (media_1789848605006.png) */
+          /* On-Brand Empty State matching target theme */
           <div className="py-14 flex flex-col items-center justify-center text-center select-none">
-            <EmptyTrayIcon size={52} className="text-slate-300 stroke-[1.4]" />
+            <OnBrandEmptyIcon size={48} />
             <h3 className="text-base font-bold text-slate-900 mt-4 tracking-tight">
               No detections yet
             </h3>
@@ -742,7 +821,9 @@ export const DetectionPage: React.FC = () => {
             {recentDetections.map((item, idx) => (
               <div
                 key={item.id}
-                className="grid grid-cols-12 gap-2 px-5 py-3.5 items-center text-xs text-slate-700 hover:bg-slate-50/80 transition-colors"
+                className={`grid grid-cols-12 gap-2 px-5 py-3.5 items-center text-xs text-slate-700 ${
+                  idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'
+                } hover:bg-blue-50/50 transition-colors`}
               >
                 <div className="col-span-1 font-semibold text-slate-500">{idx + 1}</div>
                 <div className="col-span-2 font-medium text-slate-900 truncate">
@@ -766,11 +847,26 @@ export const DetectionPage: React.FC = () => {
                   </span>
                 </div>
                 <div className="col-span-1 flex justify-end">
-                  <img
-                    src={item.previewUrl}
-                    alt="thumb"
-                    className="w-8 h-8 rounded-lg object-cover border border-slate-200"
-                  />
+                  <div className="w-8 h-8 rounded-lg overflow-hidden inline-flex items-center justify-center border border-slate-200 shadow-2xs bg-slate-100 relative">
+                    <img
+                      src={item.previewUrl}
+                      alt={item.fileName}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        const fallback = target.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
+                    />
+                    <div
+                      style={{ display: 'none' }}
+                      className="w-full h-full items-center justify-center bg-slate-100 text-slate-400"
+                      title="Preview unavailable"
+                    >
+                      <ImageIcon size={14} className="text-slate-400" />
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
