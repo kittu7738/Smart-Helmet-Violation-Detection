@@ -90,18 +90,23 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 }) => {
   const [timeRange, setTimeRange] = useState('Last 24 Hours');
   void onNavigateToDetection;
-  void stats;
+  // Helper to safely resolve assets in any base path (local dev or production)
+  const getAssetUrl = (path: string) => {
+    const base = import.meta.env.BASE_URL || '/';
+    const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${cleanBase}${cleanPath}`;
+  };
 
-  // Unified, consistent metrics across all cards, charts, and legends:
-  const totalRiders = 128;
-  const withHelmetCount = 118; // 92.2% compliance
-  const withoutHelmetCount = 12; // 9.4% unhelmeted riders (UNIFIED: 12 everywhere)
-  const otherViolationsCount = 5; // Missing plate, triple riding, signal jumps
-  const totalViolationsCount = withoutHelmetCount + otherViolationsCount; // 17 TOTAL VIOLATIONS
-
-  const complianceRate = 92.2;
-  const nonComplianceRate = 9.4;
-  const otherViolationsRate = 3.9;
+  // Unified, consistent metrics strictly binding withoutHelmet to 12
+  const totalRiders = stats?.totalRiders || 128;
+  const withoutHelmetCount = stats?.withoutHelmet ?? 12; // ALWAYS 12, never 17!
+  const complianceRate = stats?.helmetCompliance || 92.2;
+  const nonComplianceRate = Number(((withoutHelmetCount / totalRiders) * 100).toFixed(1)) || 9.4;
+  const withHelmetCount = stats?.withHelmet ?? 118; // 118
+  const otherViolationsCount = stats?.otherViolations ?? 5; // 5
+  const totalViolationsCount = stats?.violations ?? 17; // 17 (Total Violations)
+  const otherViolationsRate = Number(((otherViolationsCount / totalRiders) * 100).toFixed(1)) || 3.9;
 
   // Exact trend curves matching stat cards across all timestamps
   const trendData = [
@@ -165,7 +170,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       confidence: '96.2%',
       time: getISTTimeString(2),
       status: 'Compliant',
-      previewUrl: '/preview_1.jpg'
+      previewUrl: getAssetUrl('/preview_1.jpg')
     },
     {
       id: 2,
@@ -176,7 +181,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       confidence: '93.5%',
       time: getISTTimeString(5),
       status: 'Violation',
-      previewUrl: '/preview_2.jpg'
+      previewUrl: getAssetUrl('/preview_2.jpg')
     },
     {
       id: 3,
@@ -187,7 +192,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       confidence: '91.8%',
       time: getISTTimeString(9),
       status: 'Violation',
-      previewUrl: '/preview_3.jpg'
+      previewUrl: getAssetUrl('/preview_3.jpg')
     },
     {
       id: 4,
@@ -198,7 +203,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       confidence: '97.1%',
       time: getISTTimeString(11),
       status: 'Compliant',
-      previewUrl: '/preview_4.jpg'
+      previewUrl: getAssetUrl('/preview_4.jpg')
     },
     {
       id: 5,
@@ -209,9 +214,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       confidence: '89.6%',
       time: getISTTimeString(15),
       status: 'Violation',
-      previewUrl: '/preview_5.jpg'
+      previewUrl: getAssetUrl('/preview_5.jpg')
     }
   ];
+
+  // Log preview thumbnail paths to browser console for verification
+  console.log('[Dashboard] Loaded Recent Detections Thumbnails:', recentDetections.map((d) => ({
+    id: d.id,
+    fileName: d.fileName,
+    previewUrl: d.previewUrl
+  })));
 
   // Custom Tooltip component for Detection Trends Area Chart
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -678,7 +690,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                         <div className="w-8 h-8 rounded-lg overflow-hidden inline-flex items-center justify-center border border-slate-200 shadow-2xs bg-slate-100 relative">
                           <img
                             src={row.previewUrl}
-                            alt="preview"
+                            alt={row.fileName}
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               const target = e.currentTarget;

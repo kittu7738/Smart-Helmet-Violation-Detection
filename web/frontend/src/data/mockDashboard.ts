@@ -2,7 +2,10 @@ import { DashboardStats, LiveDetectionSummary, RecentViolation, AnalyticsData } 
 
 export const mockDashboardStats: DashboardStats = {
   totalRiders: 128,
-  helmetCompliance: 92.4,
+  helmetCompliance: 92.2,
+  withHelmet: 118,
+  withoutHelmet: 12,
+  otherViolations: 5,
   violations: 17,
   detectionFps: 38,
   motorcyclesCount: 86,

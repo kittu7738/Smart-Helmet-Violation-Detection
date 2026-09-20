@@ -61,6 +61,9 @@ export interface ModelMetrics {
 export interface DashboardStats {
   totalRiders: number;
   helmetCompliance: number;
+  withHelmet?: number;
+  withoutHelmet?: number;
+  otherViolations?: number;
   violations: number;
   detectionFps: number;
   motorcyclesCount: number;
