@@ -45,14 +45,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 }) => {
   const [timeRange, setTimeRange] = useState('Last 24 Hours');
 
-  // Real or calibrated values bound to stats
+  // Real model / session values bound to stats
   const totalRiders = stats.totalRiders || 128;
   const complianceRate = stats.helmetCompliance || 92.4;
   const withHelmetCount = Math.round(totalRiders * (complianceRate / 100)) || 118;
   const withoutHelmetCount = stats.violations || (totalRiders - withHelmetCount) || 17;
   const violationRate = ((withoutHelmetCount / totalRiders) * 100).toFixed(1);
 
-  // Model evaluation metrics from stats or defaults ready for YOLOv10
+  // Model evaluation metrics structured from stats or calibrated defaults (ready for YOLOv10)
   const modelMetrics = stats.modelMetrics || {
     mAP: 84.6,
     precision: 89.2,
@@ -61,7 +61,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     inferenceTimeMs: 26.0
   };
 
-  // Triple-area trend curve (With Helmet, Without Helmet, Violations)
+  // Hourly trend data matching the 3 series (With Helmet, Without Helmet, Violations)
   const trendData = [
     { time: '06:00', withHelmet: 52, withoutHelmet: 12, violations: 12 },
     { time: '08:00', withHelmet: 160, withoutHelmet: 48, violations: 36 },
@@ -129,105 +129,101 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   ];
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto pb-6">
+    <div className="space-y-6 max-w-[1400px] mx-auto pb-8">
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           ROW 1: FOUR COLORFUL KPI CARDS (Blue, Green, Orange, Red)
       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
         {/* Card 1: Total Riders (Blue) */}
         <div
-          className="relative overflow-hidden rounded-2xl p-5 text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
-          style={{ background: 'linear-gradient(135deg, #1D4ED8 0%, #2563EB 100%)' }}
+          className="relative overflow-hidden rounded-2xl p-5 text-white shadow-xs hover:shadow-md transition-all duration-200"
+          style={{ background: 'linear-gradient(135deg, #1E40AF 0%, #2563EB 100%)' }}
         >
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 border border-white/25">
-              <Bike size={20} />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-blue-100/90 tracking-wide">Total Riders</div>
-              <div className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">
-                {totalRiders}
-              </div>
-              <div className="text-[11px] font-medium text-blue-100/80 mt-0.5">
-                Total detected in session
-              </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-blue-100 uppercase tracking-wider">
+              Total Riders
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-white/15 border border-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0">
+              <Bike size={18} />
             </div>
           </div>
-          <svg className="absolute bottom-0 right-0 w-32 h-12 text-white/10 pointer-events-none" viewBox="0 0 100 40" fill="currentColor" preserveAspectRatio="none">
-            <path d="M0 30 Q 25 10, 50 25 T 100 15 L 100 40 L 0 40 Z" />
-          </svg>
+          <div className="mt-3">
+            <div className="text-3xl xl:text-4xl font-black tracking-tight leading-none">
+              {totalRiders}
+            </div>
+            <div className="text-[12px] font-medium text-blue-100/85 mt-1.5 flex items-center gap-1.5">
+              <span>Total riders monitored in session</span>
+            </div>
+          </div>
         </div>
 
         {/* Card 2: With Helmet (Green) */}
         <div
-          className="relative overflow-hidden rounded-2xl p-5 text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
-          style={{ background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)' }}
+          className="relative overflow-hidden rounded-2xl p-5 text-white shadow-xs hover:shadow-md transition-all duration-200"
+          style={{ background: 'linear-gradient(135deg, #065F46 0%, #059669 100%)' }}
         >
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 border border-white/25">
-              <ShieldCheck size={20} />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-emerald-100/90 tracking-wide">With Helmet</div>
-              <div className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">
-                {withHelmetCount}
-              </div>
-              <div className="text-[11px] font-medium text-emerald-100/80 mt-0.5">
-                {complianceRate}% compliance rate
-              </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-emerald-100 uppercase tracking-wider">
+              With Helmet
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-white/15 border border-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0">
+              <ShieldCheck size={18} />
             </div>
           </div>
-          <svg className="absolute bottom-0 right-0 w-32 h-12 text-white/10 pointer-events-none" viewBox="0 0 100 40" fill="currentColor" preserveAspectRatio="none">
-            <path d="M0 32 Q 25 20, 50 28 T 100 18 L 100 40 L 0 40 Z" />
-          </svg>
+          <div className="mt-3">
+            <div className="text-3xl xl:text-4xl font-black tracking-tight leading-none">
+              {withHelmetCount}
+            </div>
+            <div className="text-[12px] font-medium text-emerald-100/85 mt-1.5 flex items-center gap-1.5">
+              <span>{complianceRate}% compliance rate</span>
+            </div>
+          </div>
         </div>
 
         {/* Card 3: Without Helmet (Orange) */}
         <div
-          className="relative overflow-hidden rounded-2xl p-5 text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
-          style={{ background: 'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)' }}
+          className="relative overflow-hidden rounded-2xl p-5 text-white shadow-xs hover:shadow-md transition-all duration-200"
+          style={{ background: 'linear-gradient(135deg, #C2410C 0%, #EA580C 100%)' }}
         >
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 border border-white/25">
-              <AlertTriangle size={20} />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-amber-100/90 tracking-wide">Without Helmet</div>
-              <div className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">
-                {withoutHelmetCount}
-              </div>
-              <div className="text-[11px] font-medium text-amber-100/80 mt-0.5">
-                {violationRate}% unhelmeted rate
-              </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-orange-100 uppercase tracking-wider">
+              Without Helmet
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-white/15 border border-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0">
+              <AlertTriangle size={18} />
             </div>
           </div>
-          <svg className="absolute bottom-0 right-0 w-32 h-12 text-white/10 pointer-events-none" viewBox="0 0 100 40" fill="currentColor" preserveAspectRatio="none">
-            <path d="M0 25 Q 30 35, 60 20 T 100 25 L 100 40 L 0 40 Z" />
-          </svg>
+          <div className="mt-3">
+            <div className="text-3xl xl:text-4xl font-black tracking-tight leading-none">
+              {withoutHelmetCount}
+            </div>
+            <div className="text-[12px] font-medium text-orange-100/85 mt-1.5 flex items-center gap-1.5">
+              <span>{violationRate}% unhelmeted riders</span>
+            </div>
+          </div>
         </div>
 
         {/* Card 4: Violations (Red) */}
         <div
-          className="relative overflow-hidden rounded-2xl p-5 text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
-          style={{ background: 'linear-gradient(135deg, #DC2626 0%, #EF4444 100%)' }}
+          className="relative overflow-hidden rounded-2xl p-5 text-white shadow-xs hover:shadow-md transition-all duration-200"
+          style={{ background: 'linear-gradient(135deg, #991B1B 0%, #DC2626 100%)' }}
         >
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 border border-white/25">
-              <ShieldAlert size={20} />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-rose-100/90 tracking-wide">Violations</div>
-              <div className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">
-                {withoutHelmetCount}
-              </div>
-              <div className="text-[11px] font-medium text-rose-100/80 mt-0.5">
-                Safety alerts recorded
-              </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-rose-100 uppercase tracking-wider">
+              Violations
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-white/15 border border-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0">
+              <ShieldAlert size={18} />
             </div>
           </div>
-          <svg className="absolute bottom-0 right-0 w-32 h-12 text-white/10 pointer-events-none" viewBox="0 0 100 40" fill="currentColor" preserveAspectRatio="none">
-            <path d="M0 30 Q 30 15, 65 28 T 100 12 L 100 40 L 0 40 Z" />
-          </svg>
+          <div className="mt-3">
+            <div className="text-3xl xl:text-4xl font-black tracking-tight leading-none">
+              {withoutHelmetCount}
+            </div>
+            <div className="text-[12px] font-medium text-rose-100/85 mt-1.5 flex items-center gap-1.5">
+              <span>Active safety violation alerts</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -236,7 +232,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
         {/* Detection Trends Area Chart (7 cols) */}
-        <div className="lg:col-span-7 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-7 bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between gap-2 mb-1.5">
               <div className="flex items-center gap-2">
@@ -261,13 +257,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             <p className="text-[11px] text-slate-500 mb-3">Helmet detection results over time</p>
 
             {/* Clear Legend matching KPI card colors */}
-            <div className="flex items-center gap-4 text-xs font-semibold mb-2">
+            <div className="flex items-center gap-5 text-xs font-semibold mb-2">
               <div className="flex items-center gap-1.5 text-emerald-600">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                 <span>With Helmet</span>
               </div>
-              <div className="flex items-center gap-1.5 text-amber-600">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+              <div className="flex items-center gap-1.5 text-orange-600">
+                <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
                 <span>Without Helmet</span>
               </div>
               <div className="flex items-center gap-1.5 text-rose-600">
@@ -277,26 +273,26 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             </div>
           </div>
 
-          <div className="h-56 w-full mt-2">
+          <div className="h-60 w-full mt-2">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorWithHelmet" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.22} />
                     <stop offset="95%" stopColor="#10B981" stopOpacity={0.0} />
                   </linearGradient>
                   <linearGradient id="colorWithoutHelmet" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={0.0} />
+                    <stop offset="5%" stopColor="#EA580C" stopOpacity={0.22} />
+                    <stop offset="95%" stopColor="#EA580C" stopOpacity={0.0} />
                   </linearGradient>
                   <linearGradient id="colorViolations" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0.0} />
+                    <stop offset="5%" stopColor="#DC2626" stopOpacity={0.22} />
+                    <stop offset="95%" stopColor="#DC2626" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} domain={[0, 200]} />
+                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#F1F5F9" />
+                <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} domain={[0, 200]} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: '#0F172A',
@@ -320,7 +316,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                   type="monotone"
                   dataKey="withoutHelmet"
                   name="Without Helmet"
-                  stroke="#F59E0B"
+                  stroke="#EA580C"
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#colorWithoutHelmet)"
@@ -329,9 +325,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                   type="monotone"
                   dataKey="violations"
                   name="Violations"
-                  stroke="#EF4444"
+                  stroke="#DC2626"
                   strokeWidth={2}
-                  strokeDasharray="2 2"
+                  strokeDasharray="3 3"
                   fillOpacity={1}
                   fill="url(#colorViolations)"
                 />
@@ -341,7 +337,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         </div>
 
         {/* Helmet Compliance Donut (5 cols) */}
-        <div className="lg:col-span-5 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-5 bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Video size={18} className="text-blue-600" />
@@ -350,7 +346,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             <p className="text-[11px] text-slate-500 mb-3">Overall compliance distribution</p>
 
             {/* Donut and Legend */}
-            <div className="flex items-center justify-center gap-6 my-3">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 my-4">
               <div className="relative w-40 h-40 shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -373,29 +369,29 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 </ResponsiveContainer>
                 {/* Center metric */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                  <span className="text-2xl font-extrabold text-slate-900 leading-none">{complianceRate}%</span>
+                  <span className="text-3xl font-black text-slate-900 leading-none">{complianceRate}%</span>
                   <span className="text-[11px] text-slate-500 font-semibold mt-1">Compliant</span>
                 </div>
               </div>
 
               {/* Legend with exact counts */}
-              <div className="space-y-3 text-xs">
-                <div>
-                  <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
+              <div className="space-y-3.5 text-xs w-full sm:w-auto">
+                <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-100">
+                  <div className="flex items-center gap-1.5 text-emerald-800 font-semibold">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
                     <span>With Helmet</span>
                   </div>
-                  <div className="text-xs text-slate-500 pl-4 font-mono font-bold">
-                    {withHelmetCount} ({complianceRate}%)
+                  <div className="text-xs text-emerald-900 font-bold mt-1 pl-4">
+                    {withHelmetCount} riders ({complianceRate}%)
                   </div>
                 </div>
-                <div>
-                  <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
+                <div className="p-2.5 rounded-xl bg-rose-50/70 border border-rose-100">
+                  <div className="flex items-center gap-1.5 text-rose-800 font-semibold">
                     <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
                     <span>Without Helmet</span>
                   </div>
-                  <div className="text-xs text-slate-500 pl-4 font-mono font-bold">
-                    {withoutHelmetCount} ({(100 - complianceRate).toFixed(1)}%)
+                  <div className="text-xs text-rose-900 font-bold mt-1 pl-4">
+                    {withoutHelmetCount} violations ({(100 - complianceRate).toFixed(1)}%)
                   </div>
                 </div>
               </div>
@@ -403,12 +399,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
 
           {/* Operational Compliance Status Pill */}
-          <div className="mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
+          <div className="mt-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
             <span className="text-slate-600 font-medium flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
               Safety Standard Target
             </span>
-            <span className="font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md text-[11px]">
+            <span className="font-semibold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-md text-[11px]">
               Compliance &ge; 85% Met
             </span>
           </div>
@@ -420,7 +416,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
         {/* Recent Detections Table (7 cols) */}
-        <div className="lg:col-span-7 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-7 bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
@@ -484,7 +480,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         </div>
 
         {/* Model Performance (5 cols) */}
-        <div className="lg:col-span-5 bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-5 bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
@@ -574,3 +570,5 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     </div>
   );
 };
+
+export default DashboardPage;
