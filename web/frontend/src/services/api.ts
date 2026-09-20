@@ -10,7 +10,7 @@ const STORAGE_KEY = 'SMART_HELMET_API_URL';
 const DEFAULT_URL =
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
-  'https://batch-mods-manufacturing-jonathan.trycloudflare.com';
+  'https://tion-guided-generating-citysearch.trycloudflare.com';
 
 let currentApiBaseUrl: string = (() => {
   if (typeof window !== 'undefined') {
