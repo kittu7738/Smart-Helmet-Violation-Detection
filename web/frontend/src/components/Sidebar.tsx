@@ -71,7 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <img
               src="/logo_helmet.png"
               alt="Smart Helmet Logo"
-              className="h-9 sm:h-10 w-auto object-contain shrink-0 select-none pointer-events-none"
+              className="h-11 sm:h-12 w-auto object-contain shrink-0 select-none pointer-events-none"
             />
 
             {/* Horizontal Brand Text: Strictly single-line, no wrapping */}
