@@ -67,12 +67,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Top: Compact horizontal branding matching reference exactly */}
         <div>
           <div className="px-5 py-4 flex flex-row items-center gap-3 select-none border-b border-white/10">
-            {/* Small Helmet Logo Image matching media_1789850207537.jpg */}
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 shadow-md border border-white/40 overflow-hidden">
+            {/* Small Helmet Logo Image */}
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white/10 border border-white/25 flex items-center justify-center shrink-0 shadow-md overflow-hidden">
               <img
                 src="/logo_helmet.jpg"
                 alt="Smart Helmet"
-                className="w-full h-full object-contain select-none pointer-events-none"
+                className="w-full h-full object-cover select-none pointer-events-none"
               />
             </div>
 
