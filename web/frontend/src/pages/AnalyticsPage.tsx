@@ -18,9 +18,47 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line
+  AreaChart,
+  Area
 } from 'recharts';
+
+// Custom Interactive Tooltip for Hourly Infraction Distribution Chart
+const HourlyInfractionTooltip: React.FC<any> = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    const d = payload[0]?.payload || {};
+    return (
+      <div className="bg-[#0B132B] text-white px-3.5 py-2.5 rounded-xl shadow-xl border border-slate-700/80 text-xs select-none pointer-events-none">
+        <div className="font-bold text-slate-200 mb-1.5 pb-1 border-b border-slate-700/60 flex items-center justify-between gap-3">
+          <span className="font-mono">Time: {label}</span>
+          {label === '08:00' && (
+            <span className="text-[10px] bg-rose-500/30 text-rose-300 font-semibold px-1.5 py-0.5 rounded">
+              Peak Rush
+            </span>
+          )}
+        </div>
+        <div className="space-y-1 font-sans">
+          <div className="flex items-center justify-between gap-4 text-rose-400 font-medium">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+              <span>Violations:</span>
+            </div>
+            <span className="font-mono font-bold text-white text-sm">{d.violations ?? payload[0]?.value}</span>
+          </div>
+          {d.compliant !== undefined && (
+            <div className="flex items-center justify-between gap-4 text-emerald-400 font-medium">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                <span>Compliant Riders:</span>
+              </div>
+              <span className="font-mono font-bold text-slate-200">{d.compliant}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 export const AnalyticsPage: React.FC = () => {
   const [timeRange, setTimeRange] = useState<'24H' | '7D' | '30D'>('24H');
@@ -200,60 +238,54 @@ export const AnalyticsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Violations by Hour Area/Line Chart (5 cols) */}
+        {/* Violations by Hour Area Chart (5 cols) */}
         <div className="lg:col-span-5 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
               <div>
                 <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
                   Hourly Infraction Distribution
                 </h2>
-                <p className="text-xs text-slate-500">Peak violation count throughout the day</p>
+                <p className="text-xs text-slate-500">
+                  Peak violation count throughout the day — coincides with morning commute rush
+                </p>
               </div>
-              <span className="badge-violation px-2.5 py-0.5 rounded-md text-xs font-semibold" title="Peak morning rush-hour spike">
-                Peak: 08:00
-              </span>
+              <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                <span className="badge-violation px-2.5 py-1 rounded-md text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs whitespace-nowrap" title="Morning commute corridor spike">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  Peak: 08:00 • Coincides with morning commute
+                </span>
+              </div>
             </div>
 
             <div className="h-60 w-full pt-3">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={hourlyViolationsData} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
+                <AreaChart data={hourlyViolationsData} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="hourlyViolationGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#EF4444" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#EF4444" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-                  <XAxis dataKey="hour" tick={{ fontSize: 11, fill: '#64748B' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748B' }} />
+                  <XAxis dataKey="hour" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
                   <Tooltip
-                    content={({ active, payload, label }: any) => {
-                      if (active && payload && payload.length) {
-                        const d = payload[0].payload;
-                        return (
-                          <div className="bg-slate-900/95 backdrop-blur-md text-white px-3.5 py-2.5 rounded-xl shadow-lg border border-slate-700/60 text-xs select-none">
-                            <div className="font-mono text-slate-300 text-[11px] font-semibold mb-1">
-                              Time: {label}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-rose-500" />
-                              <span className="text-slate-300">Violations:</span>
-                              <span className="font-mono font-bold text-white text-sm">{d.violations}</span>
-                            </div>
-                            <div className="flex items-center gap-2 mt-0.5 text-emerald-400 text-[11px]">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                              <span>Compliant Riders: {d.compliant}</span>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
+                    content={<HourlyInfractionTooltip />}
+                    cursor={{ stroke: '#94A3B8', strokeWidth: 1, strokeDasharray: '3 3' }}
                   />
-                  <Line
+                  <Area
                     type="monotone"
                     dataKey="violations"
+                    name="Violations"
                     stroke="#EF4444"
                     strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#hourlyViolationGrad)"
                     dot={{ r: 3, fill: '#EF4444' }}
                     activeDot={{ r: 6, fill: '#EF4444', stroke: '#FFFFFF', strokeWidth: 2 }}
                   />
-                </LineChart>
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
