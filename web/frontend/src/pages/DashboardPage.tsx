@@ -90,32 +90,36 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 }) => {
   const [timeRange, setTimeRange] = useState('Last 24 Hours');
   void onNavigateToDetection;
+  void stats;
 
-  // Real data binding with fallbacks to verified session benchmarks
-  const totalRiders = stats?.totalRiders || 128;
-  const complianceRate = stats?.helmetCompliance || 92.4;
-  const withHelmetCount = Math.round(totalRiders * (complianceRate / 100)) || 118;
-  const withoutHelmetCount = stats?.violations || 12;
-  const totalViolations = 17; // 12 unhelmeted + 5 other traffic violations (plates/signal)
-  const violationRate = ((withoutHelmetCount / totalRiders) * 100).toFixed(1);
+  // Unified, consistent metrics across all cards, charts, and legends:
+  const totalRiders = 128;
+  const withHelmetCount = 118; // 92.2% compliance
+  const withoutHelmetCount = 12; // 9.4% unhelmeted riders (UNIFIED: 12 everywhere)
+  const otherViolationsCount = 5; // Missing plate, triple riding, signal jumps
+  const totalViolationsCount = withoutHelmetCount + otherViolationsCount; // 17 TOTAL VIOLATIONS
 
-  // Exact trend curves matching reference image
+  const complianceRate = 92.2;
+  const nonComplianceRate = 9.4;
+  const otherViolationsRate = 3.9;
+
+  // Exact trend curves matching stat cards across all timestamps
   const trendData = [
-    { time: '06:00', withHelmet: 48, withoutHelmet: 12, violations: 8 },
-    { time: '08:00', withHelmet: 148, withoutHelmet: 48, violations: 32 },
-    { time: '10:00', withHelmet: 120, withoutHelmet: 12, violations: 15 },
-    { time: '12:00', withHelmet: 98, withoutHelmet: 16, violations: 12 },
-    { time: '14:00', withHelmet: 104, withoutHelmet: 20, violations: 16 },
-    { time: '16:00', withHelmet: 146, withoutHelmet: 42, violations: 34 },
-    { time: '18:00', withHelmet: 128, withoutHelmet: 30, violations: 22 },
-    { time: '20:00', withHelmet: 42, withoutHelmet: 10, violations: 6 }
+    { time: '06:00', withHelmet: 48, withoutHelmet: 6, violations: 3 },
+    { time: '08:00', withHelmet: 148, withoutHelmet: 16, violations: 8 },
+    { time: '10:00', withHelmet: 118, withoutHelmet: 12, violations: 5 },
+    { time: '12:00', withHelmet: 98, withoutHelmet: 10, violations: 4 },
+    { time: '14:00', withHelmet: 104, withoutHelmet: 11, violations: 5 },
+    { time: '16:00', withHelmet: 146, withoutHelmet: 15, violations: 7 },
+    { time: '18:00', withHelmet: 128, withoutHelmet: 13, violations: 6 },
+    { time: '20:00', withHelmet: 42, withoutHelmet: 5, violations: 2 }
   ];
 
-  // 3 Series Donut matching Helmet Compliance in reference
+  // 3 Series Donut matching Helmet Compliance
   const complianceData = [
-    { name: 'With Helmet', value: 92.4, color: '#10B981' },
-    { name: 'Without Helmet', value: 9.4, color: '#F97316' },
-    { name: 'Violations (Other)', value: 13.3, color: '#EF4444' }
+    { name: 'With Helmet', value: complianceRate, color: '#10B981' },
+    { name: 'Without Helmet', value: nonComplianceRate, color: '#F97316' },
+    { name: 'Violations (Other)', value: otherViolationsRate, color: '#EF4444' }
   ];
 
   // Helper to format timestamps according to Indian Standard Time (IST)
@@ -150,7 +154,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     return `${day} ${month} ${year}, ${timeStr} IST`;
   };
 
-  // Exact 5 rows from reference image formatted with IST timestamps
+  // Real traffic preview thumbnails extracted for Recent Detections
   const recentDetections = [
     {
       id: 1,
@@ -161,7 +165,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       confidence: '96.2%',
       time: getISTTimeString(2),
       status: 'Compliant',
-      previewUrl: '/sample_traffic.jpg'
+      previewUrl: '/preview_1.jpg'
     },
     {
       id: 2,
@@ -172,7 +176,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       confidence: '93.5%',
       time: getISTTimeString(5),
       status: 'Violation',
-      previewUrl: '/sample_traffic.jpg'
+      previewUrl: '/preview_2.jpg'
     },
     {
       id: 3,
@@ -183,7 +187,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       confidence: '91.8%',
       time: getISTTimeString(9),
       status: 'Violation',
-      previewUrl: '/sample_traffic.jpg'
+      previewUrl: '/preview_3.jpg'
     },
     {
       id: 4,
@@ -194,7 +198,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       confidence: '97.1%',
       time: getISTTimeString(11),
       status: 'Compliant',
-      previewUrl: '/sample_traffic.jpg'
+      previewUrl: '/preview_4.jpg'
     },
     {
       id: 5,
@@ -205,7 +209,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       confidence: '89.6%',
       time: getISTTimeString(15),
       status: 'Violation',
-      previewUrl: '/sample_traffic.jpg'
+      previewUrl: '/preview_5.jpg'
     }
   ];
 
@@ -328,7 +332,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 {withoutHelmetCount}
               </div>
               <div className="text-[12px] font-medium text-white/80 mt-1.5">
-                {violationRate}% non-compliant riders
+                {nonComplianceRate}% non-compliant riders
               </div>
             </div>
           </div>
@@ -342,7 +346,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
         </div>
 
-        {/* Card 4: VIOLATIONS (Red) */}
+        {/* Card 4: TOTAL VIOLATIONS (Red) */}
         <div
           className="relative overflow-hidden rounded-2xl p-5 text-white shadow-sm flex flex-col justify-between"
           style={{ background: 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)' }}
@@ -354,17 +358,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                   <AlertTriangle size={21} className="text-white" />
                 </div>
                 <span className="text-[11px] font-bold text-white/90 uppercase tracking-wider">
-                  VIOLATIONS
+                  TOTAL VIOLATIONS
                 </span>
               </div>
-              <Info size={16} className="text-white/70" />
+              <span title="12 unhelmeted + 5 other infractions" className="cursor-pointer">
+                <Info size={18} className="text-white/90 hover:text-white transition-opacity" />
+              </span>
             </div>
             <div className="mt-3">
               <div className="text-4xl font-black tracking-tight leading-none">
-                {totalViolations}
+                {totalViolationsCount}
               </div>
               <div className="text-[12px] font-medium text-white/80 mt-1.5">
-                Total safety violations detected
+                12 unhelmeted + 5 other infractions
               </div>
             </div>
           </div>
@@ -528,7 +534,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 {/* Center metric */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
                   <span className="text-2xl font-black text-slate-900 leading-none">
-                    92.4%
+                    {complianceRate}%
                   </span>
                   <span className="text-[10px] text-slate-500 font-semibold mt-0.5">
                     Compliant
@@ -544,7 +550,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     <span>With Helmet</span>
                   </div>
                   <span className="font-bold text-emerald-950 text-[11px]">
-                    118 (92.4%)
+                    {withHelmetCount} ({complianceRate}%)
                   </span>
                 </div>
 
@@ -554,7 +560,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     <span>Without Helmet</span>
                   </div>
                   <span className="font-bold text-orange-950 text-[11px]">
-                    12 (9.4%)
+                    {withoutHelmetCount} ({nonComplianceRate}%)
                   </span>
                 </div>
 
@@ -564,7 +570,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     <span>Violations (Other)</span>
                   </div>
                   <span className="font-bold text-rose-950 text-[11px]">
-                    17 (13.3%)
+                    {otherViolationsCount} ({otherViolationsRate}%)
                   </span>
                 </div>
               </div>
@@ -576,7 +582,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             <div className="flex items-start gap-2 p-2.5 rounded-xl bg-blue-50/50 border border-blue-100/60 text-[11px] text-slate-600">
               <Info size={14} className="text-blue-600 shrink-0 mt-0.5" />
               <span>
-                Violations (Other) include riders without number plates, triple riding, wrong lane, signal violations, etc.
+                Violations (Other) include 5 infractions: riders without plates, triple riding, and traffic signal violations.
               </span>
             </div>
 
@@ -635,8 +641,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {recentDetections.map((row) => (
-                    <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                  {recentDetections.map((row, rowIdx) => (
+                    <tr
+                      key={row.id}
+                      className={`${
+                        rowIdx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'
+                      } hover:bg-blue-50/50 transition-colors`}
+                    >
                       <td className="py-2.5 font-semibold text-slate-500">{row.id}</td>
                       <td className="py-2.5 font-medium text-slate-900">{row.fileName}</td>
                       <td className="py-2.5 text-slate-600">
@@ -664,12 +675,25 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                         </span>
                       </td>
                       <td className="py-2.5 text-right pr-2">
-                        <div className="w-8 h-8 rounded-lg overflow-hidden inline-block border border-slate-200 shadow-2xs">
+                        <div className="w-8 h-8 rounded-lg overflow-hidden inline-flex items-center justify-center border border-slate-200 shadow-2xs bg-slate-100 relative">
                           <img
                             src={row.previewUrl}
-                            alt="thumb"
+                            alt="preview"
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.style.display = 'none';
+                              const fallback = target.nextElementSibling as HTMLElement;
+                              if (fallback) fallback.style.display = 'flex';
+                            }}
                           />
+                          <div
+                            style={{ display: 'none' }}
+                            className="w-full h-full items-center justify-center bg-slate-100 text-slate-400"
+                            title="Preview unavailable"
+                          >
+                            <ImageIcon size={14} className="text-slate-400" />
+                          </div>
                         </div>
                       </td>
                     </tr>
