@@ -78,9 +78,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             <Menu size={18} />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg overflow-hidden border border-slate-300/80 flex items-center justify-center shrink-0 shadow-2xs">
-              <img src="/logo_helmet.jpg" alt="Logo" className="w-full h-full object-cover" />
-            </div>
+            <img src="/logo_helmet.png" alt="Logo" className="w-7 h-7 object-contain" />
             <span className="font-bold text-slate-900 text-sm">Smart Helmet</span>
           </div>
         </div>

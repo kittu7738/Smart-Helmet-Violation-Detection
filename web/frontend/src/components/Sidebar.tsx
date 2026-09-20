@@ -67,21 +67,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Top: Compact horizontal branding matching reference exactly */}
         <div>
           <div className="px-5 py-4 flex flex-row items-center gap-3 select-none border-b border-white/10">
-            {/* Small Helmet Logo Image */}
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white/10 border border-white/25 flex items-center justify-center shrink-0 shadow-md overflow-hidden">
-              <img
-                src="/logo_helmet.jpg"
-                alt="Smart Helmet"
-                className="w-full h-full object-cover select-none pointer-events-none"
-              />
-            </div>
+            {/* Standalone Helmet Image directly on dark navy sidebar - NO BOX, NO BORDER, NO CARD */}
+            <img
+              src="/logo_helmet.png"
+              alt="Smart Helmet Logo"
+              className="h-9 sm:h-10 w-auto object-contain shrink-0 select-none pointer-events-none"
+            />
 
             {/* Horizontal Brand Text: Strictly single-line, no wrapping */}
             <div className="flex flex-col justify-center shrink-0">
-              <h1 className="text-[20px] font-bold text-white tracking-tight leading-snug whitespace-nowrap drop-shadow-sm">
+              <h1 className="text-[18px] sm:text-[19px] font-bold text-white tracking-tight leading-snug whitespace-nowrap drop-shadow-sm">
                 Smart Helmet
               </h1>
-              <p className="text-[12px] text-slate-300 font-medium tracking-tight leading-tight whitespace-nowrap drop-shadow-2xs">
+              <p className="text-[11px] sm:text-[12px] text-slate-300 font-medium tracking-tight leading-tight whitespace-nowrap drop-shadow-2xs">
                 Violation Detection System
               </p>
             </div>
