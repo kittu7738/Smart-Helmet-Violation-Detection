@@ -33,11 +33,17 @@ export const LiveCameraPage: React.FC = () => {
   };
 
   const stopWebcam = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-      tracks.forEach((track) => track.stop());
-      videoRef.current.srcObject = null;
-      setIsWebcamActive(false);
+    if (videoRef.current) {
+      if (videoRef.current.srcObject) {
+        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+        tracks.forEach((track) => track.stop());
+        videoRef.current.srcObject = null;
+      }
+      videoRef.current.pause();
+    }
+    setIsWebcamActive(false);
+    if (typeof document !== 'undefined' && (document as any).pictureInPictureElement) {
+      (document as any).exitPictureInPicture().catch(() => {});
     }
   };
 

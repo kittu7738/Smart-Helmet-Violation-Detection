@@ -42,10 +42,21 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Ensure any stray Picture-in-Picture window is closed when switching tabs
-    if (typeof document !== 'undefined' && (document as any).pictureInPictureElement) {
-      (document as any).exitPictureInPicture().catch(() => {});
-    }
+    // Aggressively exit Picture-in-Picture mode on tab switch, visibility change, and periodic watchdog
+    const exitPiP = () => {
+      if (typeof document !== 'undefined' && (document as any).pictureInPictureElement) {
+        (document as any).exitPictureInPicture().catch(() => {});
+      }
+    };
+    exitPiP();
+    const interval = setInterval(exitPiP, 1000);
+    window.addEventListener('visibilitychange', exitPiP);
+    window.addEventListener('blur', exitPiP);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('visibilitychange', exitPiP);
+      window.removeEventListener('blur', exitPiP);
+    };
   }, [activeTab]);
 
   const [stats, setStats] = useState<DashboardStats>(mockDashboardStats);

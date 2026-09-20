@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Play,
   Pause,
@@ -69,6 +69,19 @@ export const VideoAnalysisPage: React.FC = () => {
       setIsPlaying(true);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.src = '';
+        videoRef.current.load();
+      }
+      if (typeof document !== 'undefined' && (document as any).pictureInPictureElement) {
+        (document as any).exitPictureInPicture().catch(() => {});
+      }
+    };
+  }, []);
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">

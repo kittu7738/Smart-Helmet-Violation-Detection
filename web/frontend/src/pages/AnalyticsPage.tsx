@@ -186,16 +186,16 @@ export const AnalyticsPage: React.FC = () => {
 
       {/* 2D Recharts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Class-Specific AP50 Bar Chart (7 cols) */}
-        <div className="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        {/* Class-Specific AP50 Bar Chart (6 cols) */}
+        <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 min-h-[52px]">
             <div>
               <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
                 Per-Class Detection Performance (AP50)
               </h2>
               <p className="text-xs text-slate-500">Average precision across evaluated safety classes</p>
             </div>
-            <span className="badge-blue px-2.5 py-0.5 rounded-full text-xs font-semibold">
+            <span className="badge-blue px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0">
               Epoch 10 Checkpoint
             </span>
           </div>
@@ -238,10 +238,10 @@ export const AnalyticsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Violations by Hour Area Chart (5 cols) */}
-        <div className="lg:col-span-5 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4 flex flex-col justify-between">
+        {/* Violations by Hour Area Chart (6 cols) */}
+        <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4 flex flex-col justify-between">
           <div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100 min-h-[52px]">
               <div>
                 <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
                   Hourly Infraction Distribution
@@ -250,15 +250,13 @@ export const AnalyticsPage: React.FC = () => {
                   Peak violation count throughout the day — coincides with morning commute rush
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 self-start sm:self-auto">
-                <span className="badge-violation px-2.5 py-1 rounded-md text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs whitespace-nowrap" title="Morning commute corridor spike">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                  Peak: 08:00 • Coincides with morning commute
-                </span>
-              </div>
+              <span className="badge-violation px-2.5 py-1 rounded-md text-xs font-semibold shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap" title="Morning commute corridor spike">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                Peak: 08:00 (Rush Hour)
+              </span>
             </div>
 
-            <div className="h-60 w-full pt-3">
+            <div className="h-64 w-full pt-2">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={hourlyViolationsData} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
                   <defs>
