@@ -4,11 +4,18 @@ export const mockDashboardStats: DashboardStats = {
   totalRiders: 128,
   helmetCompliance: 92.4,
   violations: 17,
-  detectionFps: 28,
+  detectionFps: 38,
   motorcyclesCount: 86,
   activeAlerts: 3,
   liveStatus: 'ONLINE',
-  modelArchitecture: 'Co-DETR / Swin-L (Pipeline Ready)',
+  modelArchitecture: 'YOLOv10 (Real-Time Helmet & Rider)',
+  modelMetrics: {
+    mAP: 84.6,
+    precision: 89.2,
+    recall: 86.5,
+    fps: 38.4,
+    inferenceTimeMs: 26.0
+  },
   lastSync: new Date().toISOString()
 };
 

@@ -85,45 +85,56 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
         </div>
 
-        {/* Page Title on Desktop matching mockup (media_1789848605006.png) */}
+        {/* Page Title on Desktop */}
         <div className="hidden lg:flex items-center">
+          {(!activeTab || activeTab === 'dashboard') && (
+            <h1 className="text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">
+              Dashboard
+            </h1>
+          )}
           {activeTab === 'detection' && (
-            <h1 className="text-2xl sm:text-[28px] font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">
               Detection
             </h1>
           )}
           {activeTab === 'video' && (
-            <h1 className="text-2xl sm:text-[28px] font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">
               Video Analysis
             </h1>
           )}
           {activeTab === 'camera' && (
-            <h1 className="text-2xl sm:text-[28px] font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">
               Live Camera
             </h1>
           )}
           {activeTab === 'analytics' && (
-            <h1 className="text-2xl sm:text-[28px] font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">
               Analytics &amp; Reports
+            </h1>
+          )}
+          {activeTab === 'violations' && (
+            <h1 className="text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">
+              Violations Log
             </h1>
           )}
         </div>
 
-        {/* Right controls matching mockup */}
+        {/* Right controls */}
         <div className="flex items-center gap-3 ml-auto">
           {/* Settings Trigger Icon Button */}
           <button
             onClick={() => setModalOpen(true)}
             className="w-9 h-9 rounded-xl border border-slate-200/90 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
             title="Configure Server Endpoint"
+            aria-label="Settings"
           >
             <Settings size={16} />
           </button>
 
-          {/* System Ready / Online Pill Matching Mockup */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100/70 border border-emerald-200/80 text-emerald-800 text-xs font-semibold shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>{backendConnected ? 'System Ready' : 'System Standby'}</span>
+          {/* System Online / System Ready Status Pill */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/90 text-emerald-800 text-xs font-semibold shadow-xs select-none">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span>{backendConnected ? 'System Online' : 'System Standby'}</span>
           </div>
         </div>
       </header>

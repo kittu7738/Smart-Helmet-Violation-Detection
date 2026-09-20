@@ -50,6 +50,14 @@ export interface RecentViolation {
   location: string;
 }
 
+export interface ModelMetrics {
+  mAP: number;
+  precision: number;
+  recall: number;
+  fps: number;
+  inferenceTimeMs: number;
+}
+
 export interface DashboardStats {
   totalRiders: number;
   helmetCompliance: number;
@@ -59,6 +67,7 @@ export interface DashboardStats {
   activeAlerts: number;
   liveStatus: 'ONLINE' | 'STANDBY' | 'DEGRADED';
   modelArchitecture: string;
+  modelMetrics?: ModelMetrics;
   lastSync: string;
 }
 

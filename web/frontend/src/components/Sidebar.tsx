@@ -57,11 +57,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <aside
-        className={`fixed top-0 left-0 bottom-0 z-50 w-[280px] text-slate-300 flex flex-col justify-between border-r border-slate-800/70 transition-transform duration-300 ease-in-out lg:translate-x-0 overflow-y-auto ${
+        className={`fixed top-0 left-0 bottom-0 z-50 w-[280px] text-slate-300 flex flex-col justify-between border-r border-slate-800/80 bg-[#0A1128] transition-transform duration-300 ease-in-out lg:translate-x-0 overflow-y-auto ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
-          background: "linear-gradient(180deg, rgba(7, 15, 35, 0.64) 0%, rgba(7, 15, 35, 0.48) 30%, rgba(7, 15, 35, 0.16) 62%, rgba(7, 15, 35, 0.50) 100%), url('/sidebar_rider.jpg') center bottom / cover no-repeat"
+          background: "linear-gradient(180deg, rgba(10, 17, 40, 0.98) 0%, rgba(10, 17, 40, 0.92) 40%, rgba(10, 17, 40, 0.76) 75%, rgba(10, 17, 40, 0.92) 100%), url('/sidebar_rider.jpg') center bottom / cover no-repeat"
         }}
       >
         {/* Top: Compact horizontal branding matching reference exactly */}
