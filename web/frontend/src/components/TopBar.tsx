@@ -101,7 +101,10 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <>
-      <header className="w-full bg-[#EEF2F8] border-b border-slate-200/80 sticky top-0 z-40 px-6 sm:px-8 py-4 flex items-center justify-between shadow-xs">
+      <header
+        style={{ backgroundColor: '#EEF2F8' }}
+        className="w-full h-[72px] min-h-[72px] bg-[#EEF2F8] border-b border-slate-200/80 sticky top-0 z-40 px-6 sm:px-8 flex items-center justify-between shadow-xs shrink-0"
+      >
         {/* Mobile menu trigger */}
         <div className="flex items-center gap-3 lg:hidden">
           <button

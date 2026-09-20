@@ -337,38 +337,39 @@ export const DetectionPage: React.FC = () => {
     a.click();
   };
 
-  // Computed summary metrics (show '--' until real inference runs)
-  const totalMotorcycles = prediction
-    ? (prediction.summary.vehicles || prediction.detections.filter(d => d.class_name === 'bike' || d.class_name === 'motorcycle').length)
+  // Computed summary metrics & detection state (show '--' until real inference runs)
+  const detectionResult = prediction;
+  const totalMotorcycles = detectionResult
+    ? (detectionResult.summary.vehicles || detectionResult.detections.filter(d => d.class_name === 'bike' || d.class_name === 'motorcycle').length)
     : '--';
-  const totalDrivers = prediction
-    ? (prediction.detections.filter(d => d.class_name.includes('driver') || d.display_name.toLowerCase().includes('driver')).length || (prediction.summary.riders > 0 ? 1 : 0))
+  const totalDrivers = detectionResult
+    ? (detectionResult.detections.filter(d => d.class_name.includes('driver') || d.display_name.toLowerCase().includes('driver')).length || (detectionResult.summary.riders > 0 ? 1 : 0))
     : '--';
-  const totalPassengers = prediction
-    ? (prediction.detections.filter(d => d.class_name.includes('passenger') || d.display_name.toLowerCase().includes('passenger')).length || Math.max(0, prediction.summary.riders - 1))
+  const totalPassengers = detectionResult
+    ? (detectionResult.detections.filter(d => d.class_name.includes('passenger') || d.display_name.toLowerCase().includes('passenger')).length || Math.max(0, detectionResult.summary.riders - 1))
     : '--';
-  const withHelmet = prediction
-    ? (prediction.summary.helmet_detected || prediction.detections.filter(d => !d.violation && d.class_name !== 'bike').length)
+  const withHelmet = detectionResult
+    ? (detectionResult.summary.helmet_detected || detectionResult.detections.filter(d => !d.violation && d.class_name !== 'bike').length)
     : '--';
-  const withoutHelmet = prediction
-    ? (prediction.summary.violations || prediction.detections.filter(d => d.violation).length)
+  const withoutHelmet = detectionResult
+    ? (detectionResult.summary.violations || detectionResult.detections.filter(d => d.violation).length)
     : '--';
-  const violations = prediction
-    ? prediction.summary.violations
+  const violations = detectionResult
+    ? detectionResult.summary.violations
     : '--';
-  const inferenceTime = prediction
-    ? `${Math.round(prediction.inference_time_ms)}ms`
+  const inferenceTime = detectionResult
+    ? `${Math.round(detectionResult.inference_time_ms)}ms`
     : '--';
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto pb-8 pt-1 sm:pt-2">
+    <div className="space-y-6 max-w-[1400px] mx-auto pb-8 pt-1 sm:pt-2 scroll-mt-[80px]">
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           ROW 1: THREE COLUMNS (Upload Media | Detection Result | Summary)
       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5 items-stretch">
 
         {/* ── CARD 1: UPLOAD MEDIA (Left Column) ──────────────────── */}
-        <div className="md:col-span-1 lg:col-span-4 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+        <div className="md:col-span-1 lg:col-span-4 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between scroll-mt-[80px]">
           {/* Header */}
           <div className="flex items-center gap-2.5 mb-4">
             <div className="text-blue-600">
@@ -476,7 +477,7 @@ export const DetectionPage: React.FC = () => {
         </div>
 
         {/* ── CARD 2: DETECTION RESULT (Center Column) ─────────────── */}
-        <div className="md:col-span-1 lg:col-span-5 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+        <div className="md:col-span-1 lg:col-span-5 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between scroll-mt-[80px]">
           {/* Header */}
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <div className="flex items-center gap-2.5">
@@ -494,7 +495,7 @@ export const DetectionPage: React.FC = () => {
                   Analyzing...
                 </span>
               )}
-              {!isProcessing && prediction && (
+              {!isProcessing && detectionResult && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
                   Analysis Complete
@@ -505,6 +506,22 @@ export const DetectionPage: React.FC = () => {
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
                   Error
                 </span>
+              )}
+
+              {/* Dynamic Detection Tags (only shown when detectionResult !== null) */}
+              {detectionResult !== null && !isProcessing && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {detectionResult.detections?.some(d => d.class_name === 'motorcycle' || d.class_name === 'bike' || d.display_name?.toLowerCase().includes('motorcycle')) && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/70 text-[11px] font-semibold">
+                      <span>Motorcycle</span>
+                    </span>
+                  )}
+                  {detectionResult.detections?.some(d => d.class_name.includes('helmet') || d.display_name?.toLowerCase().includes('helmet')) && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[11px] font-semibold">
+                      <span>Helmet</span>
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 
@@ -606,7 +623,7 @@ export const DetectionPage: React.FC = () => {
         </div>
 
         {/* ── CARD 3: DETECTION SUMMARY (Right Column) ────────────── */}
-        <div className="md:col-span-2 lg:col-span-3 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+        <div className="md:col-span-2 lg:col-span-3 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between scroll-mt-[80px]">
           {/* Header */}
           <div className="flex items-center gap-2.5 mb-4">
             <div className="text-blue-600">

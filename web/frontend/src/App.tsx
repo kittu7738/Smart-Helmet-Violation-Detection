@@ -94,8 +94,8 @@ export const App: React.FC = () => {
           activeTab={activeTab}
         />
 
-        {/* Dynamic Page Content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-7 pt-5 sm:pt-6">
+        {/* Dynamic Page Content with top padding matching header height */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-7 pt-[72px] sm:pt-[72px] scroll-mt-[72px]">
           {activeTab === 'dashboard' && (
             <DashboardPage
               stats={stats}
