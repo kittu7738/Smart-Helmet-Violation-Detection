@@ -118,7 +118,39 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     { name: 'Violations (Other)', value: 13.3, color: '#EF4444' }
   ];
 
-  // Exact 5 rows from reference image
+  // Helper to format timestamps according to Indian Standard Time (IST)
+  const getISTTimeString = (minutesAgo: number = 0) => {
+    const d = new Date(Date.now() - minutesAgo * 60 * 1000);
+    return d.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Kolkata'
+    });
+  };
+
+  const getISTDateTimeString = () => {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata'
+    }).formatToParts(now);
+    const day = parts.find((p) => p.type === 'day')?.value || '20';
+    const month = parts.find((p) => p.type === 'month')?.value.slice(0, 3) || 'Sep';
+    const year = parts.find((p) => p.type === 'year')?.value || '2026';
+    const timeStr = now.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
+    });
+    return `${day} ${month} ${year}, ${timeStr} IST`;
+  };
+
+  // Exact 5 rows from reference image formatted with IST timestamps
   const recentDetections = [
     {
       id: 1,
@@ -127,7 +159,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       result: '1 rider (Helmet)',
       isCompliant: true,
       confidence: '96.2%',
-      time: '10:24:12',
+      time: getISTTimeString(2),
       status: 'Compliant',
       previewUrl: '/sample_traffic.jpg'
     },
@@ -138,7 +170,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       result: '2 riders (1 violation)',
       isCompliant: false,
       confidence: '93.5%',
-      time: '10:21:38',
+      time: getISTTimeString(5),
       status: 'Violation',
       previewUrl: '/sample_traffic.jpg'
     },
@@ -149,7 +181,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       result: '1 rider (No Helmet)',
       isCompliant: false,
       confidence: '91.8%',
-      time: '10:18:05',
+      time: getISTTimeString(9),
       status: 'Violation',
       previewUrl: '/sample_traffic.jpg'
     },
@@ -160,7 +192,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       result: '1 rider (Helmet)',
       isCompliant: true,
       confidence: '97.1%',
-      time: '10:16:42',
+      time: getISTTimeString(11),
       status: 'Compliant',
       previewUrl: '/sample_traffic.jpg'
     },
@@ -171,7 +203,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       result: '3 riders (2 violations)',
       isCompliant: false,
       confidence: '89.6%',
-      time: '10:12:17',
+      time: getISTTimeString(15),
       status: 'Violation',
       previewUrl: '/sample_traffic.jpg'
     }
@@ -766,7 +798,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between text-[10px] text-slate-500 font-medium gap-1">
             <span>Model: Co-DETR (ResNet-18 FP16)</span>
             <span>Dataset: Custom</span>
-            <span>Last Updated: 19 Sep 2026, 10:24 AM</span>
+            <span>Last Updated: {getISTDateTimeString()}</span>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings, Menu, CheckCircle2, AlertCircle, RefreshCw, Calendar } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -21,6 +21,39 @@ export const TopBar: React.FC<TopBarProps> = ({
   const [localModalOpen, setLocalModalOpen] = useState(false);
   const isModalOpen = isSettingsOpen !== undefined ? isSettingsOpen : localModalOpen;
   const setModalOpen = setIsSettingsOpen || setLocalModalOpen;
+
+  // Live IST Time & Date state
+  const [istDate, setIstDate] = useState<string>('');
+  const [istTime, setIstTime] = useState<string>('');
+
+  useEffect(() => {
+    const updateIST = () => {
+      const now = new Date();
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'Asia/Kolkata'
+      }).formatToParts(now);
+      const day = parts.find((p) => p.type === 'day')?.value || '20';
+      const month = parts.find((p) => p.type === 'month')?.value.slice(0, 3) || 'Sep';
+      const year = parts.find((p) => p.type === 'year')?.value || '2026';
+      const weekday = parts.find((p) => p.type === 'weekday')?.value || 'Sun';
+      const timeStr = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Kolkata'
+      });
+      setIstDate(`${weekday}, ${day} ${month} ${year}`);
+      setIstTime(`${timeStr} IST`);
+    };
+
+    updateIST();
+    const interval = setInterval(updateIST, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const [apiUrlInput, setApiUrlInput] = useState(api.getBaseUrl());
   const [testingStatus, setTestingStatus] = useState<{ testing: boolean; message?: string; isError?: boolean } | null>(null);
@@ -152,8 +185,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             <div className="flex items-center gap-2 pr-3 border-r border-slate-100">
               <Calendar size={15} className="text-slate-500" />
               <div className="flex flex-col text-[11px] leading-tight font-medium text-slate-600">
-                <span className="font-semibold text-slate-800">Fri, 19 Sep 2026</span>
-                <span className="text-[10px] text-slate-400">10:24 AM</span>
+                <span className="font-semibold text-slate-800">{istDate || 'Sun, 20 Sep 2026'}</span>
+                <span className="text-[10px] text-slate-400 font-semibold">{istTime || '04:27 PM IST'}</span>
               </div>
             </div>
             <div className="flex flex-col text-[10px] leading-tight font-medium text-slate-500 text-left">
