@@ -430,29 +430,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             </div>
           </div>
 
-          <div className="h-64 w-full mt-2 relative">
-            {/* Pinned Tooltip Graphic matching 10:00 AM in reference image */}
-            <div className="absolute left-[33%] top-[14%] z-10 hidden sm:block pointer-events-none">
-              <div className="bg-[#0B132B] text-white px-3.5 py-2 rounded-xl shadow-2xl border border-slate-700/80 text-[11px] min-w-[145px]">
-                <div className="font-bold text-slate-200 mb-1">10:00 AM</div>
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    <span>With Helmet : 120</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-orange-400 font-semibold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
-                    <span>Without Helmet : 12</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-rose-400 font-semibold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                    <span>Violations (Other) : 15</span>
-                  </div>
-                </div>
-              </div>
-              <div className="w-px h-28 border-l border-dashed border-emerald-500/80 mx-auto mt-1" />
-            </div>
-
+          <div className="h-64 w-full mt-2">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
