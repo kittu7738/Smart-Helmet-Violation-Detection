@@ -288,6 +288,21 @@ for pkg in "${!EXTRA_PKGS[@]}"; do
   fi
 done
 
+# ── 4e. FastAPI & Inference Service Dependencies ─────────────────────────────
+if pkg_installed "fastapi" && pkg_installed "uvicorn" && pkg_installed "pydantic"; then
+  success "FastAPI inference service dependencies already installed — skipping."
+else
+  info "Installing FastAPI, Uvicorn, Pydantic, Multipart & Requests …"
+  "${ENV_PIP}" install --no-input \
+    fastapi \
+    "uvicorn[standard]" \
+    python-multipart \
+    pydantic \
+    requests \
+    pyngrok
+  success "FastAPI & inference service stack installed."
+fi
+
 # ──────────────────────────────────────────────────────────────────────────────
 # 5. Clone / Locate Co-DETR
 # ──────────────────────────────────────────────────────────────────────────────
@@ -339,7 +354,8 @@ SITE_PACKAGES=$("${ENV_PYTHON}" -c "import site; print(site.getsitepackages()[0]
 if [[ -n "${SITE_PACKAGES}" && -d "${SITE_PACKAGES}" ]]; then
   echo "${REPO_ROOT}" > "${SITE_PACKAGES}/smart_helmet.pth"
   echo "${CODETR_DIR}" > "${SITE_PACKAGES}/codetr.pth"
-  success "Linked repository & Co-DETR to site-packages: ${SITE_PACKAGES}"
+  echo "${REPO_ROOT}/python-service" > "${SITE_PACKAGES}/smart_helmet_service.pth"
+  success "Linked repository, Co-DETR & python-service to site-packages: ${SITE_PACKAGES}"
 fi
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -351,7 +367,7 @@ RUNNER_SCRIPT="${REPO_ROOT}/run_codetr.sh"
 cat <<EOF > "${RUNNER_SCRIPT}"
 #!/usr/bin/env bash
 # Auto-generated runner for Smart-Helmet-Violation-Detection Co-DETR environment
-export PYTHONPATH="${CODETR_DIR}:${REPO_ROOT}:\${PYTHONPATH:-}"
+export PYTHONPATH="${CODETR_DIR}:${REPO_ROOT}:${REPO_ROOT}/python-service:\${PYTHONPATH:-}"
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export CV_NUM_THREADS=0
@@ -369,16 +385,30 @@ if [[ "${IS_COLAB}" == "true" ]]; then
     ln -sf "${ENV_PYTHON}" /usr/local/bin/python-codetr
     ln -sf "${ENV_PYTHON}" /usr/local/bin/codetr-python
     ln -sf "${ENV_PIP}"    /usr/local/bin/pip-codetr
+    if [[ -x "${ENV_DIR}/bin/uvicorn" ]]; then
+      ln -sf "${ENV_DIR}/bin/uvicorn" /usr/local/bin/uvicorn
+    fi
 
     # Also symlink python so default !python in Colab cells runs the Co-DETR environment directly
     ln -sf "${ENV_PYTHON}" /usr/local/bin/python
     ln -sf "${ENV_PIP}"    /usr/local/bin/pip
-    success "Linked /usr/local/bin/python -> ${ENV_PYTHON}"
+    success "Linked /usr/local/bin/python & /usr/local/bin/uvicorn -> ${ENV_PYTHON}"
   fi
 
   # Register IPython kernel for interactive Colab notebooks
   "${ENV_PYTHON}" -m ipykernel install --name codetr --display-name "Python (Co-DETR)" --user &>/dev/null || true
   success "Registered IPython kernel: 'Python (Co-DETR)'"
+
+  # Install cloudflared binary for instant zero-config public tunneling
+  if ! command -v cloudflared &>/dev/null; then
+    info "Fetching cloudflared binary for public HTTPS tunnel …"
+    curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared 2>/dev/null && \
+      chmod +x /usr/local/bin/cloudflared && \
+      success "cloudflared installed to /usr/local/bin/cloudflared" || \
+      warn "Could not auto-download cloudflared (tunneling can still be started manually)."
+  else
+    success "cloudflared binary already present."
+  fi
 fi
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -433,8 +463,8 @@ else
   VERIFY_PASS=false
 fi
 
-# ── 8e. Supplementary packages ───────────────────────────────────────────────
-for mod in timm fairscale scipy einops tensorboard fvcore pycocotools; do
+# ── 8e. Supplementary & Inference packages ───────────────────────────────────
+for mod in timm fairscale scipy einops tensorboard fvcore pycocotools fastapi uvicorn pydantic requests; do
   if "${ENV_PYTHON}" -c "import ${mod}" &>/dev/null; then
     success "Module importable: ${mod}"
   else
@@ -483,10 +513,13 @@ if [[ "${VERIFY_PASS}" == "true" ]]; then
   echo -e "  ${CYAN}Co-DETR root  :${RESET} ${CODETR_DIR}"
   echo ""
   echo -e "  ${BOLD}Usage in Colab cells:${RESET}"
-  echo -e "  • Standard python command (symlinked):"
+  echo -e "  • Start FastAPI GPU Server & Cloudflare Tunnel (1-Click):"
+  echo -e "      ${CYAN}bash scripts/start_server_colab.sh${RESET}"
+  echo -e "  • Or manual background launch:"
+  echo -e "      ${CYAN}nohup uvicorn app:app --app-dir python-service --host 0.0.0.0 --port 8000 > /content/fastapi.log 2>&1 &${RESET}"
+  echo -e "      ${CYAN}nohup cloudflared tunnel --url http://127.0.0.1:8000 > /content/tunnel.log 2>&1 &${RESET}"
+  echo -e "  • Model Training / Diagnostics:"
   echo -e "      ${CYAN}python training/codetr/train.py --training-diagnostic ...${RESET}"
-  echo -e "  • Or using the explicit runner wrapper:"
-  echo -e "      ${CYAN}bash run_codetr.sh training/codetr/train.py --training-diagnostic ...${RESET}"
   echo -e "${BOLD}══════════════════════════════════════════════════════════${RESET}"
   echo ""
   exit 0
