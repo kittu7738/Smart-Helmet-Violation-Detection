@@ -31,15 +31,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'video', label: 'Video Analysis', icon: PlayCircle },
     { id: 'camera', label: 'Live Camera', icon: Video },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'reports', label: 'Reports', icon: FileText, target: 'analytics' },
+    { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'settings', label: 'Settings', icon: Settings, isAction: true }
   ];
 
   const handleItemClick = (item: typeof menuItems[0]) => {
     if (item.isAction) {
       onOpenSettings();
-    } else if (item.target) {
-      onTabChange(item.target as NavTab);
     } else {
       onTabChange(item.id as NavTab);
     }
@@ -89,7 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <nav className="px-3.5 py-4 space-y-1">
             {menuItems.map((item) => {
               const Icon = item.icon;
-              const isSelected = activeTab === item.id || (item.target && activeTab === item.target && !['dashboard','detection','video','camera'].includes(activeTab));
+              const isSelected = activeTab === item.id || (item.id === 'reports' && activeTab === 'violations');
 
               return (
                 <button

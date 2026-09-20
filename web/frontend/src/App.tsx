@@ -16,7 +16,7 @@ import { mockDashboardStats, mockLiveDetection, mockRecentViolations } from './d
 export const App: React.FC = () => {
   const getInitialTab = (): NavTab | 'violations' => {
     const hash = window.location.hash.replace('#', '');
-    const validTabs = ['dashboard', 'detection', 'video', 'camera', 'analytics', 'about', 'violations'];
+    const validTabs = ['dashboard', 'detection', 'video', 'camera', 'analytics', 'reports', 'about', 'violations'];
     return validTabs.includes(hash) ? (hash as any) : 'dashboard';
   };
 
@@ -32,7 +32,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      const validTabs = ['dashboard', 'detection', 'video', 'camera', 'analytics', 'about', 'violations'];
+      const validTabs = ['dashboard', 'detection', 'video', 'camera', 'analytics', 'reports', 'about', 'violations'];
       if (validTabs.includes(hash)) {
         setActiveTabState(hash as any);
       }
@@ -75,7 +75,7 @@ export const App: React.FC = () => {
     <div className="min-h-screen flex bg-[#EEF2F8] text-slate-900 selection:bg-blue-200 selection:text-blue-900">
       {/* Dark Sidebar matching the reference mockup (media_1789845147108.jpg) */}
       <Sidebar
-        activeTab={activeTab === 'violations' ? 'dashboard' : activeTab}
+        activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         mobileOpen={mobileMenuOpen}
@@ -116,9 +116,9 @@ export const App: React.FC = () => {
 
           {activeTab === 'analytics' && <AnalyticsPage />}
 
-          {activeTab === 'about' && <AboutPage />}
+          {(activeTab === 'reports' || activeTab === 'violations') && <ViolationsPage />}
 
-          {activeTab === 'violations' && <ViolationsPage />}
+          {activeTab === 'about' && <AboutPage />}
         </main>
 
         {/* Footer exactly matching mockup */}

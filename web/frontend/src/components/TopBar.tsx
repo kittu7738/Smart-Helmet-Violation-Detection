@@ -148,12 +148,12 @@ export const TopBar: React.FC<TopBarProps> = ({
           )}
           {activeTab === 'analytics' && (
             <h1 className="text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">
-              Analytics &amp; Reports
+              Analytics
             </h1>
           )}
-          {activeTab === 'violations' && (
+          {(activeTab === 'reports' || activeTab === 'violations') && (
             <h1 className="text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">
-              Violations Log
+              Reports &amp; Audit Logs
             </h1>
           )}
         </div>

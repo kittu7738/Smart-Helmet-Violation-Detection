@@ -8,7 +8,7 @@ import {
   Info
 } from 'lucide-react';
 
-export type NavTab = 'dashboard' | 'detection' | 'video' | 'camera' | 'analytics' | 'about';
+export type NavTab = 'dashboard' | 'detection' | 'video' | 'camera' | 'analytics' | 'reports' | 'about';
 
 interface NavigationProps {
   activeTab: NavTab;
