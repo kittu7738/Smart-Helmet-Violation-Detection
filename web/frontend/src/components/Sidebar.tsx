@@ -116,15 +116,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </nav>
         </div>
 
-        {/* Lower Sidebar: Cursive brand text matching reference mockup */}
-        <div className="p-5 mt-auto select-none">
-          <p
-            className="text-white/90 text-[19px] italic tracking-wide drop-shadow-md leading-tight"
-            style={{ fontFamily: "'Caveat', 'Brush Script MT', 'Dancing Script', 'Playfair Display', cursive, serif", transform: 'rotate(-2deg)' }}
-          >
-            Safer Roads<br />Stronger Tomorrow
-          </p>
-        </div>
       </aside>
     </>
   );
