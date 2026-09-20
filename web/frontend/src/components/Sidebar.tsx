@@ -61,7 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
-          background: "linear-gradient(180deg, rgba(10, 17, 40, 0.98) 0%, rgba(10, 17, 40, 0.92) 40%, rgba(10, 17, 40, 0.76) 75%, rgba(10, 17, 40, 0.92) 100%), url('/sidebar_rider.jpg') center bottom / cover no-repeat"
+          background: "linear-gradient(180deg, #0A1128 0%, #0A1128 32%, rgba(10, 17, 40, 0.7) 42%, rgba(10, 17, 40, 0.1) 52%, rgba(10, 17, 40, 0.0) 65%, rgba(10, 17, 40, 0.35) 86%, rgba(10, 17, 40, 0.75) 100%), url('/sidebar_rider.jpg') center bottom / cover no-repeat"
         }}
       >
         {/* Top: Compact horizontal branding matching reference exactly */}
@@ -114,12 +114,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </nav>
         </div>
 
-        {/* Bottom rider graphic slogan */}
-        <div className="mt-auto px-5 pb-6 pt-2 select-none">
+        {/* Bottom rider graphic slogan matching reference image */}
+        <div className="mt-auto px-5 pb-5 pt-3 select-none">
           {/* Slogan */}
-          <div className="px-1">
-            <div className="text-[17px] font-extrabold text-white leading-tight">Ride <span className="text-blue-400 font-bold">Safe</span></div>
-            <div className="text-[15px] font-extrabold text-blue-500 leading-tight">Safer Tomorrow</div>
+          <div className="mb-3.5 px-0.5">
+            <div className="text-[19px] font-extrabold text-white leading-tight drop-shadow-md">
+              Ride <span className="text-blue-400 font-bold">Safe</span>
+            </div>
+            <div className="text-[17px] font-extrabold text-blue-500 leading-tight drop-shadow-md">
+              Safer Tomorrow
+            </div>
+          </div>
+
+          {/* Footer Text */}
+          <div className="text-left text-[9.5px] font-bold tracking-[0.22em] text-slate-300/80 uppercase">
+            SAFER ROADS &bull; SMARTER CITIES
           </div>
         </div>
       </aside>
