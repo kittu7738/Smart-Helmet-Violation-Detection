@@ -103,7 +103,7 @@ interface DetectionHistoryItem {
   result: string;
   confidence: number;
   time: string;
-  status: 'Violation' | 'Compliant';
+  status: 'VIOLATION' | 'COMPLIANT';
   previewUrl: string;
 }
 
@@ -145,13 +145,37 @@ export const DetectionPage: React.FC = () => {
         const w = x2 - x1;
         const h = y2 - y1;
 
-        const isViolation = det.violation;
-        const strokeColor = isViolation ? '#EF4444' : det.class_name === 'bike' ? '#3B82F6' : '#10B981';
-        const fillColor = isViolation
-          ? 'rgba(239, 68, 68, 0.16)'
-          : det.class_name === 'bike'
-          ? 'rgba(59, 130, 246, 0.12)'
-          : 'rgba(16, 185, 129, 0.16)';
+        // Color coding:
+        // Green bounding box = With Helmet
+        // Red bounding box = Without Helmet
+        // Blue bounding box = Rider / Motorcycle when applicable
+        const isViolation =
+          det.violation ||
+          det.class_name.toLowerCase().includes('no-helmet') ||
+          det.display_name.toLowerCase().includes('without helmet');
+
+        const isBikeOrRider =
+          det.class_name === 'bike' ||
+          det.class_name === 'motorcycle' ||
+          det.class_name.includes('rider') ||
+          det.class_name.includes('driver') ||
+          det.class_name.includes('passenger') ||
+          det.display_name.toLowerCase().includes('rider') ||
+          det.display_name.toLowerCase().includes('motorcycle') ||
+          det.display_name.toLowerCase().includes('bike') ||
+          det.display_name.toLowerCase().includes('driver') ||
+          det.display_name.toLowerCase().includes('passenger');
+
+        let strokeColor = '#10B981'; // Green = With Helmet
+        let fillColor = 'rgba(16, 185, 129, 0.16)';
+
+        if (isViolation) {
+          strokeColor = '#EF4444'; // Red = Without Helmet
+          fillColor = 'rgba(239, 68, 68, 0.16)';
+        } else if (isBikeOrRider) {
+          strokeColor = '#3B82F6'; // Blue = Rider / Motorcycle
+          fillColor = 'rgba(59, 130, 246, 0.14)';
+        }
 
         // Draw rectangle
         ctx.strokeStyle = strokeColor;
@@ -160,8 +184,8 @@ export const DetectionPage: React.FC = () => {
         ctx.fillRect(x1, y1, w, h);
         ctx.strokeRect(x1, y1, w, h);
 
-        // Draw badge label
-        const label = `${det.display_name} ${(det.confidence * 100).toFixed(0)}%`;
+        // Draw badge label with REAL model confidence
+        const label = `${det.display_name} ${(det.confidence * 100).toFixed(1)}%`;
         const fontSize = Math.max(12, Math.round(canvas.width / 70));
         ctx.font = `600 ${fontSize}px Inter, sans-serif`;
         const tw = ctx.measureText(label).width;
@@ -220,7 +244,7 @@ export const DetectionPage: React.FC = () => {
           result: hasViolation ? `${result.summary.violations} Violation(s) Found` : 'Compliant',
           confidence: maxConf,
           time: 'Just now',
-          status: hasViolation ? 'Violation' : 'Compliant',
+          status: hasViolation ? 'VIOLATION' : 'COMPLIANT',
           previewUrl: url
         };
 
@@ -241,7 +265,7 @@ export const DetectionPage: React.FC = () => {
           result: hasViolation ? `${fallback.summary.violations} Violation(s) Found` : 'Compliant',
           confidence: 0.91,
           time: 'Just now',
-          status: hasViolation ? 'Violation' : 'Compliant',
+          status: hasViolation ? 'VIOLATION' : 'COMPLIANT',
           previewUrl: url
         };
         setRecentDetections((prev) => [newRecord, ...prev]);
@@ -326,10 +350,10 @@ export const DetectionPage: React.FC = () => {
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           ROW 1: THREE COLUMNS (Upload Media | Detection Result | Summary)
       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5 items-stretch">
 
         {/* ── CARD 1: UPLOAD MEDIA (Left Column) ──────────────────── */}
-        <div className="lg:col-span-4 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+        <div className="md:col-span-1 lg:col-span-4 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
           {/* Header */}
           <div className="flex items-center gap-2.5 mb-4">
             <div className="text-blue-600">
@@ -357,7 +381,7 @@ export const DetectionPage: React.FC = () => {
               type="file"
               ref={fileInputRef}
               onChange={handleFileSelect}
-              accept="image/jpeg,image/png,image/webp,video/mp4,video/avi,video/quicktime"
+              accept="image/jpeg,image/png,image/webp,video/mp4,video/avi,video/quicktime,video/x-msvideo"
               className="hidden"
             />
 
@@ -385,8 +409,24 @@ export const DetectionPage: React.FC = () => {
             </button>
 
             <p className="text-[11px] text-slate-400 font-medium mt-6">
-              Supports: JPG, PNG, MP4, AVI, MOV (Max 100MB)
+              Supports: JPG, PNG, WEBP, MP4, AVI, MOV (Max 100MB)
             </p>
+
+            {/* Subtle Upload / Processing Progress Indicator */}
+            {isProcessing && (
+              <div className="w-full max-w-xs mt-4 pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-blue-700 mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 size={12} className="animate-spin text-blue-600" />
+                    Processing media...
+                  </span>
+                  <span className="text-slate-500 font-medium">Co-DETR AI</span>
+                </div>
+                <div className="w-full bg-blue-100/80 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-blue-600 h-1.5 rounded-full animate-pulse w-4/5 transition-all duration-500" />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Active File Name Indicator if selected */}
@@ -406,9 +446,9 @@ export const DetectionPage: React.FC = () => {
         </div>
 
         {/* ── CARD 2: DETECTION RESULT (Center Column) ─────────────── */}
-        <div className="lg:col-span-5 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+        <div className="md:col-span-1 lg:col-span-5 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <div className="flex items-center gap-2.5">
               <div className="text-blue-600">
                 <ImageIcon size={20} className="stroke-[2.2]" />
@@ -416,24 +456,46 @@ export const DetectionPage: React.FC = () => {
               <h2 className="text-[15px] font-bold text-slate-900 tracking-tight">
                 Detection Result
               </h2>
+
+              {/* Analysis Status Badge */}
+              {isProcessing && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
+                  Analyzing...
+                </span>
+              )}
+              {!isProcessing && prediction && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                  Analysis Complete
+                </span>
+              )}
+              {errorMessage && !isProcessing && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
+                  Error
+                </span>
+              )}
             </div>
 
             {/* Controls when active */}
-            {prediction && (
+            {prediction && !isProcessing && (
               <div className="flex items-center gap-2">
                 <button
                   onClick={downloadAnnotated}
-                  title="Download Annotated Image"
-                  className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 cursor-pointer shadow-2xs"
+                  title="Download Result"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
                 >
-                  <Download size={14} />
+                  <Download size={13} />
+                  <span>Download Result</span>
                 </button>
                 <button
-                  onClick={handleClear}
-                  title="Reset Image"
-                  className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-rose-600 hover:bg-slate-50 cursor-pointer shadow-2xs"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Analyze Another"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
                 >
-                  <RotateCcw size={14} />
+                  <RotateCcw size={13} />
+                  <span>Analyze Another</span>
                 </button>
               </div>
             )}
@@ -441,15 +503,15 @@ export const DetectionPage: React.FC = () => {
 
           {/* Center Result Area */}
           <div className="relative flex-1 min-h-[310px] rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-center overflow-hidden">
-            {/* 1. Empty State: No image uploaded yet (EXACT MATCH TO TARGET MOCKUP) */}
+            {/* 1. Empty State: No detection available */}
             {!selectedFile && !prediction && !isProcessing && (
               <div className="flex flex-col items-center justify-center p-8 text-center select-none">
                 <EmptyImageIcon size={68} className="text-slate-300 stroke-[1.4]" />
                 <h3 className="text-base font-bold text-slate-900 mt-4 tracking-tight">
-                  No image analyzed yet
+                  No detection available
                 </h3>
                 <p className="text-xs text-slate-400 font-medium mt-1.5">
-                  Upload an image or video to start detection.
+                  Upload an image or video to begin AI analysis.
                 </p>
               </div>
             )}
@@ -508,7 +570,7 @@ export const DetectionPage: React.FC = () => {
         </div>
 
         {/* ── CARD 3: DETECTION SUMMARY (Right Column) ────────────── */}
-        <div className="lg:col-span-3 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+        <div className="md:col-span-2 lg:col-span-3 bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
           {/* Header */}
           <div className="flex items-center gap-2.5 mb-4">
             <div className="text-blue-600">
@@ -694,8 +756,8 @@ export const DetectionPage: React.FC = () => {
                 <div className="col-span-1 text-slate-400">{item.time}</div>
                 <div className="col-span-1">
                   <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                      item.status === 'Violation'
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
+                      item.status === 'VIOLATION'
                         ? 'bg-rose-50 text-rose-600 border border-rose-200/80'
                         : 'bg-emerald-50 text-emerald-600 border border-emerald-200/80'
                     }`}
