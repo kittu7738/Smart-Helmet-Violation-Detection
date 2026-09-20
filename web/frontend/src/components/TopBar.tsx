@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Menu, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Settings, Menu, CheckCircle2, AlertCircle, RefreshCw, Calendar } from 'lucide-react';
 import { api } from '../services/api';
 
 interface TopBarProps {
@@ -86,11 +86,16 @@ export const TopBar: React.FC<TopBarProps> = ({
         </div>
 
         {/* Page Title on Desktop */}
-        <div className="hidden lg:flex items-center">
+        <div className="hidden lg:flex flex-col">
           {(!activeTab || activeTab === 'dashboard') && (
-            <h1 className="text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">
-              Dashboard
-            </h1>
+            <>
+              <h1 className="text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight leading-tight">
+                Dashboard
+              </h1>
+              <p className="text-xs text-slate-500 font-medium">
+                Real-time insights for safer roads
+              </p>
+            </>
           )}
           {activeTab === 'detection' && (
             <h1 className="text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">
@@ -132,9 +137,31 @@ export const TopBar: React.FC<TopBarProps> = ({
           </button>
 
           {/* System Online / System Ready Status Pill */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/90 text-emerald-800 text-xs font-semibold shadow-xs select-none">
+          <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-emerald-50/80 border border-emerald-200/90 text-xs shadow-xs select-none">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-            <span>{backendConnected ? 'System Online' : 'System Standby'}</span>
+            <div className="flex flex-col text-left">
+              <span className="font-bold text-emerald-800 leading-tight">
+                {backendConnected ? 'System Online' : 'System Standby'}
+              </span>
+              <span className="text-[10px] text-emerald-600 font-medium leading-none">
+                All systems operational
+              </span>
+            </div>
+          </div>
+
+          {/* Date & Time Card matching reference image */}
+          <div className="hidden xl:flex items-center gap-3 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200/90 text-xs shadow-xs select-none">
+            <div className="flex items-center gap-2 pr-3 border-r border-slate-100">
+              <Calendar size={15} className="text-slate-500" />
+              <div className="flex flex-col text-[11px] leading-tight font-medium text-slate-600">
+                <span className="font-semibold text-slate-800">Fri, 19 Sep 2026</span>
+                <span className="text-[10px] text-slate-400">10:24 AM</span>
+              </div>
+            </div>
+            <div className="flex flex-col text-[10px] leading-tight font-medium text-slate-500 text-left">
+              <span>Smarter Detection</span>
+              <span className="text-blue-600 font-semibold flex items-center">Safer Tomorrow &rsaquo;</span>
+            </div>
           </div>
         </div>
       </header>

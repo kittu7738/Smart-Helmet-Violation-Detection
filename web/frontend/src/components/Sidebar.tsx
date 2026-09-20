@@ -116,6 +116,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </nav>
         </div>
 
+        {/* Bottom rider graphic and AI safety monitor card matching reference */}
+        <div className="mt-auto px-4 pb-4 pt-2 select-none">
+          {/* Slogan */}
+          <div className="mb-3 px-1">
+            <div className="text-[17px] font-extrabold text-white leading-tight">Ride <span className="text-blue-400 font-bold">Safe</span></div>
+            <div className="text-[15px] font-extrabold text-blue-500 leading-tight">Safer Tomorrow</div>
+          </div>
+
+          {/* AI Safety Monitor Badge */}
+          <div className="p-3 rounded-2xl bg-black/45 backdrop-blur-md border border-white/10 shadow-lg">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <div className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
+                AI Safety Monitor
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-[11px] font-bold text-emerald-400">
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                System Ready
+              </span>
+            </div>
+            <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+              Co-DETR • Vision System
+            </div>
+          </div>
+
+          {/* Footer Text */}
+          <div className="text-center mt-3 text-[9px] font-bold tracking-[0.2em] text-slate-400/80 uppercase">
+            SAFER ROADS • SMARTER CITIES
+          </div>
+        </div>
       </aside>
     </>
   );
