@@ -361,7 +361,7 @@ export const DetectionPage: React.FC = () => {
     : '--';
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto pb-8">
+    <div className="space-y-6 max-w-[1400px] mx-auto pb-8 pt-1 sm:pt-2">
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           ROW 1: THREE COLUMNS (Upload Media | Detection Result | Summary)
       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
@@ -533,58 +533,21 @@ export const DetectionPage: React.FC = () => {
 
           {/* Center Result Area */}
           <div className="relative flex-1 min-h-[310px] rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-center overflow-hidden">
-            {/* 1. Empty State: Faint illustrative sample with bounding boxes */}
+            {/* 1. Clean Empty State: No detection available */}
             {!selectedFile && !prediction && !isProcessing && (
-              <div className="relative w-full h-full min-h-[310px] flex items-center justify-center p-4 select-none overflow-hidden">
-                {/* Faint illustrative backdrop simulating AI detection output */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none filter blur-[0.3px]">
-                  <div className="relative w-full max-w-[420px] h-[240px] rounded-xl bg-gradient-to-b from-slate-100 to-slate-200/60 border border-slate-200/80 overflow-hidden flex items-center justify-center">
-                    {/* Background traffic road lines */}
-                    <div className="absolute inset-0 opacity-40">
-                      <div className="w-full h-1/2 bg-sky-100/40" />
-                      <div className="w-full h-1/2 bg-slate-200/50 border-t border-slate-200" />
-                      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-8 h-1 bg-white rounded-full" />
-                      <div className="absolute bottom-14 left-1/2 -translate-x-1/2 w-6 h-1 bg-white/70 rounded-full" />
-                    </div>
-
-                    {/* Faint Sample Bounding Box: Helmet (Green) */}
-                    <div className="absolute top-10 left-[42%] w-16 h-16 border-2 border-emerald-500 bg-emerald-500/15 rounded-md flex flex-col justify-start">
-                      <div className="inline-flex items-center gap-1 bg-emerald-600 text-white text-[8px] font-semibold px-1 py-0.2 rounded-xs w-fit -mt-2 ml-1 shadow-2xs">
-                        Helmet 96.2%
-                      </div>
-                    </div>
-
-                    {/* Faint Sample Bounding Box: Rider (Blue) */}
-                    <div className="absolute top-8 left-[35%] w-34 h-42 border-2 border-blue-500/80 bg-blue-500/10 rounded-md">
-                      <div className="inline-flex items-center gap-1 bg-blue-600 text-white text-[8px] font-semibold px-1 py-0.2 rounded-xs w-fit -mt-2 ml-1 shadow-2xs">
-                        Rider
-                      </div>
-                    </div>
-
-                    {/* Faint Sample Bounding Box: Motorcycle (Blue) */}
-                    <div className="absolute bottom-3 left-[28%] w-46 h-26 border border-dashed border-blue-400/80 bg-blue-400/5 rounded-md">
-                      <div className="inline-flex items-center gap-1 bg-blue-500 text-white text-[8px] font-medium px-1 py-0.2 rounded-xs w-fit -mt-2 ml-1">
-                        Motorcycle
-                      </div>
-                    </div>
-                  </div>
+              <div className="flex flex-col items-center justify-center p-8 text-center select-none">
+                <div className="w-16 h-16 rounded-2xl bg-blue-50/80 border border-blue-100 flex items-center justify-center mb-3 text-blue-600 shadow-2xs">
+                  <EmptyImageIcon size={34} className="text-blue-600 stroke-[1.8]" />
                 </div>
-
-                {/* Central Overlay Guidance Card */}
-                <div className="relative z-10 flex flex-col items-center justify-center p-6 text-center max-w-sm rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-xs">
-                  <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-2.5 shadow-2xs border border-blue-100">
-                    <EmptyImageIcon size={26} className="text-blue-600 stroke-[2]" />
-                  </div>
-                  <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-                    No detection available
-                  </h3>
-                  <p className="text-xs text-slate-500 font-medium mt-1">
-                    Upload an image or video to begin AI analysis.
-                  </p>
-                  <div className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200/70">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span>AI auto-detects helmets &amp; riders with bounding boxes</span>
-                  </div>
+                <h3 className="text-[15px] font-bold text-slate-900 tracking-tight">
+                  No detection available
+                </h3>
+                <p className="text-xs text-slate-400 font-medium mt-1 max-w-xs">
+                  Upload an image or video to begin AI analysis.
+                </p>
+                <div className="mt-3.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100/80 border border-slate-200/60 text-[11px] font-medium text-slate-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>AI auto-detects helmets &amp; riders with bounding boxes</span>
                 </div>
               </div>
             )}

@@ -95,7 +95,7 @@ export const App: React.FC = () => {
         />
 
         {/* Dynamic Page Content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-7">
+        <main className="flex-1 p-4 sm:p-6 lg:p-7 pt-5 sm:pt-6">
           {activeTab === 'dashboard' && (
             <DashboardPage
               stats={stats}
