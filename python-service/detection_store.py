@@ -57,10 +57,16 @@ class DetectionStore:
         except Exception as e:
             print(f"[WARN] [DetectionStore] Failed to save {self.store_path}: {e}")
 
-    def add_prediction(self, prediction_res: Any, filename: str) -> Dict[str, Any]:
+    def add_prediction(
+        self,
+        prediction_res: Any,
+        filename: str,
+        processed_image: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Accepts a CoDETRPredictor result (ImagePredictionResponse or dict)
         and normalizes it into a central detection record.
+        Includes deduplication guard to prevent duplicate writes for the same inference.
         """
         with self._lock:
             # Handle Pydantic model or dict
@@ -122,15 +128,28 @@ class DetectionStore:
                 })
 
             total_violations = driver_violations + passenger_violations
+            rounded_inf_time = round(float(inf_time), 1)
+
+            # Deduplication guard: check if the most recent record matches this exact inference
+            if self._records:
+                latest = self._records[0]
+                if (latest.get("fileName") == filename and
+                    abs(latest.get("inferenceTimeMs", 0.0) - rounded_inf_time) < 0.2 and
+                    len(latest.get("detections", [])) == len(norm_detections)):
+                    print(f"[{time.strftime('%H:%M:%S')}] [DetectionStore] Idempotent deduplication: skipping duplicate record for {filename}")
+                    return latest
 
             record_id = f"det-{int(time.time() * 1000)}-{os.urandom(2).hex()}"
-            iso_now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            # Accurate UTC ISO-8601 timestamp with Z suffix
+            iso_now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
             record = {
                 "id": record_id,
                 "timestamp": iso_now,
                 "fileName": filename or "Unknown",
+                "processedImage": processed_image or res_dict.get("processedImage"),
                 "detections": norm_detections,
+                "rawDetections": norm_detections,
                 "summary": {
                     "motorcycles": motorcycles,
                     "drivers": drivers,
@@ -141,7 +160,8 @@ class DetectionStore:
                     "driverViolations": driver_violations,
                     "passengerViolations": passenger_violations,
                 },
-                "inferenceTimeMs": round(float(inf_time), 1),
+                "inferenceTimeMs": rounded_inf_time,
+                "status": "VIOLATION DETECTED" if total_violations > 0 else "NO VIOLATION",
             }
 
             self._records.insert(0, record)  # Newest first
@@ -153,12 +173,23 @@ class DetectionStore:
             return record
 
     def add_custom_record(self, record_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Allows direct insertion of an already normalized record."""
+        """Allows direct insertion of an already normalized record with deduplication."""
         with self._lock:
-            if "id" not in record_data:
+            rec_id = record_data.get("id")
+            if rec_id and any(r.get("id") == rec_id for r in self._records):
+                return record_data
+
+            if self._records:
+                latest = self._records[0]
+                if (latest.get("fileName") == record_data.get("fileName") and
+                    latest.get("inferenceTimeMs") == record_data.get("inferenceTimeMs") and
+                    len(latest.get("detections", [])) == len(record_data.get("detections", []))):
+                    return latest
+
+            if not rec_id:
                 record_data["id"] = f"det-{int(time.time() * 1000)}"
             if "timestamp" not in record_data:
-                record_data["timestamp"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                record_data["timestamp"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
             self._records.insert(0, record_data)
             if len(self._records) > 1000:
@@ -169,6 +200,13 @@ class DetectionStore:
     def get_records(self) -> List[Dict[str, Any]]:
         with self._lock:
             return list(self._records)
+
+    def get_latest_record(self) -> Optional[Dict[str, Any]]:
+        """Returns the single most recent detection record, or None if store is empty."""
+        with self._lock:
+            if self._records:
+                return dict(self._records[0])
+            return None
 
     def get_violations(
         self,
@@ -214,7 +252,7 @@ class DetectionStore:
                         "vehicle": file_name,  # Actual image source, no fake license plates
                         "violation": v_label,
                         "confidence": conf_pct,
-                        "status": "Detected",
+                        "status": "VIOLATION DETECTED",
                         "riderType": r_type,
                         "location": "Unknown",
                         "timestamp": ts_str,

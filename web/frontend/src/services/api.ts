@@ -71,6 +71,7 @@ export interface StoredDetectionRecord {
   id: string;
   timestamp: string;
   fileName: string;
+  processedImage?: string;
   detections: Array<{
     className: string;
     displayName: string;
@@ -90,7 +91,19 @@ export interface StoredDetectionRecord {
   };
   inferenceTimeMs: number;
   device?: string;
+  status?: string;
 }
+
+export interface ActiveDetectionSession {
+  file: File | null;
+  previewUrl: string | null;
+  prediction: ImagePredictionResponse | null;
+  confidenceThreshold: number;
+  fileName: string | null;
+  processedImage?: string | null;
+}
+
+let activeSession: ActiveDetectionSession | null = null;
 
 // In-app listener set for live UI updates across pages
 type DetectionListener = () => void;
@@ -176,6 +189,47 @@ export const api = {
     }
   },
 
+  getActiveSession(): ActiveDetectionSession | null {
+    return activeSession;
+  },
+
+  setActiveSession(session: ActiveDetectionSession | null) {
+    activeSession = session;
+  },
+
+  /**
+   * Fetch the latest real detection record from backend
+   */
+  async getLatestDetection(): Promise<StoredDetectionRecord | null> {
+    // Try FastAPI first
+    try {
+      const res = await fetch(`${currentApiBaseUrl}/api/detections/latest`, {
+        signal: AbortSignal.timeout(3000)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.record) {
+          return json.record;
+        }
+      }
+    } catch {}
+
+    // Fallback to Express backend
+    try {
+      const res = await fetch(`${BACKEND_BASE}/api/detections/latest`, {
+        signal: AbortSignal.timeout(3000)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.record) {
+          return json.record;
+        }
+      }
+    } catch {}
+
+    return null;
+  },
+
   /**
    * Run real Co-DETR detection on uploaded image
    */
@@ -201,11 +255,6 @@ export const api = {
 
     // Trigger local listeners so Reports & Analytics update immediately
     this.notifyDetection();
-
-    // Also persist record explicitly to secondary backend if configured
-    this.storeDetectionRecord(data, file.name).catch((e) => {
-      console.warn('[api.storeDetectionRecord] note:', e);
-    });
 
     return data;
   },

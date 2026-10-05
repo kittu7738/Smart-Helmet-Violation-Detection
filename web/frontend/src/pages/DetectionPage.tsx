@@ -208,6 +208,105 @@ export const DetectionPage: React.FC = () => {
     }
   }, [prediction, confidenceThreshold, renderCanvas]);
 
+  // Restore latest detection session on mount across page navigations
+  useEffect(() => {
+    const sess = api.getActiveSession();
+    if (sess && sess.prediction) {
+      setPrediction(sess.prediction);
+      setConfidenceThreshold(sess.confidenceThreshold);
+      if (sess.file) {
+        setSelectedFile(sess.file);
+      }
+      const imgUrl = sess.previewUrl || sess.processedImage;
+      if (imgUrl) {
+        const img = new Image();
+        img.src = imgUrl;
+        img.onload = () => {
+          imageRef.current = img;
+          renderCanvas();
+        };
+      }
+      return;
+    }
+
+    // Otherwise restore the most recent detection from the single source of truth
+    api.getLatestDetection().then((latestRec) => {
+      if (!latestRec) return;
+
+      const convertedPrediction: ImagePredictionResponse = {
+        success: true,
+        detections: (latestRec.detections || []).map((d, i) => ({
+          class_id: i + 1,
+          class_name: d.className,
+          display_name: d.displayName,
+          confidence: d.confidence,
+          bbox: d.bbox,
+          violation: d.violation
+        })),
+        summary: {
+          vehicles: latestRec.summary.motorcycles,
+          riders: latestRec.summary.drivers + latestRec.summary.passengers,
+          helmet_detected: latestRec.summary.withHelmet,
+          violations: latestRec.summary.violations,
+          total_detections: (latestRec.detections || []).length
+        },
+        inference_time_ms: latestRec.inferenceTimeMs,
+        image_width: 1280,
+        image_height: 720,
+        model_name: 'Co-DETR',
+        device: latestRec.device || 'cuda:0'
+      };
+
+      setPrediction(convertedPrediction);
+
+      if (latestRec.processedImage) {
+        const img = new Image();
+        img.src = latestRec.processedImage;
+        img.onload = () => {
+          imageRef.current = img;
+          renderCanvas();
+        };
+      }
+
+      api.setActiveSession({
+        file: null,
+        previewUrl: latestRec.processedImage || null,
+        prediction: convertedPrediction,
+        confidenceThreshold: 0.35,
+        fileName: latestRec.fileName,
+        processedImage: latestRec.processedImage
+      });
+
+      const hasViolation = latestRec.summary.violations > 0;
+      const maxConf = (latestRec.detections || []).length > 0
+        ? Math.max(...latestRec.detections.map((d) => d.confidence))
+        : 0.9;
+
+      let timeDisplay = 'Recent';
+      if (latestRec.timestamp) {
+        try {
+          const d = new Date(latestRec.timestamp);
+          if (!isNaN(d.getTime())) {
+            timeDisplay = d.toLocaleTimeString([], { hour12: false });
+          }
+        } catch {}
+      }
+
+      setRecentDetections([
+        {
+          id: Date.now(),
+          fileName: latestRec.fileName,
+          type: 'Image',
+          result: hasViolation ? 'VIOLATION DETECTED' : 'NO VIOLATION',
+          confidence: maxConf,
+          time: timeDisplay,
+          status: hasViolation ? 'VIOLATION DETECTED' : 'NO VIOLATION',
+          previewUrl: latestRec.processedImage || ''
+        }
+      ]);
+    }).catch((e) => console.warn('Could not load latest detection:', e));
+  }, [renderCanvas]);
+
   // Execute real AI inference on file
   const runDetectionOnFile = async (file: File) => {
     setIsProcessing(true);
@@ -221,9 +320,19 @@ export const DetectionPage: React.FC = () => {
       imageRef.current = img;
 
       try {
-        // Run inference through backend API
+        // Run inference through backend API (FastAPI stores exactly once in central store)
         const result = await api.detectImage(file, confidenceThreshold);
         setPrediction(result);
+
+        // Update active in-memory session for instant navigation restoration
+        api.setActiveSession({
+          file,
+          previewUrl: url,
+          prediction: result,
+          confidenceThreshold,
+          fileName: file.name,
+          processedImage: url
+        });
 
         // Check for violations (driver_without_helmet or passenger_without_helmet) above confidenceThreshold
         const violationsAboveThr = result.detections.filter(
@@ -242,7 +351,7 @@ export const DetectionPage: React.FC = () => {
           type: file.type.startsWith('video') ? 'Video' : 'Image',
           result: hasViolation ? 'VIOLATION DETECTED' : 'NO VIOLATION',
           confidence: maxConf,
-          time: 'Just now',
+          time: new Date().toLocaleTimeString([], { hour12: false }),
           status: hasViolation ? 'VIOLATION DETECTED' : 'NO VIOLATION',
           previewUrl: url
         };
@@ -268,7 +377,7 @@ export const DetectionPage: React.FC = () => {
           type: 'Image',
           result: hasViolation ? 'VIOLATION DETECTED' : 'NO VIOLATION',
           confidence: 0.91,
-          time: 'Just now',
+          time: new Date().toLocaleTimeString([], { hour12: false }),
           status: hasViolation ? 'VIOLATION DETECTED' : 'NO VIOLATION',
           previewUrl: url
         };
@@ -333,8 +442,17 @@ export const DetectionPage: React.FC = () => {
     setPrediction(null);
     setErrorMessage(null);
     imageRef.current = null;
+    api.setActiveSession(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const handleThresholdChange = (val: number) => {
+    setConfidenceThreshold(val);
+    const sess = api.getActiveSession();
+    if (sess) {
+      sess.confidenceThreshold = val;
     }
   };
 
@@ -347,28 +465,31 @@ export const DetectionPage: React.FC = () => {
     a.click();
   };
 
-  // Computed summary metrics & detection state (show '--' until real inference runs)
-  const detectionResult = prediction;
-  const totalMotorcycles = detectionResult
-    ? (detectionResult.summary.vehicles || detectionResult.detections.filter(d => d.class_name === 'bike' || d.class_name === 'motorcycle').length)
+  // Computed summary metrics dynamically filtered by confidenceThreshold (in-memory, NO API calls)
+  const displayedDetections = prediction
+    ? prediction.detections.filter((d) => d.confidence >= confidenceThreshold)
+    : null;
+
+  const totalMotorcycles = displayedDetections
+    ? displayedDetections.filter(d => d.class_name === 'bike' || d.class_name === 'motorcycle' || d.display_name.toLowerCase().includes('motorcycle')).length
     : '--';
-  const totalDrivers = detectionResult
-    ? (detectionResult.detections.filter(d => d.class_name.includes('driver') || d.display_name.toLowerCase().includes('driver')).length || (detectionResult.summary.riders > 0 ? 1 : 0))
+  const totalDrivers = displayedDetections
+    ? displayedDetections.filter(d => d.class_name.includes('driver') || d.display_name.toLowerCase().includes('driver')).length
     : '--';
-  const totalPassengers = detectionResult
-    ? (detectionResult.detections.filter(d => d.class_name.includes('passenger') || d.display_name.toLowerCase().includes('passenger')).length || Math.max(0, detectionResult.summary.riders - 1))
+  const totalPassengers = displayedDetections
+    ? displayedDetections.filter(d => d.class_name.includes('passenger') || d.display_name.toLowerCase().includes('passenger')).length
     : '--';
-  const withHelmet = detectionResult
-    ? (detectionResult.summary.helmet_detected || detectionResult.detections.filter(d => !d.violation && d.class_name !== 'bike').length)
+  const withHelmet = displayedDetections
+    ? displayedDetections.filter(d => d.class_name.includes('with_helmet') || d.display_name.toLowerCase().includes('with helmet') || (!d.violation && !d.class_name.includes('without') && (d.class_name.includes('driver') || d.class_name.includes('passenger')))).length
     : '--';
-  const withoutHelmet = detectionResult
-    ? (detectionResult.summary.violations || detectionResult.detections.filter(d => d.violation).length)
+  const withoutHelmet = displayedDetections
+    ? displayedDetections.filter(d => d.violation || d.class_name.includes('without_helmet') || d.display_name.toLowerCase().includes('without helmet')).length
     : '--';
-  const violations = detectionResult
-    ? detectionResult.summary.violations
+  const violations = displayedDetections
+    ? withoutHelmet
     : '--';
-  const inferenceTime = detectionResult
-    ? `${Math.round(detectionResult.inference_time_ms)}ms`
+  const inferenceTime = prediction
+    ? `${Math.round(prediction.inference_time_ms)}ms`
     : '--';
 
   return (
@@ -532,15 +653,15 @@ export const DetectionPage: React.FC = () => {
                 </span>
               )}
 
-              {/* Dynamic Detection Tags (only shown when detectionResult !== null) */}
-              {detectionResult !== null && !isProcessing && (
+              {/* Dynamic Detection Tags (only shown when prediction !== null) */}
+              {prediction !== null && !isProcessing && (
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {detectionResult.detections?.some(d => d.class_name === 'motorcycle' || d.class_name === 'bike' || d.display_name?.toLowerCase().includes('motorcycle')) && (
+                  {displayedDetections?.some((d) => d.class_name === 'motorcycle' || d.class_name === 'bike' || d.display_name?.toLowerCase().includes('motorcycle')) && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/70 text-[11px] font-semibold">
                       <span>Motorcycle</span>
                     </span>
                   )}
-                  {detectionResult.detections?.some(d => d.class_name.includes('helmet') || d.display_name?.toLowerCase().includes('helmet')) && (
+                  {displayedDetections?.some((d) => d.class_name.includes('helmet') || d.display_name?.toLowerCase().includes('helmet')) && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[11px] font-semibold">
                       <span>Helmet</span>
                     </span>
@@ -633,7 +754,7 @@ export const DetectionPage: React.FC = () => {
                 max="0.9"
                 step="0.05"
                 value={confidenceThreshold}
-                onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
+                onChange={(e) => handleThresholdChange(parseFloat(e.target.value))}
                 className="w-28 accent-blue-600 cursor-pointer"
               />
             </div>

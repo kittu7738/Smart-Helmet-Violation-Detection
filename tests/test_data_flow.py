@@ -160,6 +160,53 @@ class TestDataFlow(unittest.TestCase):
         self.assertEqual(reloaded_metrics["driverViolations"], 1)
         self.assertEqual(reloaded_metrics["passengerViolations"], 1)
 
+    def test_deduplication_guard(self):
+        """Verify that identical or repeated prediction writes do not create duplicate records."""
+        pred = {
+            "detections": [
+                {"class_name": "bike", "confidence": 0.95, "bbox": [0,0,10,10], "violation": False},
+                {"class_name": "driver_without_helmet", "confidence": 0.90, "bbox": [0,0,10,10], "violation": True}
+            ],
+            "summary": {"vehicles": 1, "riders": 1, "helmet_detected": 0, "violations": 1},
+            "inference_time_ms": 115.0
+        }
+        rec1 = self.store.add_prediction(pred, "same_image.jpg")
+        rec2 = self.store.add_prediction(pred, "same_image.jpg")
+
+        self.assertEqual(rec1["id"], rec2["id"], "Second write must return existing record without creating a duplicate.")
+        self.assertEqual(len(self.store.get_records()), 1, "Store must contain exactly 1 record.")
+
+    def test_get_latest_record_and_status_terminology(self):
+        """Verify get_latest_record returns the most recent record and status is VIOLATION DETECTED."""
+        pred_no_viol = {
+            "detections": [
+                {"class_name": "bike", "confidence": 0.95, "bbox": [0,0,10,10], "violation": False},
+                {"class_name": "driver_with_helmet", "confidence": 0.90, "bbox": [0,0,10,10], "violation": False}
+            ],
+            "summary": {"vehicles": 1, "riders": 1, "helmet_detected": 1, "violations": 0},
+            "inference_time_ms": 100.0
+        }
+        pred_viol = {
+            "detections": [
+                {"class_name": "bike", "confidence": 0.95, "bbox": [0,0,10,10], "violation": False},
+                {"class_name": "driver_without_helmet", "confidence": 0.92, "bbox": [0,0,10,10], "violation": True}
+            ],
+            "summary": {"vehicles": 1, "riders": 1, "helmet_detected": 0, "violations": 1},
+            "inference_time_ms": 105.0
+        }
+
+        self.store.add_prediction(pred_no_viol, "first.jpg")
+        self.store.add_prediction(pred_viol, "second.jpg")
+
+        latest = self.store.get_latest_record()
+        self.assertIsNotNone(latest)
+        self.assertEqual(latest["fileName"], "second.jpg")
+        self.assertEqual(latest["status"], "VIOLATION DETECTED")
+
+        violations = self.store.get_violations()
+        self.assertEqual(len(violations), 1)
+        self.assertEqual(violations[0]["status"], "VIOLATION DETECTED")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,6 @@
 export type HelmetStatus = 'HELMET' | 'NO_HELMET';
 export type RiderType = 'DRIVER' | 'PASSENGER';
-export type ViolationStatus = 'Detected' | 'Logged' | 'Reviewed' | 'Pending';
+export type ViolationStatus = 'VIOLATION DETECTED' | 'Detected' | 'Logged' | 'Reviewed' | 'Pending' | 'RESOLVED';
 
 export interface BoundingBox {
   x: number;
@@ -48,6 +48,7 @@ export interface RecentViolation {
   status: ViolationStatus;
   riderType: RiderType;
   location: string;
+  timestamp?: string;
 }
 
 export interface ModelMetrics {

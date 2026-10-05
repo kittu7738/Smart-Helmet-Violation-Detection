@@ -11,37 +11,49 @@ export const ViolationsTable: React.FC<ViolationsTableProps> = ({
   violations,
   compact = false
 }) => {
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'Detected':
-      case 'New':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold badge-violation">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
-            New
-          </span>
-        );
-      case 'Logged':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold badge-warning">
-            <CheckCircle2 className="w-3 h-3" />
-            Logged
-          </span>
-        );
-      case 'Reviewed':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold badge-blue">
-            <ShieldAlert className="w-3 h-3" />
-            Reviewed
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs badge-neutral">
-            {status}
-          </span>
-        );
+  const formatTime = (isoString?: string, fallbackTime?: string) => {
+    if (isoString) {
+      try {
+        const date = new Date(isoString);
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleTimeString([], { hour12: false });
+        }
+      } catch {}
     }
+    return fallbackTime || 'Unknown';
+  };
+
+  const getStatusBadge = (status: string) => {
+    const s = (status || '').toUpperCase();
+    if (s === 'VIOLATION DETECTED' || s === 'DETECTED' || s === 'NEW') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold badge-violation">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+          VIOLATION DETECTED
+        </span>
+      );
+    }
+    if (s === 'REVIEWED') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold badge-blue">
+          <ShieldAlert className="w-3 h-3" />
+          REVIEWED
+        </span>
+      );
+    }
+    if (s === 'RESOLVED' || s === 'LOGGED') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold badge-success">
+          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+          RESOLVED
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs badge-neutral">
+        {status}
+      </span>
+    );
   };
 
   return (
@@ -68,7 +80,7 @@ export const ViolationsTable: React.FC<ViolationsTableProps> = ({
                 <td className="py-3 px-4 font-mono text-gray-500">
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-gray-400" />
-                    <span>{v.time}</span>
+                    <span>{formatTime(v.timestamp, v.time)}</span>
                   </div>
                 </td>
 
@@ -127,7 +139,7 @@ export const ViolationsTable: React.FC<ViolationsTableProps> = ({
             </div>
 
             <div className="flex items-center justify-between text-[11px] text-gray-500 font-mono pt-1 border-t border-gray-200/80">
-              <span>{v.time}</span>
+              <span>{formatTime(v.timestamp, v.time)}</span>
               <span className="text-blue-600 font-bold">{v.confidence}% Conf</span>
             </div>
           </div>

@@ -49,6 +49,16 @@ router.get('/', (_req: Request, res: Response) => {
   });
 });
 
+// GET /api/detections/latest — return the most recent detection record
+router.get('/latest', (_req: Request, res: Response) => {
+  const latest = detectionStore.getLatestRecord();
+  if (!latest) {
+    res.json({ success: false, record: null, message: 'No detections found' });
+    return;
+  }
+  res.json({ success: true, record: latest });
+});
+
 // POST /api/detections/store — record normalized real Co-DETR detection
 router.post('/store', (req: Request, res: Response) => {
   try {

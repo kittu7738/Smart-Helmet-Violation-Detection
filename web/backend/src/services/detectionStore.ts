@@ -34,10 +34,13 @@ export interface DetectionRecord {
   id: string;
   timestamp: string;       // ISO 8601
   fileName: string;
+  processedImage?: string;
+  rawDetections?: DetectionItem[];
   detections: DetectionItem[];
   summary: DetectionSummary;
   inferenceTimeMs: number;
   device?: string;
+  status?: string;
 }
 
 export interface ViolationRecord {
@@ -46,7 +49,7 @@ export interface ViolationRecord {
   vehicle: string;
   violation: string;
   confidence: number;
-  status: 'Detected';
+  status: 'VIOLATION DETECTED' | 'REVIEWED' | 'RESOLVED';
   riderType: 'DRIVER' | 'PASSENGER';
   location: string;
   timestamp: string;
@@ -119,6 +122,21 @@ function saveToDisk(): void {
 export const detectionStore = {
   addRecord(record: DetectionRecord): DetectionRecord {
     loadFromDisk();
+
+    // Idempotent deduplication guard
+    if (records.length > 0) {
+      const latest = records[0];
+      if (
+        (record.id && latest.id === record.id) ||
+        (latest.fileName === record.fileName &&
+          Math.abs((latest.inferenceTimeMs || 0) - (record.inferenceTimeMs || 0)) < 0.2 &&
+          (latest.detections?.length || 0) === (record.detections?.length || 0))
+      ) {
+        console.log(`[DetectionStore] Idempotent deduplication: skipping duplicate record for ${record.fileName}`);
+        return latest;
+      }
+    }
+
     records.unshift(record);
     if (records.length > 1000) records = records.slice(0, 1000);
     saveToDisk();
@@ -129,6 +147,11 @@ export const detectionStore = {
   getAll(): DetectionRecord[] {
     loadFromDisk();
     return [...records];
+  },
+
+  getLatestRecord(): DetectionRecord | null {
+    loadFromDisk();
+    return records.length > 0 ? { ...records[0] } : null;
   },
 
   count(): number {
@@ -174,7 +197,7 @@ export const detectionStore = {
           vehicle: rec.fileName || 'Unknown',
           violation: violationLabel,
           confidence: Math.round(det.confidence * 1000) / 10,
-          status: 'Detected',
+          status: 'VIOLATION DETECTED',
           riderType,
           location: 'Unknown',
           timestamp: rec.timestamp,

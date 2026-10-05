@@ -17,7 +17,7 @@ export const ViolationsPage: React.FC = () => {
   const [violations, setViolations] = useState<RecentViolation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [riderFilter, setRiderFilter] = useState<'ALL' | 'DRIVER' | 'PASSENGER'>('ALL');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'Detected' | 'Logged' | 'Reviewed'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'VIOLATION DETECTED' | 'REVIEWED' | 'RESOLVED'>('ALL');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -146,9 +146,9 @@ export const ViolationsPage: React.FC = () => {
               className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-800 font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="ALL">All Statuses</option>
-              <option value="Detected">Detected</option>
-              <option value="Logged">Logged</option>
-              <option value="Reviewed">Reviewed</option>
+              <option value="VIOLATION DETECTED">VIOLATION DETECTED</option>
+              <option value="REVIEWED">REVIEWED</option>
+              <option value="RESOLVED">RESOLVED</option>
             </select>
           </div>
         </div>

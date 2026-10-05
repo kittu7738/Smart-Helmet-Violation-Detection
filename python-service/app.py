@@ -136,8 +136,14 @@ async def predict_image(
             score_thr=confidence_threshold,
         )
 
-        # Automatically record into the single source of truth
-        global_detection_store.add_prediction(response, raw_filename)
+        # Convert contents to base64 image data URL so the frontend can restore it without re-uploading
+        import base64
+        ext = filename_lower.split(".")[-1]
+        mime = "jpeg" if ext in ("jpg", "jpeg") else ext
+        b64_img = f"data:image/{mime};base64,{base64.b64encode(contents).decode('utf-8')}"
+
+        # Automatically record into the single source of truth (one inference = one record)
+        global_detection_store.add_prediction(response, raw_filename, processed_image=b64_img)
 
         return response
     except ValueError as val_err:
@@ -187,6 +193,15 @@ def get_metrics():
         "success": True,
         "data": metrics,
     }
+
+
+@app.get("/api/detections/latest")
+def get_latest_detection():
+    """Returns the most recent actual detection record, or 404/empty."""
+    rec = global_detection_store.get_latest_record()
+    if rec is None:
+        return {"success": False, "record": None, "message": "No detections found"}
+    return {"success": True, "record": rec}
 
 
 @app.get("/api/detections")
