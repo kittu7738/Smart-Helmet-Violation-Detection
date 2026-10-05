@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck,
   User,
@@ -21,6 +21,8 @@ import {
   AreaChart,
   Area
 } from 'recharts';
+import { api } from '../services/api';
+import { RealMetrics } from '../types/detection';
 
 // Custom Interactive Tooltip for Hourly Infraction Distribution Chart
 const HourlyInfractionTooltip: React.FC<any> = ({ active, payload, label }) => {
@@ -30,9 +32,9 @@ const HourlyInfractionTooltip: React.FC<any> = ({ active, payload, label }) => {
       <div className="bg-[#0B132B] text-white px-3.5 py-2.5 rounded-xl shadow-xl border border-slate-700/80 text-xs select-none pointer-events-none">
         <div className="font-bold text-slate-200 mb-1.5 pb-1 border-b border-slate-700/60 flex items-center justify-between gap-3">
           <span className="font-mono">Time: {label}</span>
-          {label === '08:00' && (
+          {d.isPeak && (
             <span className="text-[10px] bg-rose-500/30 text-rose-300 font-semibold px-1.5 py-0.5 rounded">
-              Peak Rush
+              Peak
             </span>
           )}
         </div>
@@ -62,6 +64,27 @@ const HourlyInfractionTooltip: React.FC<any> = ({ active, payload, label }) => {
 
 export const AnalyticsPage: React.FC = () => {
   const [timeRange, setTimeRange] = useState<'24H' | '7D' | '30D'>('24H');
+  const [metrics, setMetrics] = useState<RealMetrics | null>(null);
+
+  const loadMetrics = async () => {
+    try {
+      const data = await api.getMetrics();
+      setMetrics(data);
+    } catch (err) {
+      console.error('Failed to load metrics:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadMetrics();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = api.onDetection(() => {
+      loadMetrics();
+    });
+    return unsubscribe;
+  }, []);
 
   // Verified Metrics from epoch 10 checkpoint
   const verifiedMetrics = {
@@ -70,7 +93,9 @@ export const AnalyticsPage: React.FC = () => {
     ap75: '13.30%',
     recall: '52.30%',
     roiAccuracy: '95.75%',
-    avgLatency: '112 ms',
+    avgLatency: metrics?.averageInferenceTime && metrics.averageInferenceTime > 0
+      ? `${metrics.averageInferenceTime} ms`
+      : '112 ms',
     vram: '149.6 MB'
   };
 
@@ -82,22 +107,33 @@ export const AnalyticsPage: React.FC = () => {
     { name: 'Passenger (No Helmet)', ap50: 43.8, mAP: 15.2 },
   ];
 
-  const hourlyViolationsData = [
-    { hour: '06:00', violations: 4, compliant: 42 },
-    { hour: '07:00', violations: 12, compliant: 88 },
-    { hour: '08:00', violations: 28, compliant: 142 },
-    { hour: '09:00', violations: 21, compliant: 130 },
-    { hour: '10:00', violations: 14, compliant: 110 },
-    { hour: '11:00', violations: 9, compliant: 95 },
-    { hour: '12:00', violations: 11, compliant: 89 },
-    { hour: '13:00', violations: 8, compliant: 76 },
-    { hour: '14:00', violations: 10, compliant: 84 },
-    { hour: '15:00', violations: 16, compliant: 102 },
-    { hour: '16:00', violations: 22, compliant: 125 },
-    { hour: '17:00', violations: 25, compliant: 154 },
-    { hour: '18:00', violations: 19, compliant: 120 },
-    { hour: '19:00', violations: 13, compliant: 98 },
-  ];
+  // Derive real hourly violations data
+  const rawHourlyData = metrics?.violationsOverTime || [];
+  let peakHour = '';
+  let peakViolations = 0;
+
+  for (const item of rawHourlyData) {
+    if (item.violations > peakViolations) {
+      peakViolations = item.violations;
+      peakHour = item.hour;
+    }
+  }
+
+  const hourlyViolationsData = rawHourlyData.map((d) => ({
+    ...d,
+    isPeak: peakHour ? d.hour === peakHour : false
+  }));
+
+  // Real Driver vs Passenger violations counts
+  const driverViolations = metrics?.driverViolations || 0;
+  const passengerViolations = metrics?.passengerViolations || 0;
+  const totalRiderViolations = driverViolations + passengerViolations;
+  const driverPct = totalRiderViolations > 0
+    ? Math.round((driverViolations / totalRiderViolations) * 100)
+    : 0;
+  const passengerPct = totalRiderViolations > 0
+    ? (100 - driverPct)
+    : 0;
 
 
 
@@ -247,52 +283,70 @@ export const AnalyticsPage: React.FC = () => {
                   Hourly Infraction Distribution
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Peak violation count throughout the day — coincides with morning commute rush
+                  Infraction count throughout the surveillance period derived from real Co-DETR detections
                 </p>
               </div>
-              <span className="badge-violation px-2.5 py-1 rounded-md text-xs font-semibold shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap" title="Morning commute corridor spike">
+              <span className="badge-violation px-2.5 py-1 rounded-md text-xs font-semibold shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap" title="Surveillance infraction frequency">
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                Peak: 08:00 (Rush Hour)
+                {peakViolations > 0 ? `Peak: ${peakHour} (${peakViolations} viol.)` : 'Awaiting Data'}
               </span>
             </div>
 
             <div className="h-64 w-full pt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={hourlyViolationsData} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="hourlyViolationGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#EF4444" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#EF4444" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-                  <XAxis dataKey="hour" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    content={<HourlyInfractionTooltip />}
-                    cursor={{ stroke: '#94A3B8', strokeWidth: 1, strokeDasharray: '3 3' }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="violations"
-                    name="Violations"
-                    stroke="#EF4444"
-                    strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#hourlyViolationGrad)"
-                    dot={{ r: 3, fill: '#EF4444' }}
-                    activeDot={{ r: 6, fill: '#EF4444', stroke: '#FFFFFF', strokeWidth: 2 }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              {hourlyViolationsData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={hourlyViolationsData} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="hourlyViolationGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#EF4444" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#EF4444" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                    <XAxis dataKey="hour" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      content={<HourlyInfractionTooltip />}
+                      cursor={{ stroke: '#94A3B8', strokeWidth: 1, strokeDasharray: '3 3' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="violations"
+                      name="Violations"
+                      stroke="#EF4444"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#hourlyViolationGrad)"
+                      dot={{ r: 3, fill: '#EF4444' }}
+                      activeDot={{ r: 6, fill: '#EF4444', stroke: '#FFFFFF', strokeWidth: 2 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full w-full flex flex-col items-center justify-center text-center text-slate-400 p-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                  <AlertCircle className="w-8 h-8 text-slate-300 mb-2" />
+                  <p className="text-sm font-semibold text-slate-700">No detection data available</p>
+                  <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                    Infraction telemetry is calculated dynamically from real Co-DETR inference. Analyze traffic images on the Detection page to populate charts.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Contextual insight linking the Peak: 08:00 callout */}
+          {/* Contextual insight linking the Peak callout */}
           <div className="pt-2.5 border-t border-slate-100 flex items-start gap-2 text-xs text-slate-500">
             <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
             <span>
-              <strong className="text-slate-800">Peak at 08:00 (28 violations):</strong> Coincides with peak morning commute rush-hour traffic corridors where higher rider volume and haste correlate with reduced helmet compliance.
+              {peakViolations > 0 ? (
+                <>
+                  <strong className="text-slate-800">Peak at {peakHour} ({peakViolations} violations recorded):</strong> Real Co-DETR detection counts across surveillance runs.
+                </>
+              ) : (
+                <>
+                  <strong className="text-slate-800">Live surveillance telemetry:</strong> Real-time helmet violations and compliance rates will appear here as detections run.
+                </>
+              )}
             </span>
           </div>
         </div>
@@ -313,20 +367,20 @@ export const AnalyticsPage: React.FC = () => {
             <div className="flex-1 space-y-2">
               <div className="flex justify-between text-xs font-semibold text-slate-700">
                 <span className="flex items-center gap-1.5"><User className="w-4 h-4 text-blue-600" /> Drivers</span>
-                <span className="font-mono text-slate-900 font-bold">68% (11 cases)</span>
+                <span className="font-mono text-slate-900 font-bold">{driverPct}% ({driverViolations} cases)</span>
               </div>
               <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full bg-blue-600 rounded-full" style={{ width: '68%' }} />
+                <div className="h-full bg-blue-600 rounded-full transition-all duration-500" style={{ width: `${driverPct}%` }} />
               </div>
             </div>
 
             <div className="flex-1 space-y-2">
               <div className="flex justify-between text-xs font-semibold text-slate-700">
                 <span className="flex items-center gap-1.5"><Users className="w-4 h-4 text-amber-500" /> Passengers</span>
-                <span className="font-mono text-slate-900 font-bold">32% (5 cases)</span>
+                <span className="font-mono text-slate-900 font-bold">{passengerPct}% ({passengerViolations} cases)</span>
               </div>
               <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full bg-amber-500 rounded-full" style={{ width: '32%' }} />
+                <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: `${passengerPct}%` }} />
               </div>
             </div>
           </div>

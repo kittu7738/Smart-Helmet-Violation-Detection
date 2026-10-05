@@ -28,6 +28,7 @@ from fastapi.responses import JSONResponse
 
 from schemas import ImagePredictionResponse, ModelStatusResponse
 from inference import CoDETRPredictor
+from detection_store import global_detection_store
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -99,6 +100,7 @@ def model_status():
 
 
 @app.post("/predict/image", response_model=ImagePredictionResponse)
+@app.post("/api/detect/image", response_model=ImagePredictionResponse)
 async def predict_image(
     file: UploadFile = File(..., description="Traffic image file (JPEG, PNG)"),
     confidence_threshold: Optional[float] = Query(None, ge=0.0, le=1.0, description="Minimum confidence score threshold"),
@@ -106,11 +108,13 @@ async def predict_image(
     """
     Accepts an uploaded image and performs Co-DETR detection.
     Returns bounding boxes, class labels, violation status, and counts.
+    Automatically persists detection to central store for Reports & Analytics.
     """
     # Validate file extension
     valid_extensions = (".jpg", ".jpeg", ".png", ".bmp", ".webp")
-    filename = (file.filename or "").lower()
-    if not any(filename.endswith(ext) for ext in valid_extensions):
+    raw_filename = file.filename or "unknown.jpg"
+    filename_lower = raw_filename.lower()
+    if not any(filename_lower.endswith(ext) for ext in valid_extensions):
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported image format. Allowed formats: {', '.join(valid_extensions)}"
@@ -131,12 +135,80 @@ async def predict_image(
             image_input=contents,
             score_thr=confidence_threshold,
         )
+
+        # Automatically record into the single source of truth
+        global_detection_store.add_prediction(response, raw_filename)
+
         return response
     except ValueError as val_err:
         raise HTTPException(status_code=400, detail=str(val_err))
     except Exception as exc:
         print(f"[ERROR] Inference failed on {file.filename}: {exc}", flush=True)
         raise HTTPException(status_code=500, detail=f"Inference error: {str(exc)}")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Central Source of Truth Endpoints for Reports & Analytics
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/violations")
+def get_violations(
+    search: Optional[str] = Query(None, description="Search query for vehicle, violation, location"),
+    type: Optional[str] = Query(None, description="Rider type filter: ALL, DRIVER, PASSENGER"),
+    status: Optional[str] = Query(None, description="Status filter: ALL, Detected, Logged, Reviewed"),
+    limit: Optional[int] = Query(None, ge=1, le=500, description="Maximum rows to return"),
+):
+    """
+    Derives violation records dynamically from real Co-DETR detection records.
+    Returns NO mock or hardcoded records.
+    """
+    violations = global_detection_store.get_violations(
+        search=search,
+        rider_type=type,
+        status=status,
+        limit=limit,
+    )
+    return {
+        "success": True,
+        "data": violations,
+        "total": len(violations),
+    }
+
+
+@app.get("/api/metrics")
+@app.get("/api/violations/analytics")
+def get_metrics():
+    """
+    Calculates dynamic metrics from real Co-DETR detection records.
+    Returns NO mock or random values.
+    """
+    metrics = global_detection_store.get_metrics()
+    return {
+        "success": True,
+        "data": metrics,
+    }
+
+
+@app.get("/api/detections")
+def get_detections():
+    """Returns all stored real detection runs (newest first)."""
+    records = global_detection_store.get_records()
+    return {
+        "success": True,
+        "data": records,
+        "total": len(records),
+    }
+
+
+@app.post("/api/detections/store")
+async def store_detection_record(record: dict):
+    """Allows external recording of normalized detection records."""
+    stored = global_detection_store.add_custom_record(record)
+    return {
+        "success": True,
+        "message": "Detection record stored",
+        "data": stored,
+    }
 
 
 if __name__ == "__main__":

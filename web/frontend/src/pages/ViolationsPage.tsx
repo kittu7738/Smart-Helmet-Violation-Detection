@@ -24,6 +24,13 @@ export const ViolationsPage: React.FC = () => {
     loadViolations();
   }, [searchQuery, riderFilter, statusFilter]);
 
+  useEffect(() => {
+    const unsubscribe = api.onDetection(() => {
+      loadViolations();
+    });
+    return unsubscribe;
+  }, [searchQuery, riderFilter, statusFilter]);
+
   const loadViolations = async () => {
     setLoading(true);
     try {
@@ -158,7 +165,16 @@ export const ViolationsPage: React.FC = () => {
         ) : (
           <div className="text-center py-12 text-slate-400 space-y-2">
             <ShieldAlert className="w-10 h-10 mx-auto text-slate-300" />
-            <p className="text-sm font-semibold text-slate-700">No violations match the specified criteria</p>
+            <p className="text-sm font-semibold text-slate-700">
+              {searchQuery || riderFilter !== 'ALL' || statusFilter !== 'ALL'
+                ? 'No violations match the specified criteria'
+                : 'No detection data available'}
+            </p>
+            <p className="text-xs text-slate-400">
+              {searchQuery || riderFilter !== 'ALL' || statusFilter !== 'ALL'
+                ? 'Try clearing filters or search terms.'
+                : 'Run an image inference on the Detection page to audit helmet violations.'}
+            </p>
           </div>
         )}
       </div>

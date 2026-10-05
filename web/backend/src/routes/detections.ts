@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import { MockDetectionService } from '../services/mockDetectionService';
+import { detectionStore, DetectionRecord } from '../services/detectionStore';
 
 const router = Router();
 
@@ -39,37 +39,44 @@ const upload = multer({
   }
 });
 
-// GET /api/detections
+// GET /api/detections — return all real detection records
 router.get('/', (_req: Request, res: Response) => {
-  const detections = MockDetectionService.getAllDetections();
+  const records = detectionStore.getAll();
   res.json({
     success: true,
-    data: detections
+    data: records,
+    total: records.length
   });
 });
 
-// POST /api/detection/video
-router.post('/video', upload.single('video'), (req: Request, res: Response) => {
+// POST /api/detections/store — record normalized real Co-DETR detection
+router.post('/store', (req: Request, res: Response) => {
   try {
-    const file = req.file;
-    const filename = file ? file.originalname : 'sample_traffic_feed.mp4';
-    
-    // In production, this will forward to Python Co-DETR inference service:
-    // await axios.post(process.env.PYTHON_INFERENCE_URL + '/detect', form)
-    // For now, return structured mock detection response
-    const results = MockDetectionService.processMockVideoDetection(filename);
+    const body = req.body as DetectionRecord;
+    if (!body || !body.id || !body.summary) {
+      res.status(400).json({ success: false, error: 'Invalid detection record payload.' });
+      return;
+    }
 
+    const stored = detectionStore.addRecord(body);
     res.json({
       success: true,
-      message: 'Video processed successfully by Smart Helmet AI pipeline (Mock Engine)',
-      data: results
+      message: 'Detection record stored.',
+      data: stored,
+      totalRecords: detectionStore.count()
     });
   } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to process video detection'
-    });
+    console.error('[POST /api/detections/store] Error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to store detection record' });
   }
+});
+
+// POST /api/detection/video
+router.post('/video', upload.single('video'), (_req: Request, res: Response) => {
+  res.json({
+    success: false,
+    message: 'Video inference is not supported in the current deployment. Please use the Detection page for real-time Co-DETR image inference.',
+  });
 });
 
 export default router;

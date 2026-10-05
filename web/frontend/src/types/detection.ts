@@ -112,9 +112,35 @@ export interface VideoDetectionResult {
 }
 
 export interface AnalyticsData {
-  complianceTrend: Array<{ time: string; compliance: number; target: number }>;
-  violationsOverTime: Array<{ hour: string; violations: number; warnings: number }>;
-  riderComparison: { driverViolations: number; passengerViolations: number };
-  confidenceDistribution: Array<{ range: string; count: number }>;
-  motorcycleVolume: Array<{ day: string; count: number }>;
+  complianceTrend?: Array<{ time: string; compliance: number; target: number }>;
+  violationsOverTime: Array<{ hour: string; violations: number; warnings?: number; compliant?: number }>;
+  riderComparison: { driverViolations: number; passengerViolations: number; driverPercent?: number; passengerPercent?: number };
+  confidenceDistribution?: Array<{ range: string; count: number }>;
+  motorcycleVolume?: Array<{ day: string; count: number }>;
 }
+
+export interface RealMetrics {
+  totalDetections: number;
+  totalMotorcycles: number;
+  totalDrivers: number;
+  totalPassengers: number;
+  withHelmet: number;
+  withoutHelmet: number;
+  totalViolations: number;
+  driverViolations: number;
+  passengerViolations: number;
+  helmetCompliancePercentage: number;
+  violationRate: number;
+  averageConfidence: number;
+  averageInferenceTime: number;
+  violationsOverTime: Array<{ hour: string; violations: number; compliant: number }>;
+  riderComparison: {
+    driverViolations: number;
+    passengerViolations: number;
+    driverPercent: number;
+    passengerPercent: number;
+  };
+  detectionsOverTime: Array<{ time: string; detections: number; violations: number }>;
+  totalRecords: number;
+}
+

@@ -1,15 +1,15 @@
 import { Router, Request, Response } from 'express';
-import { MockDetectionService } from '../services/mockDetectionService';
+import { detectionStore } from '../services/detectionStore';
 
 const router = Router();
 
-// GET /api/violations
+// GET /api/violations — return real violation rows derived from stored detection records
 router.get('/', (req: Request, res: Response) => {
   const { search, type, status, limit } = req.query;
 
-  const result = MockDetectionService.getRecentViolations({
+  const result = detectionStore.getViolationRows({
     search: search ? String(search) : undefined,
-    type: type ? String(type) : undefined,
+    type: (type && type !== 'ALL') ? (String(type) as 'DRIVER' | 'PASSENGER') : 'ALL',
     status: status ? String(status) : undefined,
     limit: limit ? Number(limit) : undefined
   });
@@ -21,12 +21,12 @@ router.get('/', (req: Request, res: Response) => {
   });
 });
 
-// GET /api/violations/analytics
+// GET /api/violations/analytics — return real aggregated metrics for Analytics page charts
 router.get('/analytics', (_req: Request, res: Response) => {
-  const analytics = MockDetectionService.getAnalyticsData();
+  const metrics = detectionStore.getMetrics();
   res.json({
     success: true,
-    data: analytics
+    data: metrics
   });
 });
 

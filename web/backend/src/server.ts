@@ -1,12 +1,12 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import path from 'path';
 
 import healthRoute from './routes/health';
 import dashboardRoute from './routes/dashboard';
 import detectionsRoute from './routes/detections';
 import violationsRoute from './routes/violations';
+import { detectionStore } from './services/detectionStore';
 
 dotenv.config();
 
@@ -15,11 +15,11 @@ const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(cors({
-  origin: '*', // Allow development origins
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Request logger
@@ -34,8 +34,14 @@ app.use('/api/health', healthRoute);
 app.use('/api/dashboard', dashboardRoute);
 app.use('/api/detections', detectionsRoute);
 app.use('/api/violations', violationsRoute);
-// Alias for detection video upload matching specification: POST /api/detection/video
+// Alias: POST /api/detection/video
 app.use('/api/detection', detectionsRoute);
+
+// GET /api/metrics — full aggregated metrics for Analytics page
+app.get('/api/metrics', (_req: Request, res: Response) => {
+  const metrics = detectionStore.getMetrics();
+  res.json({ success: true, data: metrics });
+});
 
 // 404 Handler
 app.use((req: Request, res: Response) => {
@@ -61,6 +67,8 @@ app.listen(PORT, () => {
   console.log(` Port: ${PORT}`);
   console.log(` Health: http://localhost:${PORT}/api/health`);
   console.log(` Dashboard: http://localhost:${PORT}/api/dashboard`);
+  console.log(` Metrics: http://localhost:${PORT}/api/metrics`);
+  console.log(` Detection Store: http://localhost:${PORT}/api/detections`);
   console.log(`=================================================`);
 });
 
