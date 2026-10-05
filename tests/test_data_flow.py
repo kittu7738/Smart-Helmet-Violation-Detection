@@ -203,9 +203,14 @@ class TestDataFlow(unittest.TestCase):
         self.assertEqual(latest["fileName"], "second.jpg")
         self.assertEqual(latest["status"], "VIOLATION DETECTED")
 
-        violations = self.store.get_violations()
+        # Status filter for actual violations
+        violations = self.store.get_violations(status="VIOLATION DETECTED")
         self.assertEqual(len(violations), 1)
         self.assertEqual(violations[0]["status"], "VIOLATION DETECTED")
+
+        # All audit logs (both compliant and violations)
+        all_logs = self.store.get_violations()
+        self.assertEqual(len(all_logs), 2)
 
     def test_low_confidence_noise_filtered_from_violations(self):
         """
@@ -213,7 +218,8 @@ class TestDataFlow(unittest.TestCase):
         are kept in raw detections for slider inspection, but filtered out from:
           1. Record summary.violations (must be 0)
           2. Record status (must be NO VIOLATION)
-          3. Reports get_violations() (must return 0 rows)
+          3. Reports get_violations(status='VIOLATION DETECTED') (must return 0 rows)
+          4. Emits a compliant audit log row with status NO VIOLATION
         """
         pred_low_conf = {
             "detections": [
@@ -234,9 +240,16 @@ class TestDataFlow(unittest.TestCase):
         self.assertEqual(rec["status"], "NO VIOLATION")
         self.assertEqual(len(rec["detections"]), 5, "All candidates must be preserved in detections for UI slider")
 
-        # Reports get_violations() must return 0 rows
-        violations = self.store.get_violations()
+        # Zero violations detected
+        violations = self.store.get_violations(status="VIOLATION DETECTED")
         self.assertEqual(len(violations), 0, "No violations below 20% confidence should appear in Reports")
+
+        # Audit row exists for test3.jpeg showing compliant status
+        all_logs = self.store.get_violations()
+        self.assertEqual(len(all_logs), 1)
+        self.assertEqual(all_logs[0]["status"], "NO VIOLATION")
+        self.assertEqual(all_logs[0]["violation"], "No Violation (Compliant)")
+        self.assertEqual(all_logs[0]["vehicle"], "test3.jpeg")
 
 
 if __name__ == "__main__":

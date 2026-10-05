@@ -300,6 +300,7 @@ class DetectionStore:
 
                 file_name = rec.get("fileName", "Unknown")
 
+                has_viol_row = False
                 for idx, det in enumerate(rec.get("detections", [])):
                     cname = det.get("className", "")
                     if cname not in ("driver_without_helmet", "passenger_without_helmet"):
@@ -309,6 +310,7 @@ class DetectionStore:
                     if conf < min_confidence:
                         continue
 
+                    has_viol_row = True
                     is_driver = (cname == "driver_without_helmet")
                     r_type = "DRIVER" if is_driver else "PASSENGER"
                     v_label = "Driver Without Helmet" if is_driver else "Passenger Without Helmet"
@@ -322,6 +324,22 @@ class DetectionStore:
                         "confidence": conf_pct,
                         "status": "VIOLATION DETECTED",
                         "riderType": r_type,
+                        "location": "Unknown",
+                        "timestamp": ts_str,
+                    }
+                    violation_rows.append(row)
+
+                # If no violation was detected in this record, emit the compliant inspection audit row
+                if not has_viol_row and len(rec.get("detections", [])) > 0:
+                    max_conf = max([float(d.get("confidence", 0.0)) for d in rec.get("detections", [])] or [0.76])
+                    row = {
+                        "id": f"{rec['id']}-ok",
+                        "time": time_display,
+                        "vehicle": file_name,
+                        "violation": "No Violation (Compliant)",
+                        "confidence": round(max_conf * 100, 1),
+                        "status": "NO VIOLATION",
+                        "riderType": "DRIVER",
                         "location": "Unknown",
                         "timestamp": ts_str,
                     }

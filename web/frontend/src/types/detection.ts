@@ -1,6 +1,6 @@
 export type HelmetStatus = 'HELMET' | 'NO_HELMET';
 export type RiderType = 'DRIVER' | 'PASSENGER';
-export type ViolationStatus = 'VIOLATION DETECTED' | 'Detected' | 'Logged' | 'Reviewed' | 'Pending' | 'RESOLVED';
+export type ViolationStatus = 'VIOLATION DETECTED' | 'NO VIOLATION' | 'Detected' | 'Logged' | 'Reviewed' | 'Pending' | 'RESOLVED';
 
 export interface BoundingBox {
   x: number;

@@ -33,6 +33,14 @@ export const ViolationsTable: React.FC<ViolationsTableProps> = ({
         </span>
       );
     }
+    if (s === 'NO VIOLATION' || s === 'COMPLIANT') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+          NO VIOLATION
+        </span>
+      );
+    }
     if (s === 'REVIEWED') {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold badge-blue">
@@ -92,13 +100,19 @@ export const ViolationsTable: React.FC<ViolationsTableProps> = ({
 
                 <td className="py-3 px-4">
                   <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
-                    <span className="font-semibold text-gray-800">
+                    {v.status === 'NO VIOLATION' ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
+                    )}
+                    <span className={v.status === 'NO VIOLATION' ? "font-semibold text-emerald-700" : "font-semibold text-gray-800"}>
                       {v.violation}
                     </span>
-                    <span className="text-[11px] text-gray-400 font-mono">
-                      ({v.riderType})
-                    </span>
+                    {v.riderType && v.status !== 'NO VIOLATION' && (
+                      <span className="text-[11px] text-gray-400 font-mono">
+                        ({v.riderType})
+                      </span>
+                    )}
                   </div>
                 </td>
 
@@ -133,9 +147,13 @@ export const ViolationsTable: React.FC<ViolationsTableProps> = ({
               {getStatusBadge(v.status)}
             </div>
 
-            <div className="flex items-center gap-1.5 text-xs text-red-700 font-semibold">
-              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-red-600" />
-              <span>{v.violation} ({v.riderType})</span>
+            <div className={`flex items-center gap-1.5 text-xs font-semibold ${v.status === 'NO VIOLATION' ? 'text-emerald-700' : 'text-red-700'}`}>
+              {v.status === 'NO VIOLATION' ? (
+                <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 text-emerald-600" />
+              ) : (
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-red-600" />
+              )}
+              <span>{v.violation} {v.status !== 'NO VIOLATION' ? `(${v.riderType})` : ''}</span>
             </div>
 
             <div className="flex items-center justify-between text-[11px] text-gray-500 font-mono pt-1 border-t border-gray-200/80">

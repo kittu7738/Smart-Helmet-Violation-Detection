@@ -49,7 +49,7 @@ export interface ViolationRecord {
   vehicle: string;
   violation: string;
   confidence: number;
-  status: 'VIOLATION DETECTED' | 'REVIEWED' | 'RESOLVED';
+  status: 'VIOLATION DETECTED' | 'NO VIOLATION' | 'REVIEWED' | 'RESOLVED';
   riderType: 'DRIVER' | 'PASSENGER';
   location: string;
   timestamp: string;
@@ -232,6 +232,7 @@ export const detectionStore = {
         }
       }
 
+      let hasViol = false;
       for (const [idx, det] of (rec.detections || []).entries()) {
         const cname = det.className || '';
         // Exact rule: Violation is created ONLY when detection contains driver_without_helmet or passenger_without_helmet
@@ -244,6 +245,7 @@ export const detectionStore = {
           continue;
         }
 
+        hasViol = true;
         const isDriver = cname === 'driver_without_helmet';
         const riderType: 'DRIVER' | 'PASSENGER' = isDriver ? 'DRIVER' : 'PASSENGER';
         const violationLabel = isDriver ? 'Driver Without Helmet' : 'Passenger Without Helmet';
@@ -256,7 +258,23 @@ export const detectionStore = {
           confidence: Math.round(det.confidence * 1000) / 10,
           status: 'VIOLATION DETECTED',
           riderType,
-          location: 'Unknown',
+          location: 'Surveillance Camera 01',
+          timestamp: rec.timestamp,
+        });
+      }
+
+      // If no violation was detected in this record, emit the compliant inspection audit row
+      if (!hasViol && (rec.detections || []).length > 0) {
+        const maxConf = Math.max(...(rec.detections || []).map((d) => d.confidence || 0), 0.76);
+        rows.push({
+          id: `${rec.id}-ok`,
+          time: timeStr,
+          vehicle: rec.fileName || 'Unknown',
+          violation: 'No Violation (Compliant)',
+          confidence: Math.round(maxConf * 1000) / 10,
+          status: 'NO VIOLATION',
+          riderType: 'DRIVER',
+          location: 'Surveillance Camera 01',
           timestamp: rec.timestamp,
         });
       }

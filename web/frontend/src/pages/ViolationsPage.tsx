@@ -17,7 +17,7 @@ export const ViolationsPage: React.FC = () => {
   const [violations, setViolations] = useState<RecentViolation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [riderFilter, setRiderFilter] = useState<'ALL' | 'DRIVER' | 'PASSENGER'>('ALL');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'VIOLATION DETECTED' | 'REVIEWED' | 'RESOLVED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'VIOLATION DETECTED' | 'NO VIOLATION' | 'REVIEWED' | 'RESOLVED'>('ALL');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,7 +39,70 @@ export const ViolationsPage: React.FC = () => {
         type: riderFilter,
         status: statusFilter
       });
-      setViolations(res.violations);
+      if (res.violations && res.violations.length > 0) {
+        setViolations(res.violations);
+      } else {
+        // Fallback to active detections store so local inspection records always populate
+        const detections = await api.getDetections();
+        if (detections.length > 0) {
+          const fallbackRows: RecentViolation[] = [];
+          for (const rec of detections) {
+            const hasViol = (rec.summary?.violations || 0) > 0;
+            const timeDisplay = rec.timestamp
+              ? new Date(rec.timestamp).toLocaleTimeString([], { hour12: false })
+              : 'Unknown';
+
+            if (hasViol) {
+              for (const [idx, d] of (rec.detections || []).entries()) {
+                if (d.violation || d.className === 'driver_without_helmet' || d.className === 'passenger_without_helmet') {
+                  const isDriver = (d.className || '').includes('driver');
+                  fallbackRows.push({
+                    id: `${rec.id}-v${idx}`,
+                    time: timeDisplay,
+                    vehicle: rec.fileName || 'Unknown',
+                    violation: isDriver ? 'Driver Without Helmet' : 'Passenger Without Helmet',
+                    confidence: Math.round((d.confidence || 0.8) * 1000) / 10,
+                    status: 'VIOLATION DETECTED',
+                    riderType: isDriver ? 'DRIVER' : 'PASSENGER',
+                    location: 'Surveillance Camera 01',
+                    timestamp: rec.timestamp
+                  });
+                }
+              }
+            } else {
+              const maxConf = rec.detections && rec.detections.length > 0
+                ? Math.max(...rec.detections.map(d => d.confidence))
+                : 0.76;
+              fallbackRows.push({
+                id: `${rec.id}-ok`,
+                time: timeDisplay,
+                vehicle: rec.fileName || 'Unknown',
+                violation: 'No Violation (Compliant)',
+                confidence: Math.round(maxConf * 1000) / 10,
+                status: 'NO VIOLATION',
+                riderType: 'DRIVER',
+                location: 'Surveillance Camera 01',
+                timestamp: rec.timestamp
+              });
+            }
+          }
+
+          let filtered = fallbackRows;
+          if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            filtered = filtered.filter(v => v.vehicle.toLowerCase().includes(q) || v.violation.toLowerCase().includes(q));
+          }
+          if (riderFilter !== 'ALL') {
+            filtered = filtered.filter(v => v.riderType === riderFilter);
+          }
+          if (statusFilter !== 'ALL') {
+            filtered = filtered.filter(v => v.status === statusFilter);
+          }
+          setViolations(filtered);
+        } else {
+          setViolations([]);
+        }
+      }
     } catch (err) {
       console.error('Failed to load violations:', err);
     } finally {
@@ -47,9 +110,9 @@ export const ViolationsPage: React.FC = () => {
     }
   };
 
-  const totalViolations = violations.length;
-  const driverViolations = violations.filter((v) => v.riderType === 'DRIVER').length;
-  const passengerViolations = violations.filter((v) => v.riderType === 'PASSENGER').length;
+  const totalViolations = violations.filter((v) => v.status === 'VIOLATION DETECTED').length;
+  const driverViolations = violations.filter((v) => v.status === 'VIOLATION DETECTED' && v.riderType === 'DRIVER').length;
+  const passengerViolations = violations.filter((v) => v.status === 'VIOLATION DETECTED' && v.riderType === 'PASSENGER').length;
 
   return (
     <div className="space-y-6">
@@ -147,6 +210,7 @@ export const ViolationsPage: React.FC = () => {
             >
               <option value="ALL">All Status</option>
               <option value="VIOLATION DETECTED">VIOLATION DETECTED</option>
+              <option value="NO VIOLATION">NO VIOLATION</option>
               <option value="REVIEWED">REVIEWED</option>
               <option value="RESOLVED">RESOLVED</option>
             </select>
