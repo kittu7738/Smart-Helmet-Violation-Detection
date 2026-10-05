@@ -212,103 +212,123 @@ export const DetectionPage: React.FC = () => {
     }
   }, [prediction, confidenceThreshold, renderCanvas]);
 
-  // Restore latest detection session on mount across page navigations
+  // Restore detections history and active session on mount (navigating tabs or reloading site)
   useEffect(() => {
+    // 1. Instantly restore from active session / sessionStorage
     const sess = api.getActiveSession();
-    if (sess && sess.prediction) {
-      setPrediction(sess.prediction);
-      setConfidenceThreshold(sess.confidenceThreshold);
-      if (sess.file) {
-        setSelectedFile(sess.file);
+    if (sess) {
+      if (sess.prediction) {
+        setPrediction(sess.prediction);
+        setConfidenceThreshold(sess.confidenceThreshold);
+        if (sess.file) {
+          setSelectedFile(sess.file);
+        }
+        const imgUrl = sess.previewUrl || sess.processedImage;
+        if (imgUrl) {
+          const img = new Image();
+          img.src = imgUrl;
+          img.onload = () => {
+            imageRef.current = img;
+            renderCanvas();
+          };
+        }
       }
-      const imgUrl = sess.previewUrl || sess.processedImage;
-      if (imgUrl) {
-        const img = new Image();
-        img.src = imgUrl;
-        img.onload = () => {
-          imageRef.current = img;
-          renderCanvas();
-        };
+      if (sess.recentDetections && sess.recentDetections.length > 0) {
+        setRecentDetections(sess.recentDetections);
       }
-      return;
     }
 
-    // Otherwise restore the most recent detection from the single source of truth
-    api.getLatestDetection().then((latestRec) => {
-      if (!latestRec) return;
+    // 2. Fetch full real history from backend store to ensure recent detections table is always populated
+    api.getDetections().then((records) => {
+      if (!records || records.length === 0) return;
 
-      const convertedPrediction: ImagePredictionResponse = {
-        success: true,
-        detections: (latestRec.detections || []).map((d, i) => ({
-          class_id: i + 1,
-          class_name: d.className,
-          display_name: d.displayName,
-          confidence: d.confidence,
-          bbox: d.bbox,
-          violation: d.violation
-        })),
-        summary: {
-          vehicles: latestRec.summary.motorcycles,
-          riders: latestRec.summary.drivers + latestRec.summary.passengers,
-          helmet_detected: latestRec.summary.withHelmet,
-          violations: latestRec.summary.violations,
-          total_detections: (latestRec.detections || []).length
-        },
-        inference_time_ms: latestRec.inferenceTimeMs,
-        image_width: 1280,
-        image_height: 720,
-        model_name: 'Co-DETR',
-        device: latestRec.device || 'cuda:0'
-      };
+      const historyItems: DetectionHistoryItem[] = records.map((rec, idx) => {
+        const hasViolation = (rec.summary?.violations || 0) > 0;
+        const maxConf = (rec.detections || []).length > 0
+          ? Math.max(...rec.detections.map((d: any) => d.confidence))
+          : 0.9;
 
-      setPrediction(convertedPrediction);
+        let timeDisplay = 'Recent';
+        if (rec.timestamp) {
+          try {
+            const d = new Date(rec.timestamp);
+            if (!isNaN(d.getTime())) {
+              timeDisplay = d.toLocaleTimeString([], { hour12: false });
+            }
+          } catch {}
+        }
 
-      if (latestRec.processedImage) {
-        const img = new Image();
-        img.src = latestRec.processedImage;
-        img.onload = () => {
-          imageRef.current = img;
-          renderCanvas();
-        };
-      }
-
-      api.setActiveSession({
-        file: null,
-        previewUrl: latestRec.processedImage || null,
-        prediction: convertedPrediction,
-        confidenceThreshold: 0.20,
-        fileName: latestRec.fileName,
-        processedImage: latestRec.processedImage
-      });
-
-      const hasViolation = latestRec.summary.violations > 0;
-      const maxConf = (latestRec.detections || []).length > 0
-        ? Math.max(...latestRec.detections.map((d) => d.confidence))
-        : 0.9;
-
-      let timeDisplay = 'Recent';
-      if (latestRec.timestamp) {
-        try {
-          const d = new Date(latestRec.timestamp);
-          if (!isNaN(d.getTime())) {
-            timeDisplay = d.toLocaleTimeString([], { hour12: false });
-          }
-        } catch {}
-      }
-
-      setRecentDetections([
-        {
-          id: Date.now(),
-          fileName: latestRec.fileName,
+        return {
+          id: idx + 1,
+          fileName: rec.fileName || 'traffic.jpg',
           type: 'Image',
           result: hasViolation ? 'VIOLATION DETECTED' : 'NO VIOLATION',
           confidence: maxConf,
           time: timeDisplay,
           status: hasViolation ? 'VIOLATION DETECTED' : 'NO VIOLATION',
-          previewUrl: latestRec.processedImage || ''
+          previewUrl: rec.processedImage || ''
+        };
+      });
+
+      setRecentDetections(historyItems);
+
+      // Keep active session synchronized with recent detections
+      const curr = api.getActiveSession();
+      if (curr) {
+        curr.recentDetections = historyItems;
+        api.setActiveSession(curr);
+      }
+
+      // If no active prediction on canvas, restore the latest one
+      const currentActive = api.getActiveSession();
+      if (!currentActive?.prediction && records.length > 0) {
+        const latestRec = records[0];
+        const convertedPrediction: ImagePredictionResponse = {
+          success: true,
+          detections: (latestRec.detections || []).map((d, i) => ({
+            class_id: i + 1,
+            class_name: d.className,
+            display_name: d.displayName,
+            confidence: d.confidence,
+            bbox: d.bbox,
+            violation: d.violation
+          })),
+          summary: {
+            vehicles: latestRec.summary.motorcycles,
+            riders: latestRec.summary.drivers + latestRec.summary.passengers,
+            helmet_detected: latestRec.summary.withHelmet,
+            violations: latestRec.summary.violations,
+            total_detections: (latestRec.detections || []).length
+          },
+          inference_time_ms: latestRec.inferenceTimeMs,
+          image_width: 1280,
+          image_height: 720,
+          model_name: 'Co-DETR',
+          device: latestRec.device || 'cuda:0'
+        };
+
+        setPrediction(convertedPrediction);
+
+        if (latestRec.processedImage) {
+          const img = new Image();
+          img.src = latestRec.processedImage;
+          img.onload = () => {
+            imageRef.current = img;
+            renderCanvas();
+          };
         }
-      ]);
-    }).catch((e) => console.warn('Could not load latest detection:', e));
+
+        api.setActiveSession({
+          file: null,
+          previewUrl: latestRec.processedImage || null,
+          prediction: convertedPrediction,
+          confidenceThreshold: 0.20,
+          fileName: latestRec.fileName,
+          processedImage: latestRec.processedImage,
+          recentDetections: historyItems
+        });
+      }
+    }).catch((e) => console.warn('Could not load detections list:', e));
   }, [renderCanvas]);
 
   // Execute real AI inference on file
@@ -360,7 +380,15 @@ export const DetectionPage: React.FC = () => {
           previewUrl: url
         };
 
-        setRecentDetections((prev) => [newRecord, ...prev]);
+        setRecentDetections((prev) => {
+          const updated = [newRecord, ...prev];
+          const currSess = api.getActiveSession();
+          if (currSess) {
+            currSess.recentDetections = updated;
+            api.setActiveSession(currSess);
+          }
+          return updated;
+        });
       } catch (err: any) {
         // If GPU backend unreachable, fallback gracefully to calibrated detection
         console.warn('Backend inference failed, generating fallback detection', err);
@@ -385,7 +413,15 @@ export const DetectionPage: React.FC = () => {
           status: hasViolation ? 'VIOLATION DETECTED' : 'NO VIOLATION',
           previewUrl: url
         };
-        setRecentDetections((prev) => [newRecord, ...prev]);
+        setRecentDetections((prev) => {
+          const updated = [newRecord, ...prev];
+          const currSess = api.getActiveSession();
+          if (currSess) {
+            currSess.recentDetections = updated;
+            api.setActiveSession(currSess);
+          }
+          return updated;
+        });
         setErrorMessage('Cloud inference server offline — running local detector.');
       } finally {
         setIsProcessing(false);

@@ -101,6 +101,7 @@ export interface ActiveDetectionSession {
   confidenceThreshold: number;
   fileName: string | null;
   processedImage?: string | null;
+  recentDetections?: any[];
 }
 
 let activeSession: ActiveDetectionSession | null = null;
@@ -190,11 +191,60 @@ export const api = {
   },
 
   getActiveSession(): ActiveDetectionSession | null {
+    if (!activeSession && typeof window !== 'undefined') {
+      try {
+        const raw = sessionStorage.getItem('SMART_HELMET_SESSION');
+        if (raw) {
+          activeSession = JSON.parse(raw);
+        }
+      } catch {}
+    }
     return activeSession;
   },
 
   setActiveSession(session: ActiveDetectionSession | null) {
     activeSession = session;
+    if (typeof window !== 'undefined') {
+      try {
+        if (session) {
+          const { file, ...serializable } = session;
+          sessionStorage.setItem('SMART_HELMET_SESSION', JSON.stringify(serializable));
+        } else {
+          sessionStorage.removeItem('SMART_HELMET_SESSION');
+        }
+      } catch {}
+    }
+  },
+
+  /**
+   * Fetch all real detection records from central backend store
+   */
+  async getDetections(): Promise<StoredDetectionRecord[]> {
+    try {
+      const res = await fetch(`${currentApiBaseUrl}/api/detections`, {
+        signal: AbortSignal.timeout(3000)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          return json.data;
+        }
+      }
+    } catch {}
+
+    try {
+      const res = await fetch(`${BACKEND_BASE}/api/detections`, {
+        signal: AbortSignal.timeout(3000)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          return json.data;
+        }
+      }
+    } catch {}
+
+    return [];
   },
 
   /**
