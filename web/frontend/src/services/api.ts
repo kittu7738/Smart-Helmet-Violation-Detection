@@ -449,6 +449,113 @@ export const api = {
     return { violations: [], total: 0 };
   },
 
+  computeMetricsFromRecords(records: StoredDetectionRecord[]): RealMetrics {
+    let totalDetections = 0;
+    let totalMotorcycles = 0;
+    let totalDrivers = 0;
+    let totalPassengers = 0;
+    let withHelmet = 0;
+    let withoutHelmet = 0;
+    let totalViolations = 0;
+    let driverViolations = 0;
+    let passengerViolations = 0;
+    const confidences: number[] = [];
+    const inferenceTimes: number[] = [];
+    const hourlyMap: Record<string, { violations: number; compliant: number }> = {};
+    const timelineDetections: Array<{ time: string; detections: number; violations: number }> = [];
+
+    for (const rec of [...records].reverse()) {
+      const s = rec.summary || ({} as any);
+      totalMotorcycles += s.motorcycles || 0;
+      totalDrivers += s.drivers || 0;
+      totalPassengers += s.passengers || 0;
+      withHelmet += s.withHelmet || 0;
+      withoutHelmet += s.withoutHelmet || 0;
+      totalViolations += s.violations || 0;
+      driverViolations += s.driverViolations || 0;
+      passengerViolations += s.passengerViolations || 0;
+
+      if (typeof rec.inferenceTimeMs === 'number' && rec.inferenceTimeMs > 0) {
+        inferenceTimes.push(rec.inferenceTimeMs);
+      }
+
+      const dets = rec.detections || [];
+      totalDetections += dets.length;
+      for (const d of dets) {
+        if (typeof d.confidence === 'number') {
+          confidences.push(d.confidence);
+        }
+      }
+
+      let hourKey = '12:00';
+      let minKey = '12:00';
+      if (rec.timestamp) {
+        try {
+          const dt = new Date(rec.timestamp);
+          if (!isNaN(dt.getTime())) {
+            const h = String(dt.getHours()).padStart(2, '0');
+            const m = String(dt.getMinutes()).padStart(2, '0');
+            hourKey = `${h}:00`;
+            minKey = `${h}:${m}`;
+          }
+        } catch {}
+      }
+
+      if (!hourlyMap[hourKey]) {
+        hourlyMap[hourKey] = { violations: 0, compliant: 0 };
+      }
+      hourlyMap[hourKey].violations += s.violations || 0;
+      hourlyMap[hourKey].compliant += s.withHelmet || 0;
+
+      timelineDetections.push({
+        time: minKey,
+        detections: dets.length,
+        violations: s.violations || 0
+      });
+    }
+
+    const totalRiders = withHelmet + withoutHelmet;
+    const compliancePct = totalRiders > 0 ? Math.round((withHelmet / totalRiders) * 1000) / 10 : 0.0;
+    const violationRate = totalRiders > 0 ? Math.round((withoutHelmet / totalRiders) * 1000) / 10 : 0.0;
+    const avgConf = confidences.length > 0 ? Math.round((confidences.reduce((a, b) => a + b, 0) / confidences.length) * 1000) / 10 : 0.0;
+    const avgInf = inferenceTimes.length > 0 ? Math.round((inferenceTimes.reduce((a, b) => a + b, 0) / inferenceTimes.length) * 10) / 10 : 0.0;
+
+    const riderTotalViol = driverViolations + passengerViolations;
+    const driverPct = riderTotalViol > 0 ? Math.round((driverViolations / riderTotalViol) * 1000) / 10 : 0.0;
+    const passPct = riderTotalViol > 0 ? Math.round((passengerViolations / riderTotalViol) * 1000) / 10 : 0.0;
+
+    const violationsOverTime = Object.entries(hourlyMap).map(([hour, counts]) => ({
+      hour,
+      violations: counts.violations,
+      compliant: counts.compliant
+    })).sort((a, b) => a.hour.localeCompare(b.hour));
+
+    return {
+      totalDetections,
+      totalMotorcycles,
+      totalDrivers,
+      totalPassengers,
+      withHelmet,
+      withoutHelmet,
+      totalViolations,
+      driverViolations,
+      passengerViolations,
+      helmetCompliancePercentage: compliancePct,
+      violationRate,
+      averageConfidence: avgConf,
+      averageInferenceTime: avgInf,
+      detectionsOverTime: timelineDetections.slice(-20),
+      violationsOverTime,
+      riderComparison: {
+        driverViolations,
+        passengerViolations,
+        driverPercent: driverPct,
+        passengerPercent: passPct
+      },
+      totalRecords: records.length
+    };
+  },
+
   /**
    * Fetch real aggregated metrics for Analytics page.
    * NO MOCK DATA.
@@ -460,7 +567,9 @@ export const api = {
       });
       if (res.ok) {
         const json = await res.json();
-        return json.data || null;
+        if (json.data && (json.data.totalRecords > 0 || json.data.totalDetections > 0)) {
+          return json.data;
+        }
       }
     } catch {
       // Fallback to Express backend
@@ -472,10 +581,18 @@ export const api = {
       });
       if (res.ok) {
         const json = await res.json();
-        return json.data || null;
+        if (json.data && (json.data.totalRecords > 0 || json.data.totalDetections > 0)) {
+          return json.data;
+        }
       }
     } catch {
       // Both unreachable
+    }
+
+    // Direct fallback: Calculate metrics dynamically from local detection store
+    const detections = await this.getDetections();
+    if (detections.length > 0) {
+      return this.computeMetricsFromRecords(detections);
     }
 
     return null;

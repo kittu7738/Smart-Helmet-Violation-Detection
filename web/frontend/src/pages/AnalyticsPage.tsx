@@ -287,8 +287,12 @@ export const AnalyticsPage: React.FC = () => {
                 </p>
               </div>
               <span className="badge-violation px-2.5 py-1 rounded-md text-xs font-semibold shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap" title="Surveillance infraction frequency">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                {peakViolations > 0 ? `Peak: ${peakHour} (${peakViolations} viol.)` : 'Awaiting Data'}
+                <span className={`w-1.5 h-1.5 rounded-full ${peakViolations > 0 ? 'bg-rose-500 animate-pulse' : (metrics?.totalRecords || 0) > 0 ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                {peakViolations > 0
+                  ? `Peak: ${peakHour} (${peakViolations} viol.)`
+                  : (metrics?.totalRecords || 0) > 0
+                  ? '100% Compliant (0 Infractions)'
+                  : 'Awaiting Data'}
               </span>
             </div>
 
@@ -342,6 +346,10 @@ export const AnalyticsPage: React.FC = () => {
                 <>
                   <strong className="text-slate-800">Peak at {peakHour} ({peakViolations} violations recorded):</strong> Real Co-DETR detection counts across surveillance runs.
                 </>
+              ) : (metrics?.totalRecords || 0) > 0 ? (
+                <>
+                  <strong className="text-emerald-700">100% Helmet Compliance:</strong> All {metrics?.withHelmet || 0} monitored riders across {metrics?.totalRecords || 1} surveillance scan(s) were wearing safety helmets.
+                </>
               ) : (
                 <>
                   <strong className="text-slate-800">Live surveillance telemetry:</strong> Real-time helmet violations and compliance rates will appear here as detections run.
@@ -386,7 +394,11 @@ export const AnalyticsPage: React.FC = () => {
           </div>
 
           <p className="text-xs text-slate-500 pt-1">
-            Secondary riders exhibit lower compliance adherence, representing an enforcement priority.
+            {totalRiderViolations > 0
+              ? 'Secondary riders exhibit lower compliance adherence, representing an enforcement priority.'
+              : (metrics?.totalRecords || 0) > 0
+              ? 'All observed drivers and passengers were fully helmet compliant across recorded surveillance scans.'
+              : 'Secondary riders exhibit lower compliance adherence, representing an enforcement priority.'}
           </p>
         </div>
 
