@@ -31,6 +31,61 @@ class DetectionStore:
         self._records: List[Dict[str, Any]] = []
         self._load_from_disk()
 
+    def _normalize_record(self, rec: Dict[str, Any]) -> Dict[str, Any]:
+        """Ensures summary counts and violation flags adhere to conf >= 0.20 threshold."""
+        dets = rec.get("detections", [])
+        motorcycles = 0
+        drivers = 0
+        passengers = 0
+        with_helmet = 0
+        without_helmet = 0
+        driver_violations = 0
+        passenger_violations = 0
+
+        for det in dets:
+            cname = det.get("className", "")
+            conf = float(det.get("confidence", 0.0))
+            is_viol = (cname in ("driver_without_helmet", "passenger_without_helmet")) and (conf >= 0.20)
+            det["violation"] = is_viol
+
+            if cname == "bike":
+                if conf >= 0.20:
+                    motorcycles += 1
+            elif "driver" in cname:
+                if conf >= 0.20:
+                    drivers += 1
+                if "with_helmet" in cname:
+                    if conf >= 0.20:
+                        with_helmet += 1
+                elif "without_helmet" in cname:
+                    if conf >= 0.20:
+                        without_helmet += 1
+                        driver_violations += 1
+            elif "passenger" in cname:
+                if conf >= 0.20:
+                    passengers += 1
+                if "with_helmet" in cname:
+                    if conf >= 0.20:
+                        with_helmet += 1
+                elif "without_helmet" in cname:
+                    if conf >= 0.20:
+                        without_helmet += 1
+                        passenger_violations += 1
+
+        total_violations = driver_violations + passenger_violations
+        rec["summary"] = {
+            "motorcycles": motorcycles,
+            "drivers": drivers,
+            "passengers": passengers,
+            "withHelmet": with_helmet,
+            "withoutHelmet": without_helmet,
+            "violations": total_violations,
+            "driverViolations": driver_violations,
+            "passengerViolations": passenger_violations,
+        }
+        rec["status"] = "VIOLATION DETECTED" if total_violations > 0 else "NO VIOLATION"
+        return rec
+
     def _load_from_disk(self):
         """Loads existing records from disk if available."""
         if os.path.isfile(self.store_path) and os.path.getsize(self.store_path) > 0:
@@ -38,7 +93,7 @@ class DetectionStore:
                 with open(self.store_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     if isinstance(data, list):
-                        self._records = data
+                        self._records = [self._normalize_record(r) for r in data]
                         print(f"[{time.strftime('%H:%M:%S')}] [DetectionStore] Loaded {len(self._records)} real detection records from {self.store_path}")
             except Exception as e:
                 print(f"[WARN] [DetectionStore] Failed to load {self.store_path}: {e}")
@@ -95,29 +150,35 @@ class DetectionStore:
                 cname = det.get("class_name", "")
                 conf = float(det.get("confidence", 0.0))
                 bbox = det.get("bbox", [0, 0, 0, 0])
-                violation = bool(det.get("violation", False))
 
-                # Exact violation definition: ONLY driver_without_helmet or passenger_without_helmet
+                # Exact violation definition: ONLY driver_without_helmet or passenger_without_helmet with operational confidence >= 0.20
                 is_driver_violation = (cname == "driver_without_helmet")
                 is_passenger_violation = (cname == "passenger_without_helmet")
-                is_violation = is_driver_violation or is_passenger_violation
+                is_violation = (is_driver_violation or is_passenger_violation) and (conf >= 0.20)
 
                 if cname == "bike":
-                    motorcycles += 1
+                    if conf >= 0.20:
+                        motorcycles += 1
                 elif "driver" in cname:
-                    drivers += 1
+                    if conf >= 0.20:
+                        drivers += 1
                     if "with_helmet" in cname:
-                        with_helmet += 1
+                        if conf >= 0.20:
+                            with_helmet += 1
                     elif "without_helmet" in cname:
-                        without_helmet += 1
-                        driver_violations += 1
+                        if conf >= 0.20:
+                            without_helmet += 1
+                            driver_violations += 1
                 elif "passenger" in cname:
-                    passengers += 1
+                    if conf >= 0.20:
+                        passengers += 1
                     if "with_helmet" in cname:
-                        with_helmet += 1
+                        if conf >= 0.20:
+                            with_helmet += 1
                     elif "without_helmet" in cname:
-                        without_helmet += 1
-                        passenger_violations += 1
+                        if conf >= 0.20:
+                            without_helmet += 1
+                            passenger_violations += 1
 
                 norm_detections.append({
                     "className": cname,
@@ -175,6 +236,7 @@ class DetectionStore:
     def add_custom_record(self, record_data: Dict[str, Any]) -> Dict[str, Any]:
         """Allows direct insertion of an already normalized record with deduplication."""
         with self._lock:
+            record_data = self._normalize_record(record_data)
             rec_id = record_data.get("id")
             if rec_id and any(r.get("id") == rec_id for r in self._records):
                 return record_data
@@ -214,12 +276,14 @@ class DetectionStore:
         rider_type: Optional[str] = None,
         status: Optional[str] = None,
         limit: Optional[int] = None,
+        min_confidence: float = 0.20,
     ) -> List[Dict[str, Any]]:
         """
         Derives violation rows for Reports page.
         A violation is created ONLY when a real detection contains:
           - driver_without_helmet (riderType: DRIVER)
           - passenger_without_helmet (riderType: PASSENGER)
+          and meets the operational confidence threshold (default >= 0.20)
         """
         with self._lock:
             violation_rows = []
@@ -241,10 +305,14 @@ class DetectionStore:
                     if cname not in ("driver_without_helmet", "passenger_without_helmet"):
                         continue
 
+                    conf = float(det.get("confidence", 0.0))
+                    if conf < min_confidence:
+                        continue
+
                     is_driver = (cname == "driver_without_helmet")
                     r_type = "DRIVER" if is_driver else "PASSENGER"
                     v_label = "Driver Without Helmet" if is_driver else "Passenger Without Helmet"
-                    conf_pct = round(float(det.get("confidence", 0.0)) * 100, 1)
+                    conf_pct = round(conf * 100, 1)
 
                     row = {
                         "id": f"{rec['id']}-v{idx}",

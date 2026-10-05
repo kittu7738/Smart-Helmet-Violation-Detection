@@ -207,6 +207,37 @@ class TestDataFlow(unittest.TestCase):
         self.assertEqual(len(violations), 1)
         self.assertEqual(violations[0]["status"], "VIOLATION DETECTED")
 
+    def test_low_confidence_noise_filtered_from_violations(self):
+        """
+        Verify that candidate proposals with confidence < 0.20 (e.g. 16.3%, 12.5%, 6.6%)
+        are kept in raw detections for slider inspection, but filtered out from:
+          1. Record summary.violations (must be 0)
+          2. Record status (must be NO VIOLATION)
+          3. Reports get_violations() (must return 0 rows)
+        """
+        pred_low_conf = {
+            "detections": [
+                {"class_name": "bike", "confidence": 0.85, "bbox": [10, 10, 50, 50], "violation": False},
+                {"class_name": "driver_with_helmet", "confidence": 0.72, "bbox": [20, 20, 40, 40], "violation": False},
+                # Low confidence noise candidates (like test3.jpeg)
+                {"class_name": "driver_without_helmet", "confidence": 0.163, "bbox": [25, 25, 35, 35], "violation": True},
+                {"class_name": "driver_without_helmet", "confidence": 0.125, "bbox": [22, 22, 32, 32], "violation": True},
+                {"class_name": "driver_without_helmet", "confidence": 0.066, "bbox": [21, 21, 31, 31], "violation": True},
+            ],
+            "summary": {"vehicles": 1, "riders": 4, "helmet_detected": 1, "violations": 0},
+            "inference_time_ms": 110.0
+        }
+
+        rec = self.store.add_prediction(pred_low_conf, "test3.jpeg")
+        self.assertEqual(rec["summary"]["violations"], 0, "Violations with conf < 0.20 must not be counted in summary")
+        self.assertEqual(rec["summary"]["withoutHelmet"], 0)
+        self.assertEqual(rec["status"], "NO VIOLATION")
+        self.assertEqual(len(rec["detections"]), 5, "All candidates must be preserved in detections for UI slider")
+
+        # Reports get_violations() must return 0 rows
+        violations = self.store.get_violations()
+        self.assertEqual(len(violations), 0, "No violations below 20% confidence should appear in Reports")
+
 
 if __name__ == "__main__":
     unittest.main()

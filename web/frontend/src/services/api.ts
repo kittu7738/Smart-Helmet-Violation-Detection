@@ -325,23 +325,28 @@ export const api = {
 
     for (const det of result.detections) {
       const cn = det.class_name.toLowerCase();
+      const conf = det.confidence || 0;
       if (cn === 'bike') {
-        motorcycles++;
+        if (conf >= 0.20) motorcycles++;
       } else if (cn.includes('driver')) {
-        drivers++;
+        if (conf >= 0.20) drivers++;
         if (cn === 'driver_without_helmet' || det.violation) {
-          withoutHelmet++;
-          driverViolations++;
+          if (conf >= 0.20) {
+            withoutHelmet++;
+            driverViolations++;
+          }
         } else if (cn === 'driver_with_helmet') {
-          withHelmet++;
+          if (conf >= 0.20) withHelmet++;
         }
       } else if (cn.includes('passenger')) {
-        passengers++;
+        if (conf >= 0.20) passengers++;
         if (cn === 'passenger_without_helmet' || det.violation) {
-          withoutHelmet++;
-          passengerViolations++;
+          if (conf >= 0.20) {
+            withoutHelmet++;
+            passengerViolations++;
+          }
         } else if (cn === 'passenger_with_helmet') {
-          withHelmet++;
+          if (conf >= 0.20) withHelmet++;
         }
       }
     }
@@ -357,7 +362,7 @@ export const api = {
         displayName: d.display_name,
         confidence: d.confidence,
         bbox: d.bbox,
-        violation: d.class_name === 'driver_without_helmet' || d.class_name === 'passenger_without_helmet'
+        violation: (d.class_name === 'driver_without_helmet' || d.class_name === 'passenger_without_helmet') && (d.confidence >= 0.20)
       })),
       summary: {
         motorcycles: motorcycles || result.summary.vehicles,

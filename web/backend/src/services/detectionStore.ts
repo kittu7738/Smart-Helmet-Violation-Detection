@@ -89,6 +89,57 @@ const STORE_PATH = process.env.VERCEL
 let records: DetectionRecord[] = [];
 let storeLoaded = false;
 
+function normalizeRecord(rec: DetectionRecord): DetectionRecord {
+  let driverViolations = 0;
+  let passengerViolations = 0;
+  let drivers = 0;
+  let passengers = 0;
+  let motorcycles = 0;
+  let withHelmet = 0;
+  let withoutHelmet = 0;
+
+  for (const det of rec.detections || []) {
+    const cn = (det.className || '').toLowerCase();
+    const conf = det.confidence || 0;
+    const isViol = (cn === 'driver_without_helmet' || cn === 'passenger_without_helmet') && conf >= 0.20;
+    det.violation = isViol;
+
+    if (cn === 'bike') {
+      if (conf >= 0.20) motorcycles++;
+    } else if (cn.includes('driver')) {
+      if (conf >= 0.20) drivers++;
+      if (cn.includes('with_helmet') && conf >= 0.20) {
+        withHelmet++;
+      } else if (cn.includes('without_helmet') && conf >= 0.20) {
+        withoutHelmet++;
+        driverViolations++;
+      }
+    } else if (cn.includes('passenger')) {
+      if (conf >= 0.20) passengers++;
+      if (cn.includes('with_helmet') && conf >= 0.20) {
+        withHelmet++;
+      } else if (cn.includes('without_helmet') && conf >= 0.20) {
+        withoutHelmet++;
+        passengerViolations++;
+      }
+    }
+  }
+
+  const totalViolations = driverViolations + passengerViolations;
+  rec.summary = {
+    motorcycles,
+    drivers,
+    passengers,
+    withHelmet,
+    withoutHelmet,
+    violations: totalViolations,
+    driverViolations,
+    passengerViolations
+  };
+  rec.status = totalViolations > 0 ? 'VIOLATION DETECTED' : 'NO VIOLATION';
+  return rec;
+}
+
 function loadFromDisk(): void {
   if (storeLoaded) return;
   storeLoaded = true;
@@ -97,7 +148,7 @@ function loadFromDisk(): void {
       const raw = fs.readFileSync(STORE_PATH, 'utf-8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        records = parsed;
+        records = parsed.map(normalizeRecord);
         console.log(`[DetectionStore] Loaded ${records.length} record(s) from ${STORE_PATH}`);
       }
     }
@@ -122,6 +173,7 @@ function saveToDisk(): void {
 export const detectionStore = {
   addRecord(record: DetectionRecord): DetectionRecord {
     loadFromDisk();
+    record = normalizeRecord(record);
 
     // Idempotent deduplication guard
     if (records.length > 0) {
@@ -187,6 +239,11 @@ export const detectionStore = {
           continue;
         }
 
+        // Filter out noise below operational confidence threshold (< 20%)
+        if ((det.confidence || 0) < 0.20) {
+          continue;
+        }
+
         const isDriver = cname === 'driver_without_helmet';
         const riderType: 'DRIVER' | 'PASSENGER' = isDriver ? 'DRIVER' : 'PASSENGER';
         const violationLabel = isDriver ? 'Driver Without Helmet' : 'Passenger Without Helmet';
@@ -219,6 +276,10 @@ export const detectionStore = {
 
     if (params?.type && params.type !== 'ALL') {
       filtered = filtered.filter((v) => v.riderType === params.type);
+    }
+
+    if (params?.status && params.status !== 'ALL') {
+      filtered = filtered.filter((v) => v.status === params.status);
     }
 
     const limit = params?.limit || 500;

@@ -163,6 +163,7 @@ def get_violations(
     type: Optional[str] = Query(None, description="Rider type filter: ALL, DRIVER, PASSENGER"),
     status: Optional[str] = Query(None, description="Status filter: ALL, Detected, Logged, Reviewed"),
     limit: Optional[int] = Query(None, ge=1, le=500, description="Maximum rows to return"),
+    min_confidence: Optional[float] = Query(0.20, ge=0.0, le=1.0, description="Minimum confidence threshold for violations"),
 ):
     """
     Derives violation records dynamically from real Co-DETR detection records.
@@ -173,6 +174,7 @@ def get_violations(
         rider_type=type,
         status=status,
         limit=limit,
+        min_confidence=min_confidence if min_confidence is not None else 0.20,
     )
     return {
         "success": True,
