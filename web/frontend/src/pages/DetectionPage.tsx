@@ -97,7 +97,7 @@ interface DetectionHistoryItem {
   result: string;
   confidence: number;
   time: string;
-  status: 'VIOLATION' | 'COMPLIANT';
+  status: 'VIOLATION DETECTED' | 'NO VIOLATION' | 'ANALYZING' | 'DETECTION FAILED';
   previewUrl: string;
 }
 
@@ -225,8 +225,13 @@ export const DetectionPage: React.FC = () => {
         const result = await api.detectImage(file, confidenceThreshold);
         setPrediction(result);
 
-        // Add real result to recent detections
-        const hasViolation = result.summary.violations > 0;
+        // Check for violations (driver_without_helmet or passenger_without_helmet) above confidenceThreshold
+        const violationsAboveThr = result.detections.filter(
+          (d) =>
+            (d.violation || d.class_name === 'driver_without_helmet' || d.class_name === 'passenger_without_helmet') &&
+            d.confidence >= confidenceThreshold
+        );
+        const hasViolation = violationsAboveThr.length > 0;
         const maxConf = result.detections.length > 0
           ? Math.max(...result.detections.map(d => d.confidence))
           : 0.92;
@@ -235,10 +240,10 @@ export const DetectionPage: React.FC = () => {
           id: Date.now(),
           fileName: file.name,
           type: file.type.startsWith('video') ? 'Video' : 'Image',
-          result: hasViolation ? `${result.summary.violations} Violation(s) Found` : 'Compliant',
+          result: hasViolation ? 'VIOLATION DETECTED' : 'NO VIOLATION',
           confidence: maxConf,
           time: 'Just now',
-          status: hasViolation ? 'VIOLATION' : 'COMPLIANT',
+          status: hasViolation ? 'VIOLATION DETECTED' : 'NO VIOLATION',
           previewUrl: url
         };
 
@@ -251,15 +256,20 @@ export const DetectionPage: React.FC = () => {
         const fallback = api.getSimulatedDetection(w, h);
         setPrediction(fallback);
 
-        const hasViolation = fallback.summary.violations > 0;
+        const violationsAboveThr = fallback.detections.filter(
+          (d) =>
+            (d.violation || d.class_name === 'driver_without_helmet' || d.class_name === 'passenger_without_helmet') &&
+            d.confidence >= confidenceThreshold
+        );
+        const hasViolation = violationsAboveThr.length > 0;
         const newRecord: DetectionHistoryItem = {
           id: Date.now(),
           fileName: file.name,
           type: 'Image',
-          result: hasViolation ? `${fallback.summary.violations} Violation(s) Found` : 'Compliant',
+          result: hasViolation ? 'VIOLATION DETECTED' : 'NO VIOLATION',
           confidence: 0.91,
           time: 'Just now',
-          status: hasViolation ? 'VIOLATION' : 'COMPLIANT',
+          status: hasViolation ? 'VIOLATION DETECTED' : 'NO VIOLATION',
           previewUrl: url
         };
         setRecentDetections((prev) => [newRecord, ...prev]);
@@ -490,21 +500,35 @@ export const DetectionPage: React.FC = () => {
 
               {/* Analysis Status Badge */}
               {isProcessing && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
-                  Analyzing...
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  ANALYZING
                 </span>
               )}
-              {!isProcessing && detectionResult && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-                  Analysis Complete
-                </span>
+              {!isProcessing && prediction && (
+                (() => {
+                  const hasViolation = prediction.detections.some(
+                    (d) =>
+                      (d.violation || d.class_name === 'driver_without_helmet' || d.class_name === 'passenger_without_helmet') &&
+                      d.confidence >= confidenceThreshold
+                  );
+                  return hasViolation ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
+                      VIOLATION DETECTED
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                      NO VIOLATION
+                    </span>
+                  );
+                })()
               )}
-              {errorMessage && !isProcessing && (
+              {errorMessage && !isProcessing && !prediction && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
-                  Error
+                  DETECTION FAILED
                 </span>
               )}
 
@@ -809,17 +833,30 @@ export const DetectionPage: React.FC = () => {
                 <div className="col-span-2 font-medium text-slate-900 truncate">
                   {item.fileName}
                 </div>
-                <div className="col-span-1 text-slate-500">{item.type}</div>
-                <div className="col-span-3 font-medium">{item.result}</div>
+                <div className="col-span-3 font-semibold">
+                  <span
+                    className={
+                      item.status === 'VIOLATION DETECTED' || item.status === 'DETECTION FAILED'
+                        ? 'text-rose-600'
+                        : item.status === 'ANALYZING'
+                        ? 'text-amber-600'
+                        : 'text-emerald-600'
+                    }
+                  >
+                    {item.result}
+                  </span>
+                </div>
                 <div className="col-span-2 font-semibold text-slate-800">
                   {(item.confidence * 100).toFixed(1)}%
                 </div>
                 <div className="col-span-1 text-slate-400">{item.time}</div>
                 <div className="col-span-1">
                   <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
-                      item.status === 'VIOLATION'
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase whitespace-nowrap ${
+                      item.status === 'VIOLATION DETECTED' || item.status === 'DETECTION FAILED'
                         ? 'bg-rose-50 text-rose-600 border border-rose-200/80'
+                        : item.status === 'ANALYZING'
+                        ? 'bg-amber-50 text-amber-600 border border-amber-200/80'
                         : 'bg-emerald-50 text-emerald-600 border border-emerald-200/80'
                     }`}
                   >
