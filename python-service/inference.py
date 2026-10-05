@@ -209,6 +209,20 @@ class CoDETRPredictor:
                 if is_violation:
                     violations_count += 1
 
+        total_raw = sum(len(c) for c in raw_results if c is not None)
+        print(f"\n[{time.strftime('%H:%M:%S')}] ═══════════ INFERENCE AUDIT ═══════════", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] 1. Total raw detections before filtering : {total_raw}", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] 2. Raw detections list:", flush=True)
+        for c_idx, c_dets in enumerate(raw_results):
+            if c_dets is not None and len(c_dets) > 0:
+                cn = EXPECTED_CLASSES[c_idx] if c_idx < len(EXPECTED_CLASSES) else f"class_{c_idx}"
+                for d in c_dets:
+                    print(f"      • Cls {c_idx} ({cn}) | Conf: {float(d[4])*100:.2f}% ({float(d[4]):.4f}) | Box: {[round(float(x), 1) for x in d[:4]]}", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] 3. Detections after threshold ({thr:.2f})  : {len(detections)}", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] 4. Post-NMS / model test_cfg count        : {total_raw}", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] 5. Detections returned to frontend        : {len(detections)}", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] ═════════════════════════════════════════\n", flush=True)
+
         summary = DetectionSummary(
             vehicles=vehicles_count,
             riders=riders_count,
