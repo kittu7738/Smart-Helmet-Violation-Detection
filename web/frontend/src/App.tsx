@@ -15,9 +15,14 @@ import { mockDashboardStats, mockLiveDetection, mockRecentViolations } from './d
 
 export const App: React.FC = () => {
   const getInitialTab = (): NavTab | 'violations' => {
-    const hash = window.location.hash.replace('#', '');
+    // If URL has ?room=, default to camera page
+    if (typeof window !== 'undefined' && window.location.search.includes('room=')) {
+      return 'camera';
+    }
+    const rawHash = (typeof window !== 'undefined' ? window.location.hash : '').replace(/^#\/?/, '');
+    const tabName = rawHash.split('?')[0].split('/')[0].toLowerCase();
     const validTabs = ['dashboard', 'detection', 'video', 'camera', 'analytics', 'reports', 'about', 'violations'];
-    return validTabs.includes(hash) ? (hash as any) : 'dashboard';
+    return validTabs.includes(tabName) ? (tabName as any) : 'dashboard';
   };
 
   const [activeTab, setActiveTabState] = useState<NavTab | 'violations'>(getInitialTab);
@@ -31,10 +36,11 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '');
+      const rawHash = window.location.hash.replace(/^#\/?/, '');
+      const tabName = rawHash.split('?')[0].split('/')[0].toLowerCase();
       const validTabs = ['dashboard', 'detection', 'video', 'camera', 'analytics', 'reports', 'about', 'violations'];
-      if (validTabs.includes(hash)) {
-        setActiveTabState(hash as any);
+      if (validTabs.includes(tabName)) {
+        setActiveTabState(tabName as any);
       }
     };
     window.addEventListener('hashchange', handleHashChange);

@@ -29,7 +29,7 @@ export const LiveCameraPage: React.FC = () => {
   const [roomCode, setRoomCode] = useState<string>('');
   const [isPhoneConnected, setIsPhoneConnected] = useState<boolean>(false);
 
-  // Camera states (for local or broadcaster)
+  // Camera states
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [selectedResolution, setSelectedResolution] = useState<'1280x720' | '1920x1080' | '640x384'>('1280x720');
@@ -51,17 +51,19 @@ export const LiveCameraPage: React.FC = () => {
   const [currentTime, setCurrentTime] = useState<string>(new Date().toLocaleTimeString([], { hour12: false }));
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
 
-  // Side panel tab: 'controls' | 'telemetry' | 'phone-pairing'
-  const [activeTab, setActiveTab] = useState<'controls' | 'telemetry' | 'phone-pairing'>('phone-pairing');
+  // Side panel tab: 'phone-pairing' | 'controls' | 'telemetry'
+  const [activeTab, setActiveTab] = useState<'phone-pairing' | 'controls' | 'telemetry'>('phone-pairing');
 
   // DOM Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const detectionTimerRef = useRef<any>(null);
+  const broadcastTimerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const peerRef = useRef<Peer | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteFrameImgRef = useRef<HTMLImageElement | null>(null);
 
   // Clock ticker
   useEffect(() => {
@@ -104,24 +106,24 @@ export const LiveCameraPage: React.FC = () => {
     const rParam = hashParams.get('room') || urlParams.get('room');
 
     if (rParam) {
-      // Opened on Mobile or with room code in URL!
-      setRoomCode(rParam);
+      // Opened on Mobile via QR code or shared link!
+      const cleanRoom = rParam.toLowerCase().replace(/[^a-z0-9]/g, '');
+      setRoomCode(cleanRoom);
       setMode('broadcaster');
       setActiveTab('controls');
     } else {
       // Opened on Laptop as Monitor
-      const randomRoom = `HELMET-${Math.floor(1000 + Math.random() * 9000)}`;
+      const randomRoom = `cam${Math.floor(1000 + Math.random() * 9000)}`;
       setRoomCode(randomRoom);
       setMode('monitor');
       setActiveTab('phone-pairing');
     }
   }, []);
 
-  // Initialize PeerJS based on mode and roomCode
+  // Initialize PeerJS & Dual Relay based on mode and roomCode
   useEffect(() => {
     if (!roomCode || typeof window === 'undefined') return;
 
-    // Destroy existing peer
     if (peerRef.current) {
       peerRef.current.destroy();
       peerRef.current = null;
@@ -140,11 +142,11 @@ export const LiveCameraPage: React.FC = () => {
         });
 
         peer.on('call', (call) => {
-          // Answer incoming call from mobile phone
           call.answer();
           call.on('stream', (remoteStream) => {
             if (videoRef.current) {
               videoRef.current.srcObject = remoteStream;
+              videoRef.current.muted = true;
               videoRef.current.play().catch(() => {});
             }
             setIsPhoneConnected(true);
@@ -153,22 +155,59 @@ export const LiveCameraPage: React.FC = () => {
           });
           call.on('close', () => {
             setIsPhoneConnected(false);
-            setIsCameraActive(false);
           });
         });
 
         peer.on('error', (err) => {
-          console.warn('Peer error on monitor:', err);
+          console.warn('Monitor peer error:', err);
           if (err.type === 'unavailable-id') {
-            // Room already taken, regenerate
-            const newRoom = `HELMET-${Math.floor(1000 + Math.random() * 9000)}`;
-            setRoomCode(newRoom);
+            const nextRoom = `cam${Math.floor(1000 + Math.random() * 9000)}`;
+            setRoomCode(nextRoom);
           }
         });
 
         peerRef.current = peer;
+
+        // Fallback Frame Relay via SSE (guarantees feed even if carrier blocks P2P)
+        let eventSource: EventSource | null = null;
+        try {
+          eventSource = new EventSource(`https://ntfy.sh/sh-stream-${roomCode}/raw`);
+          eventSource.onmessage = (e) => {
+            if (e.data && e.data.startsWith('data:image/jpeg')) {
+              setIsPhoneConnected(true);
+              setIsCameraActive(true);
+              setStreamError(null);
+
+              const img = new Image();
+              img.onload = () => {
+                remoteFrameImgRef.current = img;
+                // If WebRTC video stream is not directly streaming, render the relay frame
+                if (!videoRef.current || !videoRef.current.srcObject) {
+                  const canvas = overlayCanvasRef.current;
+                  if (canvas) {
+                    if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+                      canvas.width = canvas.clientWidth;
+                      canvas.height = canvas.clientHeight;
+                    }
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    }
+                  }
+                }
+              };
+              img.src = e.data;
+            }
+          };
+        } catch (sseErr) {
+          console.warn('SSE relay error:', sseErr);
+        }
+
+        return () => {
+          if (eventSource) eventSource.close();
+        };
       } else if (mode === 'broadcaster') {
-        // Phone creates a client peer
+        // Phone connects as broadcaster
         const peer = new Peer({
           config: {
             iceServers: [
@@ -216,23 +255,54 @@ export const LiveCameraPage: React.FC = () => {
       // Show local preview on mobile
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.muted = true;
         await videoRef.current.play().catch(() => {});
       }
       setIsCameraActive(true);
 
-      // Call the laptop monitor peer!
-      if (peerRef.current && roomCode) {
-        const call = peerRef.current.call(roomCode, stream);
-        if (call) {
-          setIsPhoneConnected(true);
-          call.on('close', () => {
-            setIsPhoneConnected(false);
-          });
-          call.on('error', (err) => {
-            console.warn('Call error:', err);
+      // 1. WebRTC Call to Laptop Monitor
+      const initiateCall = (peer: Peer) => {
+        try {
+          const call = peer.call(roomCode, stream);
+          if (call) {
+            setIsPhoneConnected(true);
+            call.on('close', () => setIsPhoneConnected(false));
+            call.on('error', (e) => console.warn('Call error:', e));
+          }
+        } catch (e) {
+          console.warn('Call initiation error:', e);
+        }
+      };
+
+      if (peerRef.current) {
+        if (peerRef.current.open) {
+          initiateCall(peerRef.current);
+        } else {
+          peerRef.current.on('open', () => {
+            if (peerRef.current) initiateCall(peerRef.current);
           });
         }
       }
+
+      // 2. High-speed Relay Frame Sync (guaranteed fallback even across strict cellular NAT)
+      if (broadcastTimerRef.current) clearInterval(broadcastTimerRef.current);
+      broadcastTimerRef.current = setInterval(() => {
+        const v = videoRef.current;
+        if (!v || v.readyState < 2) return;
+
+        const cvs = document.createElement('canvas');
+        cvs.width = 480;
+        cvs.height = Math.round(480 * ((v.videoHeight || 360) / (v.videoWidth || 480)));
+        const ctx = cvs.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(v, 0, 0, cvs.width, cvs.height);
+          const dataUrl = cvs.toDataURL('image/jpeg', 0.60);
+          fetch(`https://ntfy.sh/sh-stream-${roomCode}`, {
+            method: 'POST',
+            body: dataUrl
+          }).catch(() => {});
+        }
+      }, 600);
     } catch (err: any) {
       console.error('Camera broadcast error:', err);
       try {
@@ -240,6 +310,7 @@ export const LiveCameraPage: React.FC = () => {
         localStreamRef.current = fallbackStream;
         if (videoRef.current) {
           videoRef.current.srcObject = fallbackStream;
+          videoRef.current.muted = true;
           await videoRef.current.play().catch(() => {});
         }
         setIsCameraActive(true);
@@ -268,16 +339,21 @@ export const LiveCameraPage: React.FC = () => {
       localStreamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.muted = true;
         await videoRef.current.play().catch(() => {});
       }
       setIsCameraActive(true);
-    } catch (err: any) {
-      setStreamError('Could not access laptop webcam. Check permissions.');
+    } catch {
+      setStreamError('Could not access laptop webcam. Check browser permissions.');
       setIsCameraActive(false);
     }
   };
 
   const stopCameraTracks = () => {
+    if (broadcastTimerRef.current) {
+      clearInterval(broadcastTimerRef.current);
+      broadcastTimerRef.current = null;
+    }
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
@@ -304,16 +380,8 @@ export const LiveCameraPage: React.FC = () => {
       if (mode === 'broadcaster') {
         await startBroadcasting(nextFacing);
       } else {
-        await startCamera(nextFacing);
+        await startLocalWebcam();
       }
-    }
-  };
-
-  const startCamera = async (overrideFacing?: 'environment' | 'user') => {
-    if (mode === 'broadcaster') {
-      await startBroadcasting(overrideFacing);
-    } else {
-      await startLocalWebcam();
     }
   };
 
@@ -337,7 +405,14 @@ export const LiveCameraPage: React.FC = () => {
       canvas.height = canvas.clientHeight;
     }
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Only clear if video is active (if relying on frame relay, preserve background image)
+    if (videoRef.current && videoRef.current.srcObject) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    } else if (remoteFrameImgRef.current) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(remoteFrameImgRef.current, 0, 0, canvas.width, canvas.height);
+    }
+
     if (!pred.detections || pred.detections.length === 0) return;
 
     const scaleX = canvas.width / frameW;
@@ -363,17 +438,17 @@ export const LiveCameraPage: React.FC = () => {
 
       const isWithHelmet = cn.includes('with_helmet') || dn.includes('with helmet');
 
-      let strokeColor = '#10B981'; // Green: Compliant
+      let strokeColor = '#10B981';
       let fillColor = 'rgba(16, 185, 129, 0.16)';
 
       if (isViolation) {
-        strokeColor = '#EF4444'; // Red: Non-Compliance Violation
+        strokeColor = '#EF4444';
         fillColor = 'rgba(239, 68, 68, 0.22)';
       } else if (isWithHelmet) {
-        strokeColor = '#10B981'; // Green: Compliant
+        strokeColor = '#10B981';
         fillColor = 'rgba(16, 185, 129, 0.16)';
       } else {
-        strokeColor = '#3B82F6'; // Blue: Motorcycle / Bike
+        strokeColor = '#3B82F6';
         fillColor = 'rgba(59, 130, 246, 0.14)';
       }
 
@@ -383,7 +458,7 @@ export const LiveCameraPage: React.FC = () => {
       ctx.fillRect(sx, sy, sw, sh);
       ctx.strokeRect(sx, sy, sw, sh);
 
-      // Corner reticle accents
+      // Corner reticles
       const cornerLen = Math.min(12, sw / 4, sh / 4);
       ctx.lineWidth = 3.5;
       ctx.beginPath();
@@ -436,7 +511,11 @@ export const LiveCameraPage: React.FC = () => {
   // Perform AI detection on the active stream frame (runs on Laptop Monitor or Broadcaster)
   const captureAndDetect = useCallback(async () => {
     const video = videoRef.current;
-    if (!video || video.readyState < 2 || isProcessingFrame || !isCameraActive || !isAiActive) {
+    const remoteImg = remoteFrameImgRef.current;
+    const hasVideo = video && video.readyState >= 2;
+    const hasRemoteImg = Boolean(remoteImg);
+
+    if ((!hasVideo && !hasRemoteImg) || isProcessingFrame || !isCameraActive || !isAiActive) {
       return;
     }
 
@@ -444,8 +523,8 @@ export const LiveCameraPage: React.FC = () => {
     const startMs = performance.now();
 
     try {
-      const vWidth = video.videoWidth || 640;
-      const vHeight = video.videoHeight || 384;
+      const vWidth = hasVideo ? (video.videoWidth || 640) : (remoteImg?.naturalWidth || 640);
+      const vHeight = hasVideo ? (video.videoHeight || 384) : (remoteImg?.naturalHeight || 384);
 
       if (!offscreenCanvasRef.current) {
         offscreenCanvasRef.current = document.createElement('canvas');
@@ -456,7 +535,12 @@ export const LiveCameraPage: React.FC = () => {
 
       const offCtx = offscreen.getContext('2d');
       if (!offCtx) return;
-      offCtx.drawImage(video, 0, 0, vWidth, vHeight);
+
+      if (hasVideo) {
+        offCtx.drawImage(video, 0, 0, vWidth, vHeight);
+      } else if (remoteImg) {
+        offCtx.drawImage(remoteImg, 0, 0, vWidth, vHeight);
+      }
 
       const blob = await new Promise<Blob | null>((resolve) =>
         offscreen.toBlob((b) => resolve(b), 'image/jpeg', 0.85)
@@ -540,10 +624,10 @@ export const LiveCameraPage: React.FC = () => {
     }
   };
 
-  // Full mobile direct pairing URL
+  // Full mobile pairing URL with standard ?room= query
   const mobilePairingUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/#camera?room=${encodeURIComponent(roomCode)}`
-    : `https://smart-helmet-violation-detection.vercel.app/#camera?room=${encodeURIComponent(roomCode)}`;
+    ? `${window.location.origin}/?room=${encodeURIComponent(roomCode)}#camera`
+    : `https://smart-helmet-violation-detection.vercel.app/?room=${encodeURIComponent(roomCode)}#camera`;
 
   const copyPairingLink = () => {
     navigator.clipboard.writeText(mobilePairingUrl);
@@ -571,7 +655,7 @@ export const LiveCameraPage: React.FC = () => {
               {isCameraActive
                 ? mode === 'monitor'
                   ? 'Phone Stream Live on Laptop'
-                  : 'Camera Streaming'
+                  : 'Broadcasting to Laptop'
                 : 'Awaiting Connection'}
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-mono bg-blue-50 text-blue-700 border border-blue-200/80 font-bold">
@@ -906,7 +990,7 @@ export const LiveCameraPage: React.FC = () => {
                           : 'bg-amber-50 text-amber-700 border border-amber-200'
                       }`}
                     >
-                      {isPhoneConnected ? 'PHONE CONNECTED' : 'WAITING FOR PHONE'}
+                      {isPhoneConnected ? 'PHONE STREAMING' : 'WAITING FOR PHONE'}
                     </span>
                   </div>
 
@@ -1101,7 +1185,7 @@ export const LiveCameraPage: React.FC = () => {
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-500">Video Bridge</span>
                 <span className="font-semibold text-slate-800">
-                  {mode === 'monitor' ? 'WebRTC Laptop Receiver' : 'WebRTC Mobile Sensor'}
+                  {mode === 'monitor' ? 'Dual WebRTC + SSE Relay' : 'Mobile Sensor Streamer'}
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs">
