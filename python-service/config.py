@@ -11,19 +11,58 @@ import os
 SERVICE_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.abspath(os.path.join(SERVICE_DIR, ".."))
 
-# Model configuration and checkpoint defaults
-MODEL_CONFIG = os.environ.get(
-    "MODEL_CONFIG",
-    os.path.join(REPO_ROOT, "configs/codetr/experiments/exp_K5_speed_fp16.py")
-)
+# Model configuration and checkpoint dynamic resolution
+def _resolve_config() -> str:
+    env_val = os.environ.get("MODEL_CONFIG")
+    if env_val and os.path.isfile(env_val):
+        return env_val
+    candidates = [
+        os.path.join(REPO_ROOT, "configs/codetr/experiments/exp_K5_speed_fp16.py"),
+        "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/configs/codetr/experiments/exp_K5_speed_fp16.py",
+        "/content/Smart-Helmet-Violation-Detection/configs/codetr/experiments/exp_K5_speed_fp16.py",
+    ]
+    for c in candidates:
+        if os.path.isfile(c):
+            return c
+    return candidates[0]
 
-MODEL_CHECKPOINT = os.environ.get(
-    "MODEL_CHECKPOINT",
-    os.path.join(
-        REPO_ROOT,
-        "work_dirs/k5_bs7_training/best_bbox_mAP_epoch_10.pth"
-    )
-)
+
+def _resolve_checkpoint() -> str:
+    env_val = os.environ.get("MODEL_CHECKPOINT")
+    if env_val and os.path.isfile(env_val):
+        return env_val
+
+    # Standard candidate paths
+    candidates = [
+        "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs/k5_bs7_training/best_bbox_mAP_epoch_10.pth",
+        os.path.join(REPO_ROOT, "work_dirs/k5_bs7_training/best_bbox_mAP_epoch_10.pth"),
+        "/content/Smart-Helmet-Violation-Detection/work_dirs/k5_bs7_training/best_bbox_mAP_epoch_10.pth",
+    ]
+    for c in candidates:
+        if os.path.isfile(c):
+            return c
+
+    # Glob search for best_bbox_mAP in possible work_dirs
+    import glob
+    search_dirs = [
+        "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs",
+        os.path.join(REPO_ROOT, "work_dirs"),
+        "/content/Smart-Helmet-Violation-Detection/work_dirs",
+    ]
+    for sdir in search_dirs:
+        if os.path.isdir(sdir):
+            matches = glob.glob(os.path.join(sdir, "**", "best_bbox_mAP*.pth"), recursive=True)
+            if matches:
+                return sorted(matches)[-1]
+            epoch_matches = glob.glob(os.path.join(sdir, "**", "epoch_*.pth"), recursive=True)
+            if epoch_matches:
+                return sorted(epoch_matches)[-1]
+
+    return candidates[0]
+
+
+MODEL_CONFIG = _resolve_config()
+MODEL_CHECKPOINT = _resolve_checkpoint()
 
 DEVICE = os.environ.get("DEVICE", "cuda")
 CONFIDENCE_THRESHOLD = float(os.environ.get("CONFIDENCE_THRESHOLD", "0.30"))

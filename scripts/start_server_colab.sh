@@ -24,8 +24,25 @@ pkill -f uvicorn 2>/dev/null || true
 pkill -f cloudflared 2>/dev/null || true
 sleep 1
 
+# Locate checkpoint
+CKPT_CANDS=(
+  "${MODEL_CHECKPOINT:-}"
+  "/content/drive/MyDrive/Smart-Helmet-Violation-Detection/work_dirs/k5_bs7_training/best_bbox_mAP_epoch_10.pth"
+  "${REPO_ROOT}/work_dirs/k5_bs7_training/best_bbox_mAP_epoch_10.pth"
+  "/content/Smart-Helmet-Violation-Detection/work_dirs/k5_bs7_training/best_bbox_mAP_epoch_10.pth"
+)
+for c in "${CKPT_CANDS[@]}"; do
+  if [[ -n "${c}" && -f "${c}" ]]; then
+    export MODEL_CHECKPOINT="${c}"
+    break
+  fi
+done
+
 # 2. Launch FastAPI with GPU model
 echo "[2/4] Launching FastAPI server (app:app) on port 8000..."
+if [[ -n "${MODEL_CHECKPOINT:-}" ]]; then
+  echo "      Checkpoint: ${MODEL_CHECKPOINT}"
+fi
 nohup "${PYTHON_BIN}" -m uvicorn app:app \
   --app-dir "${REPO_ROOT}/python-service" \
   --host 0.0.0.0 --port 8000 > /content/fastapi.log 2>&1 &
