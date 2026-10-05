@@ -39,32 +39,43 @@ for c in "${CKPT_CANDS[@]}"; do
 done
 
 # 2. Launch FastAPI with GPU model
-echo "[2/4] Launching FastAPI server (app:app) on port 8000..."
+echo "[2/4] Launching FastAPI server on port 8000..."
 if [[ -n "${MODEL_CHECKPOINT:-}" ]]; then
   echo "      Checkpoint: ${MODEL_CHECKPOINT}"
 fi
-nohup "${PYTHON_BIN}" -m uvicorn app:app \
-  --app-dir "${REPO_ROOT}/python-service" \
-  --host 0.0.0.0 --port 8000 > /content/fastapi.log 2>&1 &
+nohup "${PYTHON_BIN}" "${REPO_ROOT}/python-service/app.py" > /content/fastapi.log 2>&1 &
 
 FASTAPI_PID=$!
 echo "      FastAPI started in background (PID: ${FASTAPI_PID})."
 
 # 3. Launch Cloudflare Tunnel
 echo "[3/4] Launching Cloudflare Tunnel for public HTTPS access..."
-if command -v cloudflared &>/dev/null; then
-  nohup cloudflared tunnel --url http://127.0.0.1:8000 > /content/tunnel.log 2>&1 &
-  echo "      Cloudflare tunnel started in background."
-elif [[ -x "/usr/local/bin/cloudflared" ]]; then
-  nohup /usr/local/bin/cloudflared tunnel --url http://127.0.0.1:8000 > /content/tunnel.log 2>&1 &
+if ! command -v cloudflared &>/dev/null && [[ ! -x "/usr/local/bin/cloudflared" ]]; then
+  echo "      Downloading cloudflared binary..."
+  curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared 2>/dev/null || true
+  chmod +x /usr/local/bin/cloudflared 2>/dev/null || true
+fi
+
+CLOUDFLARED_BIN="$(command -v cloudflared || echo '/usr/local/bin/cloudflared')"
+if [[ -x "${CLOUDFLARED_BIN}" ]]; then
+  nohup "${CLOUDFLARED_BIN}" tunnel --url http://127.0.0.1:8000 > /content/tunnel.log 2>&1 &
   echo "      Cloudflare tunnel started in background."
 else
-  echo "      [WARN] cloudflared not found. Install via scripts/setup_codetr_colab.sh"
+  echo "      [WARN] cloudflared not found. Install via: curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared"
 fi
 
 # 4. Wait for warmup & retrieve public URL
-echo "[4/4] Waiting 12 seconds for Co-DETR model to initialize on GPU..."
-sleep 12
+echo "[4/4] Waiting for Co-DETR model initialization and public URL..."
+TUNNEL_URL=""
+for i in {1..25}; do
+  if [[ -f /content/tunnel.log ]]; then
+    TUNNEL_URL=$(grep -o 'https://[a-zA-Z0-9.-]*\.trycloudflare\.com' /content/tunnel.log 2>/dev/null | tail -1 || true)
+    if [[ -n "${TUNNEL_URL}" ]]; then
+      break
+    fi
+  fi
+  sleep 1
+done
 
 echo ""
 echo "====================================================================="
@@ -74,14 +85,13 @@ tail -n 10 /content/fastapi.log 2>/dev/null || true
 
 echo ""
 echo "====================================================================="
-if [[ -f /content/tunnel.log ]]; then
-  TUNNEL_URL=$(grep -o 'https://[a-zA-Z0-9.-]*\.trycloudflare\.com' /content/tunnel.log 2>/dev/null | tail -1 || true)
-  if [[ -n "${TUNNEL_URL}" ]]; then
-    echo "  🌐 PUBLIC HTTPS TUNNEL URL (Paste into Web App Settings):"
-    echo "     ${TUNNEL_URL}"
-  else
-    echo "  ℹ️  Cloudflare Tunnel is still negotiating. Check url with:"
-    echo "     !grep -o 'https://.*trycloudflare.com' /content/tunnel.log | tail -1"
-  fi
+if [[ -n "${TUNNEL_URL}" ]]; then
+  echo "  🌐 GLOBAL PUBLIC HTTPS TUNNEL URL:"
+  echo "     ${TUNNEL_URL}"
+  echo ""
+  echo "  👉 Paste this URL into your Web App settings / API URL input!"
+else
+  echo "  ℹ️  Cloudflare Tunnel is still initializing. Check url with:"
+  echo "     !grep -o 'https://.*trycloudflare.com' /content/tunnel.log | tail -1"
 fi
 echo "====================================================================="
