@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import Peer from 'peerjs';
+import Peer, { DataConnection } from 'peerjs';
 import {
   Camera,
   Radio,
@@ -19,7 +19,9 @@ import {
   Video,
   Activity,
   Maximize2,
-  CheckCircle2
+  CheckCircle2,
+  Eye,
+  History
 } from 'lucide-react';
 import { api, ImagePredictionResponse } from '../services/api';
 
@@ -51,6 +53,16 @@ export const LiveCameraPage: React.FC = () => {
   const [currentTime, setCurrentTime] = useState<string>(new Date().toLocaleTimeString([], { hour12: false }));
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
 
+  // Captured Violations Gallery
+  const [capturedViolations, setCapturedViolations] = useState<Array<{
+    id: string;
+    timestamp: string;
+    image: string;
+    violationName: string;
+    confidence: number;
+  }>>([]);
+  const [inspectModalImage, setInspectModalImage] = useState<string | null>(null);
+
   // Side panel tab: 'phone-pairing' | 'controls' | 'telemetry'
   const [activeTab, setActiveTab] = useState<'phone-pairing' | 'controls' | 'telemetry'>('phone-pairing');
 
@@ -62,8 +74,10 @@ export const LiveCameraPage: React.FC = () => {
   const broadcastTimerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const peerRef = useRef<Peer | null>(null);
+  const dataConnRef = useRef<DataConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteFrameImgRef = useRef<HTMLImageElement | null>(null);
+  const lastCaptureTimeRef = useRef<number>(0);
 
   // Clock ticker
   useEffect(() => {
@@ -84,7 +98,7 @@ export const LiveCameraPage: React.FC = () => {
       const gain = ctx.createGain();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(880, ctx.currentTime);
-      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.setValueAtTime(0.20, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
       osc.connect(gain);
       gain.connect(ctx.destination);
@@ -120,6 +134,215 @@ export const LiveCameraPage: React.FC = () => {
     }
   }, []);
 
+  // Clear HUD Canvas
+  const clearOverlay = () => {
+    const canvas = overlayCanvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  };
+
+  // Draw real-time bounding boxes on overlay canvas
+  const drawOverlay = useCallback((pred: ImagePredictionResponse, frameW: number, frameH: number) => {
+    const canvas = overlayCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+    }
+
+    if (videoRef.current && videoRef.current.srcObject) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    } else if (remoteFrameImgRef.current) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(remoteFrameImgRef.current, 0, 0, canvas.width, canvas.height);
+    }
+
+    if (!pred.detections || pred.detections.length === 0) return;
+
+    const scaleX = canvas.width / (frameW || 640);
+    const scaleY = canvas.height / (frameH || 384);
+
+    pred.detections.forEach((det) => {
+      if (det.confidence < confidenceThreshold) return;
+
+      const [x1, y1, x2, y2] = det.bbox;
+      const sx = x1 * scaleX;
+      const sy = y1 * scaleY;
+      const sw = (x2 - x1) * scaleX;
+      const sh = (y2 - y1) * scaleY;
+
+      const cn = det.class_name.toLowerCase();
+      const dn = det.display_name.toLowerCase();
+
+      const isViolation =
+        det.violation ||
+        cn.includes('without_helmet') ||
+        dn.includes('without helmet') ||
+        cn.includes('no-helmet');
+
+      const isWithHelmet = cn.includes('with_helmet') || dn.includes('with helmet');
+
+      let strokeColor = '#10B981';
+      let fillColor = 'rgba(16, 185, 129, 0.16)';
+
+      if (isViolation) {
+        strokeColor = '#EF4444';
+        fillColor = 'rgba(239, 68, 68, 0.22)';
+      } else if (isWithHelmet) {
+        strokeColor = '#10B981';
+        fillColor = 'rgba(16, 185, 129, 0.16)';
+      } else {
+        strokeColor = '#3B82F6';
+        fillColor = 'rgba(59, 130, 246, 0.14)';
+      }
+
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 2.5;
+      ctx.fillStyle = fillColor;
+      ctx.fillRect(sx, sy, sw, sh);
+      ctx.strokeRect(sx, sy, sw, sh);
+
+      // Corner reticles
+      const cornerLen = Math.min(12, sw / 4, sh / 4);
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy + cornerLen);
+      ctx.lineTo(sx, sy);
+      ctx.lineTo(sx + cornerLen, sy);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(sx + sw - cornerLen, sy);
+      ctx.lineTo(sx + sw, sy);
+      ctx.lineTo(sx + sw, sy + cornerLen);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(sx, sy + sh - cornerLen);
+      ctx.lineTo(sx, sy + sh);
+      ctx.lineTo(sx + cornerLen, sy + sh);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(sx + sw - cornerLen, sy + sh);
+      ctx.lineTo(sx + sw, sy + sh);
+      ctx.lineTo(sx + sw, sy + sh - cornerLen);
+      ctx.stroke();
+
+      // Label badge
+      const label = `${det.display_name} ${(det.confidence * 100).toFixed(0)}%`;
+      const fontSize = 11;
+      ctx.font = `bold ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
+      const tw = ctx.measureText(label).width;
+      const pad = 6;
+      const pillHeight = fontSize + 8;
+      const pillY = Math.max(0, sy - pillHeight);
+
+      ctx.fillStyle = strokeColor;
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(sx, pillY, tw + pad * 2, pillHeight, 4);
+        ctx.fill();
+      } else {
+        ctx.fillRect(sx, pillY, tw + pad * 2, pillHeight);
+      }
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(label, sx + pad, pillY + fontSize + 1);
+    });
+  }, [confidenceThreshold]);
+
+  // Check violations, trigger alarms, and automatically capture evidence frame
+  const checkAndCaptureViolation = useCallback((pred: ImagePredictionResponse, frameW: number, frameH: number) => {
+    const violations = pred.detections.filter(
+      (d) =>
+        (d.violation ||
+          d.class_name.toLowerCase().includes('without_helmet') ||
+          d.display_name.toLowerCase().includes('without helmet')) &&
+        d.confidence >= confidenceThreshold
+    );
+
+    if (violations.length === 0) {
+      setLatestViolationText(null);
+      return;
+    }
+
+    const topViol = violations[0];
+    setViolationCount((prev) => prev + violations.length);
+    setLatestViolationText(`${topViol.display_name} (${(topViol.confidence * 100).toFixed(1)}%)`);
+    playAlertSound();
+
+    const now = Date.now();
+    // Throttle automatic captures to once every 2.5 seconds to avoid duplicates
+    if (now - lastCaptureTimeRef.current < 2500) return;
+    lastCaptureTimeRef.current = now;
+
+    // Capture the annotated evidence photo
+    try {
+      const v = videoRef.current;
+      const remoteImg = remoteFrameImgRef.current;
+      const capCanvas = document.createElement('canvas');
+      capCanvas.width = frameW || 640;
+      capCanvas.height = frameH || 384;
+      const capCtx = capCanvas.getContext('2d');
+      if (!capCtx) return;
+
+      if (v && v.readyState >= 2) {
+        capCtx.drawImage(v, 0, 0, capCanvas.width, capCanvas.height);
+      } else if (remoteImg) {
+        capCtx.drawImage(remoteImg, 0, 0, capCanvas.width, capCanvas.height);
+      }
+
+      // Draw bounding box annotations directly onto the captured evidence photo
+      pred.detections.forEach((det) => {
+        if (det.confidence < confidenceThreshold) return;
+        const [x1, y1, x2, y2] = det.bbox;
+        const w = x2 - x1;
+        const h = y2 - y1;
+        const isViol = det.violation || det.class_name.toLowerCase().includes('without_helmet');
+        capCtx.strokeStyle = isViol ? '#EF4444' : '#10B981';
+        capCtx.lineWidth = 3;
+        capCtx.strokeRect(x1, y1, w, h);
+
+        const label = `${det.display_name} ${(det.confidence * 100).toFixed(0)}%`;
+        capCtx.fillStyle = isViol ? '#EF4444' : '#10B981';
+        capCtx.fillRect(x1, Math.max(0, y1 - 22), capCtx.measureText(label).width + 12, 22);
+        capCtx.fillStyle = '#FFFFFF';
+        capCtx.font = 'bold 12px sans-serif';
+        capCtx.fillText(label, x1 + 6, Math.max(16, y1 - 6));
+      });
+
+      // Watermark header
+      capCtx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      capCtx.fillRect(0, 0, capCanvas.width, 28);
+      capCtx.fillStyle = '#F87171';
+      capCtx.font = 'bold 11px monospace';
+      capCtx.fillText(`🚨 SMART HELMET INFRACTION AUDIT · ${new Date().toLocaleTimeString()} · CONF: ${(topViol.confidence * 100).toFixed(1)}%`, 10, 18);
+
+      const evidenceDataUrl = capCanvas.toDataURL('image/jpeg', 0.85);
+
+      const recordItem = {
+        id: `viol-${now}`,
+        timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+        image: evidenceDataUrl,
+        violationName: topViol.display_name,
+        confidence: Math.round(topViol.confidence * 1000) / 10
+      };
+
+      setCapturedViolations((prev) => [recordItem, ...prev].slice(0, 12));
+
+      // Persist to store so Reports & Analytics update immediately!
+      api.storeDetectionRecord(pred, `Live-Infraction-${now}.jpg`, evidenceDataUrl).catch(console.error);
+    } catch (e) {
+      console.warn('Frame capture error:', e);
+    }
+  }, [confidenceThreshold, playAlertSound]);
+
   // Initialize PeerJS & Dual Relay based on mode and roomCode
   useEffect(() => {
     if (!roomCode || typeof window === 'undefined') return;
@@ -141,6 +364,7 @@ export const LiveCameraPage: React.FC = () => {
           }
         });
 
+        // Answer incoming video call from mobile phone
         peer.on('call', (call) => {
           call.answer();
           call.on('stream', (remoteStream) => {
@@ -158,6 +382,19 @@ export const LiveCameraPage: React.FC = () => {
           });
         });
 
+        // Listen for DataChannel connection to receive real-time bounding boxes from phone
+        peer.on('connection', (conn) => {
+          dataConnRef.current = conn;
+          conn.on('data', (data: any) => {
+            if (data && data.type === 'DETECTION' && data.prediction) {
+              setLatestPrediction(data.prediction);
+              setTotalFramesScanned((prev) => prev + 1);
+              drawOverlay(data.prediction, data.frameW, data.frameH);
+              checkAndCaptureViolation(data.prediction, data.frameW, data.frameH);
+            }
+          });
+        });
+
         peer.on('error', (err) => {
           console.warn('Monitor peer error:', err);
           if (err.type === 'unavailable-id') {
@@ -170,7 +407,9 @@ export const LiveCameraPage: React.FC = () => {
 
         // Fallback Frame Relay via SSE (guarantees feed even if carrier blocks P2P)
         let eventSource: EventSource | null = null;
+        let metaSource: EventSource | null = null;
         try {
+          // Stream frames relay
           eventSource = new EventSource(`https://ntfy.sh/sh-stream-${roomCode}/raw`);
           eventSource.onmessage = (e) => {
             if (e.data && e.data.startsWith('data:image/jpeg')) {
@@ -181,7 +420,6 @@ export const LiveCameraPage: React.FC = () => {
               const img = new Image();
               img.onload = () => {
                 remoteFrameImgRef.current = img;
-                // If WebRTC video stream is not directly streaming, render the relay frame
                 if (!videoRef.current || !videoRef.current.srcObject) {
                   const canvas = overlayCanvasRef.current;
                   if (canvas) {
@@ -199,12 +437,27 @@ export const LiveCameraPage: React.FC = () => {
               img.src = e.data;
             }
           };
+
+          // Metadata & Bounding Boxes relay
+          metaSource = new EventSource(`https://ntfy.sh/sh-meta-${roomCode}/raw`);
+          metaSource.onmessage = (e) => {
+            try {
+              const msg = JSON.parse(e.data);
+              if (msg && msg.prediction) {
+                setLatestPrediction(msg.prediction);
+                setTotalFramesScanned((prev) => prev + 1);
+                drawOverlay(msg.prediction, msg.frameW, msg.frameH);
+                checkAndCaptureViolation(msg.prediction, msg.frameW, msg.frameH);
+              }
+            } catch {}
+          };
         } catch (sseErr) {
           console.warn('SSE relay error:', sseErr);
         }
 
         return () => {
           if (eventSource) eventSource.close();
+          if (metaSource) metaSource.close();
         };
       } else if (mode === 'broadcaster') {
         // Phone connects as broadcaster
@@ -229,7 +482,7 @@ export const LiveCameraPage: React.FC = () => {
         peerRef.current = null;
       }
     };
-  }, [mode, roomCode]);
+  }, [mode, roomCode, drawOverlay, checkAndCaptureViolation]);
 
   // Mobile Broadcaster: Start camera and stream to laptop monitor
   const startBroadcasting = async (overrideFacing?: 'environment' | 'user') => {
@@ -252,7 +505,6 @@ export const LiveCameraPage: React.FC = () => {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       localStreamRef.current = stream;
 
-      // Show local preview on mobile
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.muted = true;
@@ -260,8 +512,8 @@ export const LiveCameraPage: React.FC = () => {
       }
       setIsCameraActive(true);
 
-      // 1. WebRTC Call to Laptop Monitor
-      const initiateCall = (peer: Peer) => {
+      // 1. WebRTC Call & DataChannel to Laptop Monitor
+      const initiateConnection = (peer: Peer) => {
         try {
           const call = peer.call(roomCode, stream);
           if (call) {
@@ -269,6 +521,12 @@ export const LiveCameraPage: React.FC = () => {
             call.on('close', () => setIsPhoneConnected(false));
             call.on('error', (e) => console.warn('Call error:', e));
           }
+
+          // Open data channel to send real-time bounding boxes to laptop
+          const conn = peer.connect(roomCode);
+          conn.on('open', () => {
+            dataConnRef.current = conn;
+          });
         } catch (e) {
           console.warn('Call initiation error:', e);
         }
@@ -276,15 +534,15 @@ export const LiveCameraPage: React.FC = () => {
 
       if (peerRef.current) {
         if (peerRef.current.open) {
-          initiateCall(peerRef.current);
+          initiateConnection(peerRef.current);
         } else {
           peerRef.current.on('open', () => {
-            if (peerRef.current) initiateCall(peerRef.current);
+            if (peerRef.current) initiateConnection(peerRef.current);
           });
         }
       }
 
-      // 2. High-speed Relay Frame Sync (guaranteed fallback even across strict cellular NAT)
+      // 2. High-speed Relay Frame Sync
       if (broadcastTimerRef.current) clearInterval(broadcastTimerRef.current);
       broadcastTimerRef.current = setInterval(() => {
         const v = videoRef.current;
@@ -385,130 +643,7 @@ export const LiveCameraPage: React.FC = () => {
     }
   };
 
-  const clearOverlay = () => {
-    const canvas = overlayCanvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-  };
-
-  // Draw real-time bounding boxes
-  const drawOverlay = (pred: ImagePredictionResponse, frameW: number, frameH: number) => {
-    const canvas = overlayCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
-      canvas.width = canvas.clientWidth;
-      canvas.height = canvas.clientHeight;
-    }
-
-    // Only clear if video is active (if relying on frame relay, preserve background image)
-    if (videoRef.current && videoRef.current.srcObject) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    } else if (remoteFrameImgRef.current) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(remoteFrameImgRef.current, 0, 0, canvas.width, canvas.height);
-    }
-
-    if (!pred.detections || pred.detections.length === 0) return;
-
-    const scaleX = canvas.width / frameW;
-    const scaleY = canvas.height / frameH;
-
-    pred.detections.forEach((det) => {
-      if (det.confidence < confidenceThreshold) return;
-
-      const [x1, y1, x2, y2] = det.bbox;
-      const sx = x1 * scaleX;
-      const sy = y1 * scaleY;
-      const sw = (x2 - x1) * scaleX;
-      const sh = (y2 - y1) * scaleY;
-
-      const cn = det.class_name.toLowerCase();
-      const dn = det.display_name.toLowerCase();
-
-      const isViolation =
-        det.violation ||
-        cn.includes('without_helmet') ||
-        dn.includes('without helmet') ||
-        cn.includes('no-helmet');
-
-      const isWithHelmet = cn.includes('with_helmet') || dn.includes('with helmet');
-
-      let strokeColor = '#10B981';
-      let fillColor = 'rgba(16, 185, 129, 0.16)';
-
-      if (isViolation) {
-        strokeColor = '#EF4444';
-        fillColor = 'rgba(239, 68, 68, 0.22)';
-      } else if (isWithHelmet) {
-        strokeColor = '#10B981';
-        fillColor = 'rgba(16, 185, 129, 0.16)';
-      } else {
-        strokeColor = '#3B82F6';
-        fillColor = 'rgba(59, 130, 246, 0.14)';
-      }
-
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 2.5;
-      ctx.fillStyle = fillColor;
-      ctx.fillRect(sx, sy, sw, sh);
-      ctx.strokeRect(sx, sy, sw, sh);
-
-      // Corner reticles
-      const cornerLen = Math.min(12, sw / 4, sh / 4);
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      ctx.moveTo(sx, sy + cornerLen);
-      ctx.lineTo(sx, sy);
-      ctx.lineTo(sx + cornerLen, sy);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(sx + sw - cornerLen, sy);
-      ctx.lineTo(sx + sw, sy);
-      ctx.lineTo(sx + sw, sy + cornerLen);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(sx, sy + sh - cornerLen);
-      ctx.lineTo(sx, sy + sh);
-      ctx.lineTo(sx + cornerLen, sy + sh);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(sx + sw - cornerLen, sy + sh);
-      ctx.lineTo(sx + sw, sy + sh);
-      ctx.lineTo(sx + sw, sy + sh - cornerLen);
-      ctx.stroke();
-
-      // Label badge
-      const label = `${det.display_name} ${(det.confidence * 100).toFixed(0)}%`;
-      const fontSize = 11;
-      ctx.font = `bold ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-      const tw = ctx.measureText(label).width;
-      const pad = 6;
-      const pillHeight = fontSize + 8;
-      const pillY = Math.max(0, sy - pillHeight);
-
-      ctx.fillStyle = strokeColor;
-      if (ctx.roundRect) {
-        ctx.beginPath();
-        ctx.roundRect(sx, pillY, tw + pad * 2, pillHeight, 4);
-        ctx.fill();
-      } else {
-        ctx.fillRect(sx, pillY, tw + pad * 2, pillHeight);
-      }
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillText(label, sx + pad, pillY + fontSize + 1);
-    });
-  };
-
-  // Perform AI detection on the active stream frame (runs on Laptop Monitor or Broadcaster)
+  // Perform AI detection on the active stream frame
   const captureAndDetect = useCallback(async () => {
     const video = videoRef.current;
     const remoteImg = remoteFrameImgRef.current;
@@ -562,31 +697,36 @@ export const LiveCameraPage: React.FC = () => {
       setLatestPrediction(result);
       setTotalFramesScanned((prev) => prev + 1);
 
+      // Draw bounding boxes on local canvas
       drawOverlay(result, vWidth, vHeight);
 
-      const violations = result.detections.filter(
-        (d) =>
-          (d.violation ||
-            d.class_name.toLowerCase().includes('without_helmet') ||
-            d.display_name.toLowerCase().includes('without helmet')) &&
-          d.confidence >= confidenceThreshold
-      );
+      // Check violation and auto-capture evidence
+      checkAndCaptureViolation(result, vWidth, vHeight);
 
-      if (violations.length > 0) {
-        setViolationCount((prev) => prev + violations.length);
-        const topViol = violations[0];
-        setLatestViolationText(`${topViol.display_name} (${(topViol.confidence * 100).toFixed(1)}%)`);
-        playAlertSound();
-        api.storeDetectionRecord(result, `Live-Camera-${Date.now()}.jpg`).catch(() => {});
-      } else {
-        setLatestViolationText(null);
+      // IF ON PHONE (BROADCASTER): TRANSMIT DETECTION BOXES TO LAPTOP IN REAL TIME!
+      if (mode === 'broadcaster') {
+        if (dataConnRef.current && dataConnRef.current.open) {
+          try {
+            dataConnRef.current.send({
+              type: 'DETECTION',
+              prediction: result,
+              frameW: vWidth,
+              frameH: vHeight
+            });
+          } catch {}
+        }
+        // Relay fallback
+        fetch(`https://ntfy.sh/sh-meta-${roomCode}`, {
+          method: 'POST',
+          body: JSON.stringify({ prediction: result, frameW: vWidth, frameH: vHeight })
+        }).catch(() => {});
       }
     } catch (err) {
       console.warn('Live detection error:', err);
     } finally {
       setIsProcessingFrame(false);
     }
-  }, [isProcessingFrame, isCameraActive, isAiActive, confidenceThreshold, playAlertSound]);
+  }, [isProcessingFrame, isCameraActive, isAiActive, confidenceThreshold, mode, roomCode, drawOverlay, checkAndCaptureViolation]);
 
   // Detection loop
   useEffect(() => {
@@ -624,7 +764,6 @@ export const LiveCameraPage: React.FC = () => {
     }
   };
 
-  // Full mobile pairing URL with standard ?room= query
   const mobilePairingUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/?room=${encodeURIComponent(roomCode)}#camera`
     : `https://smart-helmet-violation-detection.vercel.app/?room=${encodeURIComponent(roomCode)}#camera`;
@@ -934,6 +1073,64 @@ export const LiveCameraPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Captured Infractions Live Audit Gallery (Automatic Evidence Log) */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 text-xs">
+              <div className="flex items-center gap-2">
+                <History className="w-4 h-4 text-blue-600" />
+                <span className="font-bold text-slate-900 uppercase tracking-tight">
+                  Auto-Captured Infraction Evidence ({capturedViolations.length})
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-500 font-mono">
+                Auto-synced to Reports &amp; Analytics
+              </span>
+            </div>
+
+            {capturedViolations.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {capturedViolations.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => setInspectModalImage(item.image)}
+                    className="group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col"
+                  >
+                    <div className="relative aspect-video w-full overflow-hidden bg-black">
+                      <img
+                        src={item.image}
+                        alt="Violation capture"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-slate-950/20 group-hover:bg-slate-950/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <Eye className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="absolute top-1.5 left-1.5 bg-rose-600 text-white text-[9px] font-mono font-bold px-1.5 py-0.5 rounded shadow">
+                        VIOLATION
+                      </span>
+                    </div>
+                    <div className="p-2 bg-white space-y-0.5 text-[11px]">
+                      <div className="font-bold text-slate-900 truncate" title={item.violationName}>
+                        {item.violationName}
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                        <span>{item.timestamp}</span>
+                        <span className="text-rose-600 font-bold">{item.confidence}%</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-slate-400 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                <ShieldCheck className="w-8 h-8 text-slate-300 mx-auto mb-1.5" />
+                <p className="font-semibold text-slate-700">No violations detected yet</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  When a rider without helmet is spotted by your phone, the annotated frame is automatically captured and added to Reports and Analytics!
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Column: Mobile Pairing, Telemetry & Controls */}
@@ -1185,7 +1382,7 @@ export const LiveCameraPage: React.FC = () => {
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-500">Video Bridge</span>
                 <span className="font-semibold text-slate-800">
-                  {mode === 'monitor' ? 'Dual WebRTC + SSE Relay' : 'Mobile Sensor Streamer'}
+                  {mode === 'monitor' ? 'WebRTC + SSE Sync' : 'Mobile Sensor Streamer'}
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs">
@@ -1199,6 +1396,27 @@ export const LiveCameraPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal to view captured violation evidence photo full size */}
+      {inspectModalImage && (
+        <div
+          onClick={() => setInspectModalImage(null)}
+          className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div className="relative max-w-4xl w-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl p-2">
+            <img src={inspectModalImage} alt="Audited Violation Evidence" className="w-full h-auto rounded-xl" />
+            <div className="p-3 flex items-center justify-between text-xs text-white">
+              <span className="font-mono text-rose-400 font-bold">AUTOMATICALLY LOGGED TO REPORTS &amp; ANALYTICS</span>
+              <button
+                onClick={() => setInspectModalImage(null)}
+                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

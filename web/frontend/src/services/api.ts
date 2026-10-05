@@ -367,7 +367,7 @@ export const api = {
   /**
    * Normalize a Co-DETR ImagePredictionResponse and save to backend store
    */
-  async storeDetectionRecord(result: ImagePredictionResponse, fileName: string): Promise<void> {
+  async storeDetectionRecord(result: ImagePredictionResponse, fileName: string, processedImage?: string): Promise<void> {
     let driverViolations = 0;
     let passengerViolations = 0;
     let drivers = 0;
@@ -410,6 +410,7 @@ export const api = {
       id: `det-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       timestamp: new Date().toISOString(),
       fileName: fileName || 'Unknown',
+      processedImage: processedImage,
       detections: result.detections.map((d) => ({
         className: d.class_name,
         displayName: d.display_name,
