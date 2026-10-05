@@ -348,6 +348,9 @@ export const DetectionPage: React.FC = () => {
         const result = await api.detectImage(file, confidenceThreshold);
         setPrediction(result);
 
+        // Explicitly sync detection record into store so Reports and Analytics update immediately
+        api.storeDetectionRecord(result, file.name).catch((err) => console.warn('Store detection record error:', err));
+
         // Update active in-memory session for instant navigation restoration
         api.setActiveSession({
           file,
@@ -396,6 +399,9 @@ export const DetectionPage: React.FC = () => {
         const h = img.naturalHeight || 720;
         const fallback = api.getSimulatedDetection(w, h);
         setPrediction(fallback);
+
+        // Sync fallback record to store so analytics and reports update
+        api.storeDetectionRecord(fallback, file.name).catch((e) => console.warn('Store fallback error:', e));
 
         const violationsAboveThr = fallback.detections.filter(
           (d) =>

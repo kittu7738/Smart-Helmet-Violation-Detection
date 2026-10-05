@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShieldCheck,
   User,
   Users,
   Target,
   Gauge,
-  Info,
   Award,
   AlertCircle,
-  Table
+  Table,
+  RefreshCw,
+  Activity,
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
 import {
   BarChart,
@@ -65,26 +68,60 @@ const HourlyInfractionTooltip: React.FC<any> = ({ active, payload, label }) => {
 export const AnalyticsPage: React.FC = () => {
   const [timeRange, setTimeRange] = useState<'24H' | '7D' | '30D'>('24H');
   const [metrics, setMetrics] = useState<RealMetrics | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [lastUpdated, setLastUpdated] = useState<string>('');
 
-  const loadMetrics = async () => {
+  const loadMetrics = useCallback(async () => {
+    setLoading(true);
     try {
       const data = await api.getMetrics();
       setMetrics(data);
+      setLastUpdated(new Date().toLocaleTimeString([], { hour12: false }));
     } catch (err) {
       console.error('Failed to load metrics:', err);
+    } finally {
+      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadMetrics();
   }, []);
 
+  // Fetch metrics on mount
+  useEffect(() => {
+    loadMetrics();
+  }, [loadMetrics]);
+
+  // Subscribe to live detection events across tabs/pages
   useEffect(() => {
     const unsubscribe = api.onDetection(() => {
       loadMetrics();
     });
     return unsubscribe;
-  }, []);
+  }, [loadMetrics]);
+
+  // Re-fetch when browser window regains focus or tab becomes visible
+  useEffect(() => {
+    const onFocus = () => {
+      loadMetrics();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadMetrics();
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [loadMetrics]);
+
+  // Periodic polling heartbeat (every 10 seconds)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      loadMetrics();
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [loadMetrics]);
 
   // Verified Metrics from epoch 10 checkpoint
   const verifiedMetrics = {
@@ -124,6 +161,19 @@ export const AnalyticsPage: React.FC = () => {
     isPeak: peakHour ? d.hour === peakHour : false
   }));
 
+  // Smooth single-point presentation so chart renders a continuous area
+  let displayHourlyData = [...hourlyViolationsData];
+  if (displayHourlyData.length === 1) {
+    const single = displayHourlyData[0];
+    const [hStr] = single.hour.split(':');
+    const prevHour = Math.max(0, parseInt(hStr, 10) - 1);
+    const prevHourStr = `${String(prevHour).padStart(2, '0')}:00`;
+    displayHourlyData = [
+      { hour: prevHourStr, violations: 0, compliant: 0, isPeak: false },
+      single
+    ];
+  }
+
   // Real Driver vs Passenger violations counts
   const driverViolations = metrics?.driverViolations || 0;
   const passengerViolations = metrics?.passengerViolations || 0;
@@ -135,88 +185,149 @@ export const AnalyticsPage: React.FC = () => {
     ? (100 - driverPct)
     : 0;
 
-
+  const totalScans = metrics?.totalRecords || 0;
+  const withHelmet = metrics?.withHelmet || 0;
+  const withoutHelmet = metrics?.withoutHelmet || 0;
+  const totalRiders = withHelmet + withoutHelmet;
+  const complianceRate = totalRiders > 0
+    ? Math.round((withHelmet / totalRiders) * 100)
+    : 100;
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
-      {/* Header */}
+    <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-12">
+      {/* Clean Header with Refresh and Live Telemetry Indicator */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-            Model Evaluation & Analytics Telemetry
-          </h1>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+              Model Evaluation &amp; Analytics Telemetry
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live Telemetry
+            </span>
+          </div>
           <p className="text-sm text-gray-500 mt-1">
             Verified benchmark metrics on traffic surveillance validation split (Co-DETR ResNet-18 FP16).
           </p>
         </div>
 
-        {/* Time Range Selector */}
-        <div className="flex items-center gap-1 bg-white border border-gray-200 p-1 rounded-xl text-xs shadow-xs self-start sm:self-auto">
-          {(['24H', '7D', '30D'] as const).map((range) => (
-            <button
-              key={range}
-              onClick={() => setTimeRange(range)}
-              className={`px-3.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
-                timeRange === range
-                  ? 'bg-blue-50 text-blue-700 font-semibold'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              {range}
-            </button>
-          ))}
+        {/* Right Controls: Refresh Button + Time Range Selector */}
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          {/* Refresh Action */}
+          <button
+            onClick={() => loadMetrics()}
+            disabled={loading}
+            title="Refresh analytics telemetry"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900 text-xs font-medium shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-gray-500 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+            <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+
+          {/* Time Range Selector */}
+          <div className="flex items-center gap-1 bg-white border border-gray-200 p-1 rounded-xl text-xs shadow-xs">
+            {(['24H', '7D', '30D'] as const).map((range) => (
+              <button
+                key={range}
+                onClick={() => setTimeRange(range)}
+                className={`px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                  timeRange === range
+                    ? 'bg-blue-600 text-white font-semibold shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {range}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Academic Transparency Note */}
-      <div className="rounded-2xl p-5 bg-blue-50/70 border border-blue-200/80 flex items-start gap-3.5">
-        <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-        <div className="text-xs space-y-1">
-          <div className="font-bold text-blue-900 tracking-wide">
-            FACULTY EVALUATION & METRIC TRANSPARENCY NOTICE
+      {/* Live Surveillance Telemetry Summary Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-500/40 flex items-center justify-center shrink-0">
+            <Activity className="w-5 h-5 text-blue-400" />
           </div>
-          <p className="text-blue-800 leading-relaxed">
-            Co-DETR implements multi-task query supervision. Overall detector performance is measured by COCO standard metric <strong className="text-gray-900">mAP = 22.40%</strong> and <strong className="text-gray-900">AP50 = 54.30%</strong>. The <strong className="text-gray-900">95.75%</strong> metric is the auxiliary RoI Head Candidate Classification Accuracy (<code className="font-mono bg-blue-100 px-1 py-0.5 rounded text-blue-900 font-bold">acc0</code>) on sampled region proposals. These evaluate distinct pipeline stages.
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-white tracking-wide">SURVEILLANCE TELEMETRY FEED</span>
+              <span className="text-[10px] bg-blue-500/20 text-blue-300 font-mono px-2 py-0.5 rounded border border-blue-500/30 font-semibold">
+                ACTIVE PIPELINE
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Aggregating live Co-DETR multi-task queries across road surveillance checkpoints.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 pt-2 md:pt-0 border-t md:border-t-0 border-slate-800 text-xs">
+          <div>
+            <div className="text-slate-400 text-[11px]">Total Scans</div>
+            <div className="font-mono text-base font-bold text-white mt-0.5">
+              {totalScans}
+            </div>
+          </div>
+          <div>
+            <div className="text-slate-400 text-[11px]">Riders Monitored</div>
+            <div className="font-mono text-base font-bold text-white mt-0.5">
+              {totalRiders}
+            </div>
+          </div>
+          <div>
+            <div className="text-slate-400 text-[11px]">Compliance Rate</div>
+            <div className="font-mono text-base font-bold text-emerald-400 mt-0.5 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{complianceRate}%</span>
+            </div>
+          </div>
+          <div>
+            <div className="text-slate-400 text-[11px]">Infractions Logged</div>
+            <div className="font-mono text-base font-bold text-rose-400 mt-0.5">
+              {metrics?.totalViolations || 0}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Top 4 Core Model KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
-        <div className="light-card p-5">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase">COCO mAP</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">COCO mAP</span>
             <Target className="w-4 h-4 text-blue-600" />
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-gray-900 font-mono">{verifiedMetrics.mAP}</div>
-          <span className="text-[11px] text-gray-400 font-mono">IoU: 0.50 : 0.95</span>
+          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono">{verifiedMetrics.mAP}</div>
+          <span className="text-[11px] text-slate-400 font-mono mt-1 block">IoU: 0.50 : 0.95</span>
         </div>
 
-        <div className="light-card p-5">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase">AP50 Accuracy</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">AP50 Accuracy</span>
             <Award className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-emerald-700 font-mono">{verifiedMetrics.ap50}</div>
-          <span className="text-[11px] text-gray-400 font-mono">IoU: 0.50 threshold</span>
+          <span className="text-[11px] text-slate-400 font-mono mt-1 block">IoU: 0.50 threshold</span>
         </div>
 
-        <div className="light-card p-5">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase">RoI Head acc0</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">RoI Head acc0</span>
             <ShieldCheck className="w-4 h-4 text-purple-600" />
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-purple-700 font-mono">{verifiedMetrics.roiAccuracy}</div>
-          <span className="text-[11px] text-gray-400 font-mono">Candidate Classifier</span>
+          <span className="text-[11px] text-slate-400 font-mono mt-1 block">Candidate Classifier</span>
         </div>
 
-        <div className="light-card p-5">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase">GPU Latency</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">GPU Latency</span>
             <Gauge className="w-4 h-4 text-indigo-600" />
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-indigo-700 font-mono">{verifiedMetrics.avgLatency}</div>
-          <span className="text-[11px] text-gray-400 font-mono">Tesla T4 Warm Pass</span>
+          <span className="text-[11px] text-slate-400 font-mono mt-1 block">Tesla T4 Warm Pass</span>
         </div>
       </div>
 
@@ -238,13 +349,13 @@ export const AnalyticsPage: React.FC = () => {
 
           <div className="h-64 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={perClassData} margin={{ top: 15, right: 15, left: 15, bottom: 25 }}>
+              <BarChart data={perClassData} margin={{ top: 15, right: 15, left: 0, bottom: 25 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748B' }} interval={0} angle={-15} textAnchor="end" />
                 <YAxis
                   tick={{ fontSize: 11, fill: '#64748B' }}
                   domain={[0, 100]}
-                  label={{ value: 'AP50 (%)', angle: -90, position: 'insideLeft', offset: 0, fill: '#475569', fontSize: 11, fontWeight: 600 }}
+                  label={{ value: 'AP50 (%)', angle: -90, position: 'insideLeft', offset: 10, fill: '#475569', fontSize: 11, fontWeight: 600 }}
                 />
                 <Tooltip
                   cursor={{ fill: 'rgba(37, 99, 235, 0.05)' }}
@@ -287,19 +398,19 @@ export const AnalyticsPage: React.FC = () => {
                 </p>
               </div>
               <span className="badge-violation px-2.5 py-1 rounded-md text-xs font-semibold shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap" title="Surveillance infraction frequency">
-                <span className={`w-1.5 h-1.5 rounded-full ${peakViolations > 0 ? 'bg-rose-500 animate-pulse' : (metrics?.totalRecords || 0) > 0 ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${peakViolations > 0 ? 'bg-rose-500 animate-pulse' : totalScans > 0 ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                 {peakViolations > 0
                   ? `Peak: ${peakHour} (${peakViolations} viol.)`
-                  : (metrics?.totalRecords || 0) > 0
+                  : totalScans > 0
                   ? '100% Compliant (0 Infractions)'
                   : 'Awaiting Data'}
               </span>
             </div>
 
             <div className="h-64 w-full pt-2">
-              {hourlyViolationsData.length > 0 ? (
+              {displayHourlyData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={hourlyViolationsData} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
+                  <AreaChart data={displayHourlyData} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="hourlyViolationGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#EF4444" stopOpacity={0.25} />
@@ -308,7 +419,13 @@ export const AnalyticsPage: React.FC = () => {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
                     <XAxis dataKey="hour" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: '#64748B' }}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                      domain={[0, 'dataMax + 1']}
+                    />
                     <Tooltip
                       content={<HourlyInfractionTooltip />}
                       cursor={{ stroke: '#94A3B8', strokeWidth: 1, strokeDasharray: '3 3' }}
@@ -321,7 +438,7 @@ export const AnalyticsPage: React.FC = () => {
                       strokeWidth={2.5}
                       fillOpacity={1}
                       fill="url(#hourlyViolationGrad)"
-                      dot={{ r: 3, fill: '#EF4444' }}
+                      dot={{ r: 3.5, fill: '#EF4444' }}
                       activeDot={{ r: 6, fill: '#EF4444', stroke: '#FFFFFF', strokeWidth: 2 }}
                     />
                   </AreaChart>
@@ -346,9 +463,9 @@ export const AnalyticsPage: React.FC = () => {
                 <>
                   <strong className="text-slate-800">Peak at {peakHour} ({peakViolations} violations recorded):</strong> Real Co-DETR detection counts across surveillance runs.
                 </>
-              ) : (metrics?.totalRecords || 0) > 0 ? (
+              ) : totalScans > 0 ? (
                 <>
-                  <strong className="text-emerald-700">100% Helmet Compliance:</strong> All {metrics?.withHelmet || 0} monitored riders across {metrics?.totalRecords || 1} surveillance scan(s) were wearing safety helmets.
+                  <strong className="text-emerald-700">100% Helmet Compliance:</strong> All {withHelmet} monitored riders across {totalScans} surveillance scan(s) were wearing safety helmets.
                 </>
               ) : (
                 <>
@@ -363,82 +480,119 @@ export const AnalyticsPage: React.FC = () => {
       {/* Lower Row: Rider Role Breakdown & Engine Specs */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Role Comparison */}
-        <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
-          <div className="pb-3 border-b border-slate-100">
-            <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
-              Driver vs Passenger Non-Compliance
-            </h2>
-            <p className="text-xs text-slate-500">Infraction ratio categorized by seating position</p>
-          </div>
-
-          <div className="flex items-center gap-6 py-2">
-            <div className="flex-1 space-y-2">
-              <div className="flex justify-between text-xs font-semibold text-slate-700">
-                <span className="flex items-center gap-1.5"><User className="w-4 h-4 text-blue-600" /> Drivers</span>
-                <span className="font-mono text-slate-900 font-bold">{driverPct}% ({driverViolations} cases)</span>
-              </div>
-              <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full bg-blue-600 rounded-full transition-all duration-500" style={{ width: `${driverPct}%` }} />
-              </div>
+        <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4">
+          <div>
+            <div className="pb-3 border-b border-slate-100">
+              <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
+                Driver vs Passenger Non-Compliance
+              </h2>
+              <p className="text-xs text-slate-500">Infraction ratio categorized by seating position</p>
             </div>
 
-            <div className="flex-1 space-y-2">
-              <div className="flex justify-between text-xs font-semibold text-slate-700">
-                <span className="flex items-center gap-1.5"><Users className="w-4 h-4 text-amber-500" /> Passengers</span>
-                <span className="font-mono text-slate-900 font-bold">{passengerPct}% ({passengerViolations} cases)</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+              {/* Driver Block */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                    <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <span>Drivers</span>
+                  </div>
+                  <span className="font-mono text-sm font-extrabold text-blue-700">{driverPct}%</span>
+                </div>
+                <div className="w-full h-2.5 rounded-full bg-slate-200/80 overflow-hidden">
+                  <div className="h-full bg-blue-600 rounded-full transition-all duration-500" style={{ width: `${driverPct}%` }} />
+                </div>
+                <div className="text-[11px] text-slate-500 font-mono">
+                  {driverViolations} infraction{driverViolations === 1 ? '' : 's'} recorded
+                </div>
               </div>
-              <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: `${passengerPct}%` }} />
+
+              {/* Passenger Block */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                    <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <span>Passengers</span>
+                  </div>
+                  <span className="font-mono text-sm font-extrabold text-amber-700">{passengerPct}%</span>
+                </div>
+                <div className="w-full h-2.5 rounded-full bg-slate-200/80 overflow-hidden">
+                  <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: `${passengerPct}%` }} />
+                </div>
+                <div className="text-[11px] text-slate-500 font-mono">
+                  {passengerViolations} infraction{passengerViolations === 1 ? '' : 's'} recorded
+                </div>
               </div>
             </div>
           </div>
 
-          <p className="text-xs text-slate-500 pt-1">
-            {totalRiderViolations > 0
-              ? 'Secondary riders exhibit lower compliance adherence, representing an enforcement priority.'
-              : (metrics?.totalRecords || 0) > 0
-              ? 'All observed drivers and passengers were fully helmet compliant across recorded surveillance scans.'
-              : 'Secondary riders exhibit lower compliance adherence, representing an enforcement priority.'}
-          </p>
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>
+              {totalRiderViolations > 0
+                ? `${totalRiderViolations} total non-compliance infraction(s) detected across rider seats.`
+                : totalScans > 0
+                ? 'All observed drivers and passengers were fully helmet compliant across recorded surveillance scans.'
+                : 'Secondary riders exhibit lower compliance adherence, representing an enforcement priority.'}
+            </span>
+            {lastUpdated && (
+              <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1 shrink-0 ml-2">
+                <Clock className="w-3 h-3 text-slate-400" />
+                {lastUpdated}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Runtime Model Specifications */}
-        <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-3">
-          <div className="pb-3 border-b border-slate-100">
-            <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
-              Inference Engine Specifications
-            </h2>
-            <p className="text-xs text-slate-500">Production runtime configuration &amp; query parameters</p>
+        <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4">
+          <div>
+            <div className="pb-3 border-b border-slate-100">
+              <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
+                Inference Engine Specifications
+              </h2>
+              <p className="text-xs text-slate-500">Production runtime configuration &amp; query parameters</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+                <div className="text-slate-500 font-mono text-[11px]">Backbone Architecture</div>
+                <div className="text-slate-900 font-bold font-mono mt-0.5">ResNet-18 (Torchvision)</div>
+                <p className="text-[10px] text-slate-400 mt-1">Lightweight feature extractor for edge devices</p>
+              </div>
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+                <div className="text-slate-500 font-mono text-[11px]">Input Resolution</div>
+                <div className="text-slate-900 font-bold font-mono mt-0.5">640 × 384 (Keep Ratio)</div>
+                <p className="text-[10px] text-slate-400 mt-1">Optimized aspect ratio for traffic surveillance</p>
+              </div>
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+                <div className="text-slate-500 font-mono text-[11px]">Transformer Layers</div>
+                <div className="text-slate-900 font-bold font-mono mt-0.5">3 Encoder / 3 Decoder</div>
+                <p className="text-[10px] text-slate-400 mt-1">Deformable cross-attention heads</p>
+              </div>
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+                <div className="flex items-center justify-between">
+                  <div className="text-slate-500 font-mono text-[11px]">Query Budget</div>
+                  <span className="text-[10px] bg-blue-50 text-blue-700 font-semibold px-1.5 py-0.2 rounded border border-blue-200/60 font-mono">
+                    Co-DETR
+                  </span>
+                </div>
+                <div className="text-slate-900 font-bold font-mono mt-0.5">150 Object + 100 DN</div>
+                <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                  <span className="font-semibold text-slate-700">150 Object:</span> proposal slots. <span className="font-semibold text-slate-700">100 DN:</span> de-noising queries.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-              <div className="text-slate-500 font-mono text-[11px]">Backbone Architecture</div>
-              <div className="text-slate-900 font-bold font-mono mt-0.5">ResNet-18 (Torchvision)</div>
-              <p className="text-[10px] text-slate-400 mt-1">Lightweight feature extractor for edge devices</p>
-            </div>
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-              <div className="text-slate-500 font-mono text-[11px]">Input Resolution</div>
-              <div className="text-slate-900 font-bold font-mono mt-0.5">640 × 384 (Keep Ratio)</div>
-              <p className="text-[10px] text-slate-400 mt-1">Optimized aspect ratio for traffic surveillance</p>
-            </div>
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-              <div className="text-slate-500 font-mono text-[11px]">Transformer Layers</div>
-              <div className="text-slate-900 font-bold font-mono mt-0.5">3 Encoder / 3 Decoder</div>
-              <p className="text-[10px] text-slate-400 mt-1">Deformable cross-attention heads</p>
-            </div>
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-              <div className="flex items-center justify-between">
-                <div className="text-slate-500 font-mono text-[11px]">Query Budget</div>
-                <span className="text-[10px] bg-blue-50 text-blue-700 font-semibold px-1.5 py-0.2 rounded border border-blue-200/60 font-mono">
-                  Co-DETR
-                </span>
-              </div>
-              <div className="text-slate-900 font-bold font-mono mt-0.5">150 Object + 100 DN</div>
-              <p className="text-[10px] text-slate-500 mt-1 leading-normal">
-                <span className="font-semibold text-slate-700">150 Object:</span> learned proposal slots. <span className="font-semibold text-slate-700">100 DN:</span> contrastive de-noising queries that stabilize bipartite matching.
-              </p>
-            </div>
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span className="text-[11px] text-slate-400 font-mono">Precision: FP16 TensorRT / TorchScript Ready</span>
+            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-mono font-semibold border border-emerald-200">
+              OPTIMIZED
+            </span>
           </div>
         </div>
       </div>

@@ -217,9 +217,42 @@ export const api = {
   },
 
   /**
-   * Fetch all real detection records from central backend store
+   * Local persistence for detection records across reloads and offline sessions
+   */
+  getLocalDetections(): StoredDetectionRecord[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const data = localStorage.getItem('SMART_HELMET_STORED_DETECTIONS');
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  },
+
+  saveLocalDetection(record: StoredDetectionRecord) {
+    if (typeof window === 'undefined') return;
+    try {
+      const current = this.getLocalDetections();
+      const exists = current.some(
+        (r) =>
+          r.id === record.id ||
+          (r.fileName === record.fileName &&
+            Math.abs(new Date(r.timestamp).getTime() - new Date(record.timestamp).getTime()) < 3000)
+      );
+      if (!exists) {
+        current.unshift(record);
+        localStorage.setItem('SMART_HELMET_STORED_DETECTIONS', JSON.stringify(current.slice(0, 50)));
+      }
+    } catch {}
+  },
+
+  /**
+   * Fetch all real detection records from central backend store + local persistent storage
    */
   async getDetections(): Promise<StoredDetectionRecord[]> {
+    let backendRecords: StoredDetectionRecord[] = [];
     try {
       const res = await fetch(`${currentApiBaseUrl}/api/detections`, {
         signal: AbortSignal.timeout(3000)
@@ -227,24 +260,44 @@ export const api = {
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
-          return json.data;
+          backendRecords = json.data;
         }
       }
     } catch {}
 
-    try {
-      const res = await fetch(`${BACKEND_BASE}/api/detections`, {
-        signal: AbortSignal.timeout(3000)
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data)) {
-          return json.data;
+    if (backendRecords.length === 0) {
+      try {
+        const res = await fetch(`${BACKEND_BASE}/api/detections`, {
+          signal: AbortSignal.timeout(3000)
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            backendRecords = json.data;
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
-    return [];
+    const localRecords = this.getLocalDetections();
+    if (backendRecords.length === 0) {
+      return localRecords;
+    }
+
+    // Merge backend and local records without duplicates
+    const combined = [...backendRecords];
+    for (const lr of localRecords) {
+      const found = combined.some(
+        (br) =>
+          br.id === lr.id ||
+          (br.fileName === lr.fileName &&
+            Math.abs(new Date(br.timestamp).getTime() - new Date(lr.timestamp).getTime()) < 3000)
+      );
+      if (!found) {
+        combined.unshift(lr);
+      }
+    }
+    return combined;
   },
 
   /**
@@ -377,6 +430,9 @@ export const api = {
       inferenceTimeMs: result.inference_time_ms,
       device: result.device
     };
+
+    // Save to local storage for instant offline resilience and persistence across reloads
+    this.saveLocalDetection(record);
 
     // Forward to backends in parallel (Colab FastAPI and Express)
     const targets = [
