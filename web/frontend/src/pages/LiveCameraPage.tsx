@@ -65,6 +65,7 @@ export const LiveCameraPage: React.FC = () => {
 
   // Side panel tab: 'phone-pairing' | 'controls' | 'telemetry'
   const [activeTab, setActiveTab] = useState<'phone-pairing' | 'controls' | 'telemetry'>('phone-pairing');
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null); // null = unknown, true = online, false = offline
 
   // DOM Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -688,8 +689,16 @@ export const LiveCameraPage: React.FC = () => {
 
       try {
         result = await api.detectImage(file, confidenceThreshold);
+        setBackendOnline(true);
       } catch {
-        result = api.getSimulatedDetection(vWidth, vHeight);
+        // GPU backend is offline — do NOT use fake simulated detections.
+        // Just clear overlay and show the "offline" badge so the user knows.
+        setBackendOnline(false);
+        clearOverlay();
+        setLatestPrediction(null);
+        setInferenceLatency(null);
+        setIsProcessingFrame(false);
+        return;
       }
 
       const elapsed = Math.round(performance.now() - startMs);
@@ -927,12 +936,32 @@ export const LiveCameraPage: React.FC = () => {
                         AI INFERRING
                       </span>
                     )}
+                    {/* Backend connectivity badge */}
+                    {backendOnline === false && (
+                      <span className="bg-amber-900/90 backdrop-blur-md text-amber-300 text-[10px] font-mono font-bold px-2 py-1 rounded-md border border-amber-500/60 flex items-center gap-1 shadow-sm">
+                        <span className="w-2 h-2 rounded-full bg-amber-400" />
+                        GPU OFFLINE · Connect Colab
+                      </span>
+                    )}
+                    {backendOnline === true && !isProcessingFrame && (
+                      <span className="bg-emerald-900/90 backdrop-blur-md text-emerald-300 text-[10px] font-mono font-bold px-2 py-1 rounded-md border border-emerald-500/60 flex items-center gap-1 shadow-sm">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                        GPU ONLINE
+                      </span>
+                    )}
                   </div>
+
 
                   {/* Top-Right HUD */}
                   <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
-                    <span className="bg-slate-900/85 backdrop-blur-md text-emerald-400 text-[10px] font-mono font-bold px-2.5 py-1 rounded-md border border-slate-700/80 shadow-sm">
-                      {inferenceLatency ? `${inferenceLatency} ms Co-DETR` : 'Tesla T4 Warm'}
+                    <span className={`backdrop-blur-md text-[10px] font-mono font-bold px-2.5 py-1 rounded-md border shadow-sm ${
+                      backendOnline === false
+                        ? 'bg-amber-950/85 text-amber-400 border-amber-700/60'
+                        : 'bg-slate-900/85 text-emerald-400 border-slate-700/80'
+                    }`}>
+                      {backendOnline === false
+                        ? 'No GPU backend · Paste Colab URL in Settings'
+                        : inferenceLatency ? `${inferenceLatency} ms Co-DETR` : 'Tesla T4 Warm'}
                     </span>
                   </div>
 
