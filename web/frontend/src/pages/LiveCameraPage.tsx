@@ -386,6 +386,16 @@ export const LiveCameraPage: React.FC = () => {
         // Listen for DataChannel connection to receive real-time bounding boxes from phone
         peer.on('connection', (conn) => {
           dataConnRef.current = conn;
+
+          // As soon as the channel opens, push our saved backend URL to the phone
+          // so the phone uses the same Colab GPU endpoint as the laptop
+          conn.on('open', () => {
+            const laptopUrl = api.getBaseUrl();
+            if (laptopUrl) {
+              try { conn.send({ type: 'BACKEND_URL', url: laptopUrl }); } catch {}
+            }
+          });
+
           conn.on('data', (data: any) => {
             if (data && data.type === 'DETECTION' && data.prediction) {
               setLatestPrediction(data.prediction);
@@ -405,6 +415,15 @@ export const LiveCameraPage: React.FC = () => {
         });
 
         peerRef.current = peer;
+
+        // Also broadcast the backend URL over the SSE relay channel (fallback for phones without P2P)
+        const laptopUrl = api.getBaseUrl();
+        if (laptopUrl) {
+          const urlPayload = JSON.stringify({ type: 'BACKEND_URL', url: laptopUrl });
+          // Push to both channels — phone listens on sh-ctrl when in broadcaster mode
+          fetch(`https://ntfy.sh/sh-ctrl-${roomCode}`, { method: 'POST', body: urlPayload }).catch(() => {});
+          fetch(`https://ntfy.sh/sh-meta-${roomCode}`, { method: 'POST', body: urlPayload }).catch(() => {});
+        }
 
         // Fallback Frame Relay via SSE (guarantees feed even if carrier blocks P2P)
         let eventSource: EventSource | null = null;
@@ -444,6 +463,11 @@ export const LiveCameraPage: React.FC = () => {
           metaSource.onmessage = (e) => {
             try {
               const msg = JSON.parse(e.data);
+              // Laptop sends its saved backend URL to the room so phone can sync it
+              // (This message is also read by the phone's own SSE listener — ignored here by the laptop)
+              if (msg && msg.type === 'BACKEND_URL') {
+                return; // laptop already has the URL; just skip this message
+              }
               if (msg && msg.prediction) {
                 setLatestPrediction(msg.prediction);
                 setTotalFramesScanned((prev) => prev + 1);
@@ -528,6 +552,13 @@ export const LiveCameraPage: React.FC = () => {
           conn.on('open', () => {
             dataConnRef.current = conn;
           });
+          // Receive backend URL from laptop so phone uses the same Colab GPU endpoint
+          conn.on('data', (data: any) => {
+            if (data && data.type === 'BACKEND_URL' && data.url) {
+              api.setBaseUrl(data.url);
+              setBackendOnline(null); // reset so next inference attempt re-checks
+            }
+          });
         } catch (e) {
           console.warn('Call initiation error:', e);
         }
@@ -545,6 +576,19 @@ export const LiveCameraPage: React.FC = () => {
 
       // 2. High-speed Relay Frame Sync
       if (broadcastTimerRef.current) clearInterval(broadcastTimerRef.current);
+
+      // Listen on control channel for backend URL pushed by laptop (SSE fallback when DataChannel is blocked)
+      const ctrlSource = new EventSource(`https://ntfy.sh/sh-ctrl-${roomCode}/raw`);
+      ctrlSource.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg && msg.type === 'BACKEND_URL' && msg.url) {
+            api.setBaseUrl(msg.url);
+            setBackendOnline(null); // trigger re-check on next inference
+          }
+        } catch {}
+      };
+
       broadcastTimerRef.current = setInterval(() => {
         const v = videoRef.current;
         if (!v || v.readyState < 2) return;
