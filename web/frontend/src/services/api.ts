@@ -238,7 +238,9 @@ export const api = {
     formData.append('file', file);
 
     const url = new URL(`${currentApiBaseUrl}/predict/image`);
-    url.searchParams.set('confidence_threshold', String(confidenceThreshold));
+    // Request with base cutoff 0.05 so the frontend slider can dynamically reveal all real candidates
+    const baseCutoff = Math.min(0.05, confidenceThreshold);
+    url.searchParams.set('confidence_threshold', String(baseCutoff));
 
     const res = await fetch(url.toString(), {
       method: 'POST',

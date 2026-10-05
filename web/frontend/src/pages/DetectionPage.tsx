@@ -106,7 +106,7 @@ export const DetectionPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [prediction, setPrediction] = useState<ImagePredictionResponse | null>(null);
-  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.35);
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.20);
   const [dragActive, setDragActive] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -145,20 +145,21 @@ export const DetectionPage: React.FC = () => {
         // Blue bounding box = Rider / Motorcycle when applicable
         const isViolation =
           det.violation ||
-          det.class_name.toLowerCase().includes('no-helmet') ||
-          det.display_name.toLowerCase().includes('without helmet');
+          det.class_name.toLowerCase().includes('without_helmet') ||
+          det.display_name.toLowerCase().includes('without helmet') ||
+          det.class_name.toLowerCase().includes('no-helmet');
+
+        const isWithHelmet =
+          det.class_name.toLowerCase().includes('with_helmet') ||
+          det.display_name.toLowerCase().includes('with helmet');
 
         const isBikeOrRider =
           det.class_name === 'bike' ||
           det.class_name === 'motorcycle' ||
-          det.class_name.includes('rider') ||
-          det.class_name.includes('driver') ||
-          det.class_name.includes('passenger') ||
-          det.display_name.toLowerCase().includes('rider') ||
+          det.class_name === 'driver' ||
+          det.class_name === 'passenger' ||
           det.display_name.toLowerCase().includes('motorcycle') ||
-          det.display_name.toLowerCase().includes('bike') ||
-          det.display_name.toLowerCase().includes('driver') ||
-          det.display_name.toLowerCase().includes('passenger');
+          det.display_name.toLowerCase().includes('bike');
 
         let strokeColor = '#10B981'; // Green = With Helmet
         let fillColor = 'rgba(16, 185, 129, 0.16)';
@@ -166,6 +167,9 @@ export const DetectionPage: React.FC = () => {
         if (isViolation) {
           strokeColor = '#EF4444'; // Red = Without Helmet
           fillColor = 'rgba(239, 68, 68, 0.16)';
+        } else if (isWithHelmet) {
+          strokeColor = '#10B981'; // Green = With Helmet
+          fillColor = 'rgba(16, 185, 129, 0.16)';
         } else if (isBikeOrRider) {
           strokeColor = '#3B82F6'; // Blue = Rider / Motorcycle
           fillColor = 'rgba(59, 130, 246, 0.14)';
@@ -272,7 +276,7 @@ export const DetectionPage: React.FC = () => {
         file: null,
         previewUrl: latestRec.processedImage || null,
         prediction: convertedPrediction,
-        confidenceThreshold: 0.35,
+        confidenceThreshold: 0.20,
         fileName: latestRec.fileName,
         processedImage: latestRec.processedImage
       });
